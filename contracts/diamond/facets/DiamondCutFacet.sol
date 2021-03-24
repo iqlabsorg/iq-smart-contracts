@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.2;
+pragma solidity 0.7.6;
+pragma experimental ABIEncoderV2;
 
 /******************************************************************************\
 * Author: Nick Mudge <nick@perfectabstractions.com> (https://twitter.com/mudgen)
 * EIP-2535 Diamond Standard: https://eips.ethereum.org/EIPS/eip-2535
 /******************************************************************************/
 
-import "../interfaces/IDiamondCut.sol";
-import "../libraries/LibDiamond.sol";
+import '../interfaces/IDiamondCut.sol';
+import '../libraries/LibDiamond.sol';
 
 contract DiamondCutFacet is IDiamondCut {
     /// @notice Add/replace/remove any number of functions and optionally execute

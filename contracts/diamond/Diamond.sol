@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.2;
+pragma solidity 0.7.6;
+pragma experimental ABIEncoderV2;
 
 /******************************************************************************\
 * Author: Nick Mudge <nick@perfectabstractions.com> (https://twitter.com/mudgen)
@@ -8,11 +9,11 @@ pragma solidity 0.8.2;
 * Implementation of a diamond.
 /******************************************************************************/
 
-import "./libraries/LibDiamond.sol";
-import "./interfaces/IDiamondLoupe.sol";
-import "./interfaces/IDiamondCut.sol";
-import "./interfaces/IERC173.sol";
-import "./interfaces/IERC165.sol";
+import './libraries/LibDiamond.sol';
+import './interfaces/IDiamondLoupe.sol';
+import './interfaces/IDiamondCut.sol';
+import './interfaces/IERC173.sol';
+import './interfaces/IERC165.sol';
 
 contract Diamond {
     // more arguments are added to this struct
@@ -43,7 +44,7 @@ contract Diamond {
             ds.slot := position
         }
         address facet = ds.selectorToFacetAndPosition[msg.sig].facetAddress;
-        require(facet != address(0), "Diamond: Function does not exist");
+        require(facet != address(0), 'Diamond: Function does not exist');
         assembly {
             calldatacopy(0, 0, calldatasize())
             let result := delegatecall(gas(), facet, 0, calldatasize(), 0, 0)

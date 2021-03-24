@@ -1,23 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.2;
+pragma solidity 0.7.6;
 
-import "../../erc1155/Address.sol";
-import "../../erc1155/Common.sol";
-import "../../erc1155/IERC1155TokenReceiver.sol";
-import "../../erc1155/IERC1155.sol";
-import "./ERC1155StorageLibrary.sol";
+import '../../erc1155/SafeMath.sol';
+import '../../erc1155/Address.sol';
+import '../../erc1155/Common.sol';
+import '../../erc1155/IERC1155TokenReceiver.sol';
+import '../../erc1155/IERC1155.sol';
+import '../../diamond/libraries/LibDiamond.sol';
+import './ERC1155StorageLibrary.sol';
 
 // A sample implementation of core ERC1155 function.
-contract ERC1155 is IERC1155, ERC165, CommonConstants
-{
+contract ERC1155 is IERC1155, CommonConstants {
+    using SafeMath for uint256;
     using Address for address;
 
-/////////////////////////////////////////// ERC165 //////////////////////////////////////////////
-
-    /*
-        bytes4(keccak256('supportsInterface(bytes4)'));
-    */
-    bytes4 constant private INTERFACE_SIGNATURE_ERC165 = 0x01ffc9a7;
+    /////////////////////////////////////////// ERC165 //////////////////////////////////////////////
 
     /*
         bytes4(keccak256("safeTransferFrom(address,address,uint256,uint256,bytes)")) ^
@@ -27,47 +24,48 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         bytes4(keccak256("setApprovalForAll(address,bool)")) ^
         bytes4(keccak256("isApprovedForAll(address,address)"));
     */
-    bytes4 constant private INTERFACE_SIGNATURE_ERC1155 = 0xd9b67a26;
+    bytes4 private constant INTERFACE_SIGNATURE_ERC1155 = 0xd9b67a26;
 
-    function supportsInterface(bytes4 _interfaceId)
-    override
-    public
-    pure
-    returns (bool) {
-         if (_interfaceId == INTERFACE_SIGNATURE_ERC165 ||
-             _interfaceId == INTERFACE_SIGNATURE_ERC1155) {
-            return true;
-         }
-
-         return false;
+    function initialize() public {
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        ds.supportedInterfaces[INTERFACE_SIGNATURE_ERC1155] = true;
     }
 
-/////////////////////////////////////////// ERC1155 //////////////////////////////////////////////
+    /////////////////////////////////////////// ERC1155 //////////////////////////////////////////////
 
     /**
-        @notice Transfers `_value` amount of an `_id` from the `_from` address to the `_to` address specified (with safety call).
-        @dev Caller must be approved to manage the tokens being transferred out of the `_from` account (see "Approval" section of the standard).
-        MUST revert if `_to` is the zero address.
-        MUST revert if balance of holder for token `_id` is lower than the `_value` sent.
-        MUST revert on any other error.
-        MUST emit the `TransferSingle` event to reflect the balance change (see "Safe Transfer Rules" section of the standard).
-        After the above conditions are met, this function MUST check if `_to` is a smart contract (e.g. code size > 0). If so, it MUST call `onERC1155Received` on `_to` and act appropriately (see "Safe Transfer Rules" section of the standard).
-        @param _from    Source address
-        @param _to      Target address
-        @param _id      ID of the token type
-        @param _value   Transfer amount
-        @param _data    Additional data with no specified format, MUST be sent unaltered in call to `onERC1155Received` on `_to`
-    */
-    function safeTransferFrom(address _from, address _to, uint256 _id, uint256 _value, bytes calldata _data) override external {
+    @notice Transfers `_value` amount of an `_id` from the `_from` address to the `_to` address specified (with safety call).
+    @dev Caller must be approved to manage the tokens being transferred out of the `_from` account (see "Approval" section of the standard).
+    MUST revert if `_to` is the zero address.
+    MUST revert if balance of holder for token `_id` is lower than the `_value` sent.
+    MUST revert on any other error.
+    MUST emit the `TransferSingle` event to reflect the balance change (see "Safe Transfer Rules" section of the standard).
+    After the above conditions are met, this function MUST check if `_to` is a smart contract (e.g. code size > 0). If so, it MUST call `onERC1155Received` on `_to` and act appropriately (see "Safe Transfer Rules" section of the standard).
+    @param _from    Source address
+    @param _to      Target address
+    @param _id      ID of the token type
+    @param _value   Transfer amount
+    @param _data    Additional data with no specified format, MUST be sent unaltered in call to `onERC1155Received` on `_to`
+  */
+    function safeTransferFrom(
+        address _from,
+        address _to,
+        uint256 _id,
+        uint256 _value,
+        bytes calldata _data
+    ) external override {
         ERC1155StorageLibrary.ERC1155Storage storage ds = ERC1155StorageLibrary.erc1155Storage();
 
-        require(_to != address(0x0), "_to must be non-zero.");
-        require(_from == msg.sender || ds.operatorApproval[_from][msg.sender] == true, "Need operator approval for 3rd party transfers.");
+        require(_to != address(0x0), '_to must be non-zero.');
+        require(
+            _from == msg.sender || ds.operatorApproval[_from][msg.sender] == true,
+            'Need operator approval for 3rd party transfers.'
+        );
 
         // SafeMath will throw with insuficient funds _from
         // or if _id is not valid (balance will be 0)
-        ds.balances[_id][_from] -= _value;
-        ds.balances[_id][_to] += _value;
+        ds.balances[_id][_from] = ds.balances[_id][_from].sub(_value);
+        ds.balances[_id][_to] = _value.add(ds.balances[_id][_to]);
 
         // MUST emit event
         emit TransferSingle(msg.sender, _from, _to, _id, _value);
@@ -95,13 +93,22 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         @param _values  Transfer amounts per token type (order and length must match _ids array)
         @param _data    Additional data with no specified format, MUST be sent unaltered in call to the `ERC1155TokenReceiver` hook(s) on `_to`
     */
-    function safeBatchTransferFrom(address _from, address _to, uint256[] calldata _ids, uint256[] calldata _values, bytes calldata _data) override external {
+    function safeBatchTransferFrom(
+        address _from,
+        address _to,
+        uint256[] calldata _ids,
+        uint256[] calldata _values,
+        bytes calldata _data
+    ) external override {
         ERC1155StorageLibrary.ERC1155Storage storage ds = ERC1155StorageLibrary.erc1155Storage();
 
         // MUST Throw on errors
-        require(_to != address(0x0), "destination address must be non-zero.");
-        require(_ids.length == _values.length, "_ids and _values array length must match.");
-        require(_from == msg.sender || ds.operatorApproval[_from][msg.sender] == true, "Need operator approval for 3rd party transfers.");
+        require(_to != address(0x0), 'destination address must be non-zero.');
+        require(_ids.length == _values.length, '_ids and _values array length must match.');
+        require(
+            _from == msg.sender || ds.operatorApproval[_from][msg.sender] == true,
+            'Need operator approval for 3rd party transfers.'
+        );
 
         for (uint256 i = 0; i < _ids.length; ++i) {
             uint256 id = _ids[i];
@@ -109,8 +116,8 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
 
             // SafeMath will throw with insuficient funds _from
             // or if _id is not valid (balance will be 0)
-            ds.balances[id][_from] -= value;
-            ds.balances[id][_to] += value;
+            ds.balances[id][_from] = ds.balances[id][_from].sub(value);
+            ds.balances[id][_to] = value.add(ds.balances[id][_to]);
         }
 
         // Note: instead of the below batch versions of event and acceptance check you MAY have emitted a TransferSingle
@@ -134,7 +141,7 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         @param _id     ID of the Token
         @return        The _owner's balance of the Token type requested
      */
-    function balanceOf(address _owner, uint256 _id) override external view returns (uint256) {
+    function balanceOf(address _owner, uint256 _id) external view override returns (uint256) {
         ERC1155StorageLibrary.ERC1155Storage storage ds = ERC1155StorageLibrary.erc1155Storage();
         // The balance of any account can be calculated from the Transfer events history.
         // However, since we need to keep the balances to validate transfer request,
@@ -142,14 +149,18 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         return ds.balances[_id][_owner];
     }
 
-
     /**
         @notice Get the balance of multiple account/token pairs
         @param _owners The addresses of the token holders
         @param _ids    ID of the Tokens
         @return        The _owner's balance of the Token types requested (i.e. balance for each (owner, id) pair)
      */
-    function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids) override external view returns (uint256[] memory) {
+    function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids)
+        external
+        view
+        override
+        returns (uint256[] memory)
+    {
         ERC1155StorageLibrary.ERC1155Storage storage ds = ERC1155StorageLibrary.erc1155Storage();
 
         require(_owners.length == _ids.length);
@@ -169,7 +180,7 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         @param _operator  Address to add to the set of authorized operators
         @param _approved  True if the operator is approved, false to revoke approval
     */
-    function setApprovalForAll(address _operator, bool _approved) override external {
+    function setApprovalForAll(address _operator, bool _approved) external override {
         ERC1155StorageLibrary.ERC1155Storage storage ds = ERC1155StorageLibrary.erc1155Storage();
         ds.operatorApproval[msg.sender][_operator] = _approved;
 
@@ -182,31 +193,49 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         @param _operator  Address of authorized operator
         @return           True if the operator is approved, false if not
     */
-    function isApprovedForAll(address _owner, address _operator) override external view returns (bool) {
+    function isApprovedForAll(address _owner, address _operator) external view override returns (bool) {
         ERC1155StorageLibrary.ERC1155Storage storage ds = ERC1155StorageLibrary.erc1155Storage();
         return ds.operatorApproval[_owner][_operator];
     }
 
-/////////////////////////////////////////// Internal //////////////////////////////////////////////
+    /////////////////////////////////////////// Internal //////////////////////////////////////////////
 
-    function _doSafeTransferAcceptanceCheck(address _operator, address _from, address _to, uint256 _id, uint256 _value, bytes memory _data) internal {
-
+    function _doSafeTransferAcceptanceCheck(
+        address _operator,
+        address _from,
+        address _to,
+        uint256 _id,
+        uint256 _value,
+        bytes memory _data
+    ) internal {
         // If this was a hybrid standards solution you would have to check ERC165(_to).supportsInterface(0x4e2312e0) here but as this is a pure implementation of an ERC-1155 token set as recommended by
         // the standard, it is not necessary. The below should revert in all failure cases i.e. _to isn't a receiver, or it is and either returns an unknown value or it reverts in the call to indicate non-acceptance.
 
-
         // Note: if the below reverts in the onERC1155Received function of the _to address you will have an undefined revert reason returned rather than the one in the require test.
         // If you want predictable revert reasons consider using low level _to.call() style instead so the revert does not bubble up and you can revert yourself on the ERC1155_ACCEPTED test.
-        require(ERC1155TokenReceiver(_to).onERC1155Received(_operator, _from, _id, _value, _data) == ERC1155_ACCEPTED, "contract returned an unknown value from onERC1155Received");
+        require(
+            ERC1155TokenReceiver(_to).onERC1155Received(_operator, _from, _id, _value, _data) == ERC1155_ACCEPTED,
+            'contract returned an unknown value from onERC1155Received'
+        );
     }
 
-    function _doSafeBatchTransferAcceptanceCheck(address _operator, address _from, address _to, uint256[] memory _ids, uint256[] memory _values, bytes memory _data) internal {
-
+    function _doSafeBatchTransferAcceptanceCheck(
+        address _operator,
+        address _from,
+        address _to,
+        uint256[] memory _ids,
+        uint256[] memory _values,
+        bytes memory _data
+    ) internal {
         // If this was a hybrid standards solution you would have to check ERC165(_to).supportsInterface(0x4e2312e0) here but as this is a pure implementation of an ERC-1155 token set as recommended by
         // the standard, it is not necessary. The below should revert in all failure cases i.e. _to isn't a receiver, or it is and either returns an unknown value or it reverts in the call to indicate non-acceptance.
 
         // Note: if the below reverts in the onERC1155BatchReceived function of the _to address you will have an undefined revert reason returned rather than the one in the require test.
         // If you want predictable revert reasons consider using low level _to.call() style instead so the revert does not bubble up and you can revert yourself on the ERC1155_BATCH_ACCEPTED test.
-        require(ERC1155TokenReceiver(_to).onERC1155BatchReceived(_operator, _from, _ids, _values, _data) == ERC1155_BATCH_ACCEPTED, "contract returned an unknown value from onERC1155BatchReceived");
+        require(
+            ERC1155TokenReceiver(_to).onERC1155BatchReceived(_operator, _from, _ids, _values, _data) ==
+                ERC1155_BATCH_ACCEPTED,
+            'contract returned an unknown value from onERC1155BatchReceived'
+        );
     }
 }

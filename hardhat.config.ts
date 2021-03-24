@@ -11,14 +11,15 @@ task('accounts', 'Prints accounts', async (_, { ethers }) => {
 
 const buidlerConfig: HardhatUserConfig = {
   solidity: {
-    version: '0.8.2',
+    version: '0.7.6',
     settings: {
       optimizer: {
-        enabled: false,
-        runs: 200,
+        enabled: true,
+        runs: 1000,
       },
     },
   },
+  // Typechain fails to create types for DiamondCut event
   // typechain: {
   //   outDir: 'types',
   //   target: 'ethers-v5',

@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.2;
+pragma solidity 0.7.6;
 
-import "./ERC165.sol";
+import './ERC165.sol';
 
 /**
     @title ERC-1155 Multi Token Standard
     @dev See https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1155.md
     Note: The ERC-165 identifier for this interface is 0xd9b67a26.
  */
-interface IERC1155 /* is ERC165 */ {
+/* is ERC165 */
+interface IERC1155 {
     /**
         @dev Either `TransferSingle` or `TransferBatch` MUST emit when tokens are transferred, including zero value transfers as well as minting or burning (see "Safe Transfer Rules" section of the standard).
         The `_operator` argument MUST be msg.sender.
@@ -20,7 +21,13 @@ interface IERC1155 /* is ERC165 */ {
         When minting/creating tokens, the `_from` argument MUST be set to `0x0` (i.e. zero address).
         When burning/destroying tokens, the `_to` argument MUST be set to `0x0` (i.e. zero address).
     */
-    event TransferSingle(address indexed _operator, address indexed _from, address indexed _to, uint256 _id, uint256 _value);
+    event TransferSingle(
+        address indexed _operator,
+        address indexed _from,
+        address indexed _to,
+        uint256 _id,
+        uint256 _value
+    );
 
     /**
         @dev Either `TransferSingle` or `TransferBatch` MUST emit when tokens are transferred, including zero value transfers as well as minting or burning (see "Safe Transfer Rules" section of the standard).
@@ -32,7 +39,13 @@ interface IERC1155 /* is ERC165 */ {
         When minting/creating tokens, the `_from` argument MUST be set to `0x0` (i.e. zero address).
         When burning/destroying tokens, the `_to` argument MUST be set to `0x0` (i.e. zero address).
     */
-    event TransferBatch(address indexed _operator, address indexed _from, address indexed _to, uint256[] _ids, uint256[] _values);
+    event TransferBatch(
+        address indexed _operator,
+        address indexed _from,
+        address indexed _to,
+        uint256[] _ids,
+        uint256[] _values
+    );
 
     /**
         @dev MUST emit when approval for a second party/operator address to manage all tokens for an owner address is enabled or disabled (absense of an event assumes disabled).
@@ -60,7 +73,13 @@ interface IERC1155 /* is ERC165 */ {
         @param _value   Transfer amount
         @param _data    Additional data with no specified format, MUST be sent unaltered in call to `onERC1155Received` on `_to`
     */
-    function safeTransferFrom(address _from, address _to, uint256 _id, uint256 _value, bytes calldata _data) external;
+    function safeTransferFrom(
+        address _from,
+        address _to,
+        uint256 _id,
+        uint256 _value,
+        bytes calldata _data
+    ) external;
 
     /**
         @notice Transfers `_values` amount(s) of `_ids` from the `_from` address to the `_to` address specified (with safety call).
@@ -78,7 +97,13 @@ interface IERC1155 /* is ERC165 */ {
         @param _values  Transfer amounts per token type (order and length must match _ids array)
         @param _data    Additional data with no specified format, MUST be sent unaltered in call to the `ERC1155TokenReceiver` hook(s) on `_to`
     */
-    function safeBatchTransferFrom(address _from, address _to, uint256[] calldata _ids, uint256[] calldata _values, bytes calldata _data) external;
+    function safeBatchTransferFrom(
+        address _from,
+        address _to,
+        uint256[] calldata _ids,
+        uint256[] calldata _values,
+        bytes calldata _data
+    ) external;
 
     /**
         @notice Get the balance of an account's Tokens.
@@ -94,7 +119,10 @@ interface IERC1155 /* is ERC165 */ {
         @param _ids    ID of the Tokens
         @return        The _owner's balance of the Token types requested (i.e. balance for each (owner, id) pair)
      */
-    function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids) external view returns (uint256[] memory);
+    function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids)
+        external
+        view
+        returns (uint256[] memory);
 
     /**
         @notice Enable or disable approval for a third party ("operator") to manage all of the caller's tokens.

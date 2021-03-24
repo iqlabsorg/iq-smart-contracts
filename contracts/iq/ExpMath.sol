@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.7.6;
+
+library ExpMath {
+    uint256 private constant BASE = 144;
+    uint256 private constant ONE = 1 << BASE;
+    uint256 private constant LOG_ONE_HALF = 15457698658747239244624307340191628289589491; // log(0.5) * 2 ** 144
+
+    // TODO: adapt to uint32, uint112, uint32, uint32
+    function halfLife(
+        uint256 t0,
+        uint256 c0,
+        uint256 t12,
+        uint256 t
+    ) internal pure returns (uint256) {
+        require(t - t0 < 2**BASE, 'Period bit size is over 144 bit');
+        require(c0 < 2**112, 'C0 bit size is over 112 bit');
+        require(t >= t0, 'Invalid period');
+        t -= t0;
+        c0 >>= t / t12;
+        t %= t12;
+        if (t == 0 || c0 == 0) return c0;
+
+        uint256 sum = 0;
+        uint256 z = c0;
+        uint256 x = (LOG_ONE_HALF * t) / t12;
+        uint256 i = ONE;
+
+        while (z != 0) {
+            sum += z;
+            z = (z * x) / i;
+            i += ONE;
+            sum -= z;
+            z = (z * x) / i;
+            i += ONE;
+        }
+        return sum;
+    }
+}
