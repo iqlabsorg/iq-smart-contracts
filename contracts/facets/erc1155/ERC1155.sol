@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.7.6;
 
-import '../../erc1155/SafeMath.sol';
-import '../../erc1155/Address.sol';
-import '../../erc1155/Common.sol';
-import '../../erc1155/IERC1155TokenReceiver.sol';
-import '../../erc1155/IERC1155.sol';
-import '../../diamond/libraries/LibDiamond.sol';
-import './ERC1155StorageLibrary.sol';
+import "../../erc1155/SafeMath.sol";
+import "../../erc1155/Address.sol";
+import "../../erc1155/Common.sol";
+import "../../erc1155/IERC1155TokenReceiver.sol";
+import "../../erc1155/IERC1155.sol";
+import "../../diamond/libraries/LibDiamond.sol";
+import "./ERC1155StorageLibrary.sol";
 
 // A sample implementation of core ERC1155 function.
 contract ERC1155 is IERC1155, CommonConstants {
@@ -56,10 +56,10 @@ contract ERC1155 is IERC1155, CommonConstants {
     ) external override {
         ERC1155StorageLibrary.ERC1155Storage storage ds = ERC1155StorageLibrary.erc1155Storage();
 
-        require(_to != address(0x0), '_to must be non-zero.');
+        require(_to != address(0x0), "_to must be non-zero.");
         require(
             _from == msg.sender || ds.operatorApproval[_from][msg.sender] == true,
-            'Need operator approval for 3rd party transfers.'
+            "Need operator approval for 3rd party transfers."
         );
 
         // SafeMath will throw with insuficient funds _from
@@ -103,11 +103,11 @@ contract ERC1155 is IERC1155, CommonConstants {
         ERC1155StorageLibrary.ERC1155Storage storage ds = ERC1155StorageLibrary.erc1155Storage();
 
         // MUST Throw on errors
-        require(_to != address(0x0), 'destination address must be non-zero.');
-        require(_ids.length == _values.length, '_ids and _values array length must match.');
+        require(_to != address(0x0), "destination address must be non-zero.");
+        require(_ids.length == _values.length, "_ids and _values array length must match.");
         require(
             _from == msg.sender || ds.operatorApproval[_from][msg.sender] == true,
-            'Need operator approval for 3rd party transfers.'
+            "Need operator approval for 3rd party transfers."
         );
 
         for (uint256 i = 0; i < _ids.length; ++i) {
@@ -215,7 +215,7 @@ contract ERC1155 is IERC1155, CommonConstants {
         // If you want predictable revert reasons consider using low level _to.call() style instead so the revert does not bubble up and you can revert yourself on the ERC1155_ACCEPTED test.
         require(
             ERC1155TokenReceiver(_to).onERC1155Received(_operator, _from, _id, _value, _data) == ERC1155_ACCEPTED,
-            'contract returned an unknown value from onERC1155Received'
+            "contract returned an unknown value from onERC1155Received"
         );
     }
 
@@ -235,7 +235,7 @@ contract ERC1155 is IERC1155, CommonConstants {
         require(
             ERC1155TokenReceiver(_to).onERC1155BatchReceived(_operator, _from, _ids, _values, _data) ==
                 ERC1155_BATCH_ACCEPTED,
-            'contract returned an unknown value from onERC1155BatchReceived'
+            "contract returned an unknown value from onERC1155BatchReceived"
         );
     }
 }

@@ -2,7 +2,7 @@
 pragma solidity 0.7.6;
 
 library ERC1155StorageLibrary {
-    bytes32 constant ERC1155_STORAGE_POSITION = keccak256('iq.protocol.erc1155');
+    bytes32 constant ERC1155_STORAGE_POSITION = keccak256("iq.protocol.erc1155");
 
     struct ERC1155Storage {
         mapping(uint256 => mapping(address => uint256)) balances;

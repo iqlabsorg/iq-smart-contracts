@@ -7,8 +7,8 @@ pragma experimental ABIEncoderV2;
 * EIP-2535 Diamond Standard: https://eips.ethereum.org/EIPS/eip-2535
 /******************************************************************************/
 
-import '../interfaces/IDiamondCut.sol';
-import '../libraries/LibDiamond.sol';
+import "../interfaces/IDiamondCut.sol";
+import "../libraries/LibDiamond.sol";
 
 contract DiamondCutFacet is IDiamondCut {
     /// @notice Add/replace/remove any number of functions and optionally execute

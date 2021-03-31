@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.7.6;
 
-import './Common.sol';
-import './IERC1155TokenReceiver.sol';
+import "./Common.sol";
+import "./IERC1155TokenReceiver.sol";
 
 // Contract to test safe transfer behavior.
 contract ERC1155MockReceiver is ERC1155TokenReceiver, CommonConstants {
@@ -31,7 +32,7 @@ contract ERC1155MockReceiver is ERC1155TokenReceiver, CommonConstants {
         lastValue = _value;
         lastData = _data;
         if (shouldReject == true) {
-            revert('onERC1155Received: transfer not accepted');
+            revert("onERC1155Received: transfer not accepted");
         } else {
             return ERC1155_ACCEPTED;
         }
@@ -50,14 +51,14 @@ contract ERC1155MockReceiver is ERC1155TokenReceiver, CommonConstants {
         lastValue = _values[0];
         lastData = _data;
         if (shouldReject == true) {
-            revert('onERC1155BatchReceived: transfer not accepted');
+            revert("onERC1155BatchReceived: transfer not accepted");
         } else {
             return ERC1155_BATCH_ACCEPTED;
         }
     }
 
     // ERC165 interface support
-    function supportsInterface(bytes4 interfaceID) external view returns (bool) {
+    function supportsInterface(bytes4 interfaceID) external pure returns (bool) {
         return
             interfaceID == 0x01ffc9a7 || // ERC165
             interfaceID == 0x4e2312e0; // ERC1155_ACCEPTED ^ ERC1155_BATCH_ACCEPTED;

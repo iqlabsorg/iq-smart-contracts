@@ -6,16 +6,15 @@ library ExpMath {
     uint256 private constant ONE = 1 << BASE;
     uint256 private constant LOG_ONE_HALF = 15457698658747239244624307340191628289589491; // log(0.5) * 2 ** 144
 
-    // TODO: adapt to uint32, uint112, uint32, uint32
     function halfLife(
-        uint256 t0,
-        uint256 c0,
-        uint256 t12,
-        uint256 t
-    ) internal pure returns (uint256) {
-        require(t - t0 < 2**BASE, 'Period bit size is over 144 bit');
-        require(c0 < 2**112, 'C0 bit size is over 112 bit');
-        require(t >= t0, 'Invalid period');
+        uint32 t0,
+        uint112 c0,
+        uint32 t12,
+        uint32 t
+    ) internal pure returns (uint112) {
+        require(t - t0 < 2**BASE, "Period bit size is over 144 bit");
+        require(c0 < 2**112, "C0 bit size is over 112 bit");
+        require(t >= t0, "Invalid period");
         t -= t0;
         c0 >>= t / t12;
         t %= t12;
@@ -34,6 +33,6 @@ library ExpMath {
             z = (z * x) / i;
             i += ONE;
         }
-        return sum;
+        return uint112(sum);
     }
 }

@@ -2,62 +2,106 @@
 
 pragma solidity 0.7.6;
 
-import './ExpMath.sol';
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "./ERC1155Base.sol";
 
-/* is ERC1155 */
-contract PowerToken {
+contract PowerToken is ERC1155Base {
+    using SafeERC20 for ERC20;
+
     struct State {
-        uint256 balance;
-        uint256 energy;
-        uint256 timestamp;
+        uint112 balance;
+        uint112 energy;
+        uint32 timestamp;
     }
 
-    uint256 public halfLife;
-    mapping(uint256 => mapping(address => uint256)) private balances;
+    uint32 public halfLife;
+
     mapping(address => State) private states;
 
-    function safeTransferFrom(
-        address _from,
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        string memory _baseUri,
+        uint32 _halfLife
+    ) ERC1155Base(_name, _symbol, _baseUri) {
+        halfLife = _halfLife;
+    }
+
+    function mint(
         address _to,
         uint256 _id,
         uint256 _value,
-        bytes calldata _data
-    ) external {
-        require(_to != address(0x0), '_to must be non-zero.');
+        bytes memory _data
+    ) external onlyOwner {
+        //TODO: checks
+        _mint(_to, _id, uint112(_value), _data);
+    }
+
+    function burn(
+        address _account,
+        uint256 _id,
+        uint256 _value
+    ) external onlyOwner {
         require(
-            _from == msg.sender, //TODO: || ds.operatorApproval[_from][msg.sender] == true,
-            'Need operator approval for 3rd party transfers.'
+            _account == msg.sender || isApprovedForAll(_account, msg.sender),
+            "ERC1155: caller is not owner nor approved"
         );
 
-        State storage fromState = states[_from];
-        State storage toState = states[_to];
+        _burn(_account, _id, _value);
+    }
 
-        fromState.energy = getEnergy(fromState, block.timestamp);
-        toState.energy = getEnergy(toState, block.timestamp);
+    function energyAt(address who, uint32 timestamp) public view returns (uint112) {
+        State memory state = states[who];
+        return _getEnergy(state, timestamp);
+    }
 
-        fromState.timestamp = toState.timestamp = block.timestamp;
+    /////////////////////////////////////////// Internal //////////////////////////////////////////////
 
-        fromState.balance -= _value;
-        toState.balance += _value;
+    function _burn(
+        address _from,
+        uint256 _id,
+        uint256 _value
+    ) internal {
+        _onBeforeTransfer(_from, address(0), _id, _value);
 
         balances[_id][_from] -= _value;
-        balances[_id][_to] += _value;
+
+        emit TransferSingle(msg.sender, _from, address(0), _id, _value);
+
+        _doSafeTransferAcceptanceCheck(msg.sender, _from, address(0), _id, _value, "");
     }
 
-    function energyAt(address who, uint256 timestamp) public view returns (uint256) {
-        State storage state = states[who];
-        return getEnergy(state, timestamp);
-    }
-
-    function getEnergy(State storage state, uint256 timestamp) internal view returns (uint256) {
+    function _getEnergy(State memory state, uint32 timestamp) internal view returns (uint112) {
         if (state.balance > state.energy) {
-            return
-                state.balance -
-                ExpMath.halfLife(state.timestamp, state.balance - state.energy, halfLife, timestamp);
+            return state.balance - ExpMath.halfLife(state.timestamp, state.balance - state.energy, halfLife, timestamp);
         } else {
-            return
-                state.balance +
-                ExpMath.halfLife(state.timestamp, state.energy - state.balance, halfLife, timestamp);
+            return state.balance + ExpMath.halfLife(state.timestamp, state.energy - state.balance, halfLife, timestamp);
+        }
+    }
+
+    function _onBeforeTransfer(
+        address _from,
+        address _to,
+        uint256,
+        uint256 _value
+    ) internal override {
+        uint32 timestamp = uint32(block.timestamp);
+
+        if (_from != address(0)) {
+            State memory fromState = states[_from];
+            fromState.energy = _getEnergy(fromState, timestamp);
+            fromState.timestamp = timestamp;
+            fromState.balance -= uint112(_value);
+            states[_from] = fromState;
+        }
+
+        if (_to != address(0)) {
+            State memory toState = states[_to];
+            toState.energy = _getEnergy(toState, timestamp);
+            toState.timestamp = timestamp;
+            toState.balance += uint112(_value);
+            states[_to] = toState;
         }
     }
 }

@@ -7,10 +7,10 @@ pragma experimental ABIEncoderV2;
 * EIP-2535 Diamond Standard: https://eips.ethereum.org/EIPS/eip-2535
 /******************************************************************************/
 
-import '../libraries/LibDiamond.sol';
-import '../interfaces/IDiamondCut.sol';
-import '../interfaces/IDiamondLoupe.sol';
-import '../interfaces/IERC165.sol';
+import "../libraries/LibDiamond.sol";
+import "../interfaces/IDiamondCut.sol";
+import "../interfaces/IDiamondLoupe.sol";
+import "../interfaces/IERC165.sol";
 
 contract DiamondLoupeFacet is IDiamondLoupe, IERC165 {
     // Diamond Loupe Functions

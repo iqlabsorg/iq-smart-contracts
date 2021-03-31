@@ -2,7 +2,7 @@
 pragma solidity 0.7.6;
 
 library ERC1155MintableStorageLibrary {
-    bytes32 constant ERC1155_MINTABLE_STORAGE_POSITION = keccak256('iq.protocol.erc1155.mintable');
+    bytes32 constant ERC1155_MINTABLE_STORAGE_POSITION = keccak256("iq.protocol.erc1155.mintable");
 
     struct ERC1155MintableStorage {
         mapping(uint256 => address) creators;

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.7.6;
 
-import '../../erc1155/SafeMath.sol';
-import '../../erc1155/Address.sol';
-import './ERC1155.sol';
-import './ERC1155MintableStorageLibrary.sol';
+import "../../erc1155/SafeMath.sol";
+import "../../erc1155/Address.sol";
+import "./ERC1155.sol";
+import "./ERC1155MintableStorageLibrary.sol";
 
 /**
     @dev Mintable form of ERC1155
@@ -64,7 +64,7 @@ contract ERC1155Mintable is ERC1155 {
             emit TransferSingle(msg.sender, address(0x0), to, _id, quantity);
 
             if (to.isContract()) {
-                _doSafeTransferAcceptanceCheck(msg.sender, msg.sender, to, _id, quantity, '');
+                _doSafeTransferAcceptanceCheck(msg.sender, msg.sender, to, _id, quantity, "");
             }
         }
     }
