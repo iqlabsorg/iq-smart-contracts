@@ -23,7 +23,6 @@ contract RentingPool is Ownable {
 
     struct State {
         uint112 plannedBalance;
-        uint112 acquiredBalance;
         uint32 timestamp;
     }
 
@@ -31,11 +30,13 @@ contract RentingPool is Ownable {
     InterestToken public iToken;
     uint256 public reserve;
     uint256 public availableReserve;
+    uint256 public totalShares;
     string public baseUri;
     mapping(PowerToken => Service) public services;
     mapping(address => mapping(uint32 => mapping(uint8 => State))) public states;
     mapping(address => int16) public supportedInterestTokensIndex;
     address[] public supportedInterestTokens;
+    mapping(address => uint112) public collectedInterest;
 
     constructor(ERC20 _liquidityToken, string memory _baseUri) {
         liquidityToken = _liquidityToken;
@@ -135,7 +136,7 @@ contract RentingPool is Ownable {
                 ? type(uint112).max
                 : uint112(UintInterestInLiquidityTokens);
 
-        return convert(interestInLiquidityTokens, _interestPaymentToken);
+        return convertTo(interestInLiquidityTokens, _interestPaymentToken);
     }
 
     function burn(
@@ -143,6 +144,7 @@ contract RentingPool is Ownable {
         uint256 _tokenId,
         uint112 _amount
     ) external {
+        //TODO: allow burn other users token (if it is expired)
         uint256 balance = _powerToken.balanceOf(msg.sender, _tokenId);
         require(_amount <= balance, "Can't burn more that balance");
 
@@ -181,11 +183,60 @@ contract RentingPool is Ownable {
         );
     }
 
-    function convert(uint112 _liquidityAmount, ERC20 _payment) internal view returns (uint112) {
+    function convertTo(uint112 _liquidityAmount, ERC20 _payment) internal view returns (uint112) {
         //TODO: apply convertation
         require(address(_payment) == address(liquidityToken), "Other payment options are not supported yet");
 
         return _liquidityAmount;
+    }
+
+    function convertFrom(uint112 _interestAmount, ERC20 _payment) internal view returns (uint112) {
+        //TODO: apply convertation
+        require(address(_payment) == address(liquidityToken), "Other payment options are not supported yet");
+
+        return _interestAmount;
+    }
+
+    function lend(uint256 _liquidityAmount, uint32 _halfWithdrawPeriod) external {
+        liquidityToken.safeTransferFrom(msg.sender, address(this), _liquidityAmount);
+
+        uint256 totalLiquidity = getTotalLiquidity();
+        uint256 newShares = (totalShares * _liquidityAmount) / totalLiquidity;
+        uint256 tokenId = _halfWithdrawPeriod;
+
+        iToken.mint(msg.sender, tokenId, newShares);
+        totalShares += newShares;
+
+        reserve += _liquidityAmount;
+        availableReserve += _liquidityAmount;
+    }
+
+    function withdrawLiquidity(
+        uint256 _sharesAmount,
+        uint256 _tokenId,
+        address _interestToken
+    ) external {
+        uint256 balance = iToken.balanceOf(msg.sender, _tokenId);
+        require(balance >= _sharesAmount, "Insufficient balance");
+
+        uint256 liquidityWithInterest = (getTotalLiquidity() * _sharesAmount) / totalShares;
+        require(_interestToken == address(liquidityToken), "Not supported yet");
+        require(liquidityWithInterest <= availableReserve, "Insufficient liquidity");
+
+        liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
+
+        reserve -= liquidityWithInterest;
+        availableReserve -= liquidityWithInterest;
+    }
+
+    function getTotalLiquidity() internal view returns (uint256 result) {
+        result = reserve;
+        uint256 n = supportedInterestTokens.length;
+        for (uint256 i = 0; i < n; i++) {
+            address tokenAddress = supportedInterestTokens[i];
+
+            result += convertFrom(collectedInterest[tokenAddress], ERC20(tokenAddress));
+        }
     }
 
     function _updateState(uint256 _tokenId) internal returns (State storage state) {
@@ -194,14 +245,24 @@ contract RentingPool is Ownable {
         uint32 duration = uint32(to - from);
 
         state = states[interestPaymentToken][duration][curvature];
-        state.acquiredBalance =
+
+        uint112 interest =
             state.plannedBalance -
-            ExpMath.halfLife(
-                state.timestamp,
-                state.plannedBalance - state.acquiredBalance,
-                duration / curvature,
-                uint32(block.timestamp - state.timestamp)
-            );
+                ExpMath.halfLife(
+                    state.timestamp,
+                    state.plannedBalance,
+                    duration / curvature,
+                    uint32(block.timestamp - state.timestamp)
+                );
+
+        if (interestPaymentToken == address(liquidityToken)) {
+            reserve += interest;
+            availableReserve += interest;
+        } else {
+            collectedInterest[interestPaymentToken] += interest;
+        }
+
+        state.plannedBalance -= interest;
         state.timestamp = uint32(block.timestamp);
     }
 
