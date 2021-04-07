@@ -43,11 +43,6 @@ contract PowerToken is ERC1155Base {
         uint256 _id,
         uint256 _value
     ) external onlyOwner {
-        require(
-            _account == msg.sender || isApprovedForAll(_account, msg.sender),
-            "ERC1155: caller is not owner nor approved"
-        );
-
         _burn(_account, _id, _value);
     }
 

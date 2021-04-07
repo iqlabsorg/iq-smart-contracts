@@ -2,8 +2,7 @@
 pragma solidity 0.7.6;
 
 library ExpMath {
-    uint256 private constant BASE = 144;
-    uint256 private constant ONE = 1 << BASE;
+    uint256 private constant ONE = 1 << 144;
     uint256 private constant LOG_ONE_HALF = 15457698658747239244624307340191628289589491; // log(0.5) * 2 ** 144
 
     function halfLife(
@@ -12,8 +11,6 @@ library ExpMath {
         uint32 t12,
         uint32 t
     ) internal pure returns (uint112) {
-        require(t - t0 < 2**BASE, "Period bit size is over 144 bit");
-        require(c0 < 2**112, "C0 bit size is over 112 bit");
         require(t >= t0, "Invalid period");
         t -= t0;
         c0 >>= t / t12;

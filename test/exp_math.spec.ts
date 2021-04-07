@@ -16,7 +16,7 @@ describe('ExpMath', function () {
   });
 
   ([
-    // t0     c0      t12   t    exp   delta
+    // t0     c0      t12   t    exp
     [100n, 1000, 20n, 120n, 500],
     [100n, 1000, 20n, 140n, 250],
     [100n, 1000, 20n, 110n, Math.sqrt(1000 * 500)],

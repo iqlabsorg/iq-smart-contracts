@@ -1,7 +1,8 @@
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { ethers } from 'hardhat';
 import { FacetCutAction, getSelectors } from './utils';
 
-export async function deploy() {
+export async function deployDiamond() {
   const [admin] = await ethers.getSigners();
   const ERC1155Mintable = await ethers.getContractFactory('ERC1155Mintable');
   const erc1155Proxy = await ERC1155Mintable.deploy();
@@ -26,4 +27,10 @@ export async function deploy() {
     }
   );
   console.log('Diamond deployed to:', diamond.address);
+}
+
+export async function deploy(account: SignerWithAddress, liquidityToken: string, baseUri: string) {
+  const RentingPool = await ethers.getContractFactory('RentingPool', account);
+  const pool = await RentingPool.deploy(liquidityToken, baseUri);
+  return pool;
 }

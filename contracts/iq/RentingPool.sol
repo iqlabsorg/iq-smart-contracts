@@ -38,11 +38,36 @@ contract RentingPool is Ownable {
     address[] public supportedInterestTokens;
     mapping(address => uint112) public collectedInterest;
 
-    constructor(ERC20 _liquidityToken, string memory _baseUri) {
-        liquidityToken = _liquidityToken;
-        baseUri = _baseUri;
-        _enableInterestToken(address(_liquidityToken));
+    event ServiceRegistered(
+        address indexed powerToken,
+        uint32 halfLife,
+        uint112 factor,
+        uint32 interestRateHalvingPeriod
+    );
+
+    event Borrowed(address indexed powerToken, uint256 tokenId);
+
+    constructor(ERC20 liquidityToken_, string memory baseUri_) {
+        liquidityToken = liquidityToken_;
+        baseUri = baseUri_;
+        _enableInterestToken(address(liquidityToken_));
+        string memory symbol = liquidityToken_.symbol();
+
+        string memory iname = string(abi.encodePacked("Interest Bearing ", symbol));
+        string memory isymbol = string(abi.encodePacked("i", symbol));
+
+        iToken = new InterestToken(this, iname, isymbol, baseUri_);
     }
+
+    // Test sequence
+    // 1. Mint tokens
+    // 2. Create service
+    // 2.1. Approvals
+    // 3. Lend
+    // 4. Borrow
+    // 5. Burn
+    // 6. Withdraw all
+    // 7. Profit!
 
     function registerService(
         string memory _name,
@@ -62,6 +87,9 @@ contract RentingPool is Ownable {
         services[powerToken].allowedRefundCurvatures = _allowedRefundCurvatures;
         services[powerToken].factor = _factor;
         services[powerToken].interestRateHalvingPeriod = _interestRateHalvingPeriod;
+        services[powerToken].lastDeal = uint32(block.timestamp);
+
+        emit ServiceRegistered(address(powerToken), _halfLife, _factor, _interestRateHalvingPeriod);
     }
 
     function borrow(
@@ -78,7 +106,7 @@ contract RentingPool is Ownable {
         );
         require(isAllowedLoanDuration(_powerToken, _duration), "Duration not allowed");
         require(isAllowedRefundCurvatures(_powerToken, _refundCurvature), "Curvature not allowed");
-        require(availableReserve >= _amount, "Insufficient reserves");
+        require(_amount <= availableReserve, "Insufficient reserves");
 
         uint112 interest =
             estimateBorrow(
@@ -109,6 +137,8 @@ contract RentingPool is Ownable {
 
         State storage state = _updateState(tokenId);
         state.plannedBalance += interest;
+
+        emit Borrowed(address(_powerToken), tokenId);
     }
 
     function estimateBorrow(
@@ -121,9 +151,9 @@ contract RentingPool is Ownable {
     ) public view returns (uint112) {
         require(isAllowedLoanDuration(_powerToken, _duration), "Duration not allowed");
         require(isAllowedRefundCurvatures(_powerToken, _refundCurvature), "Curvature not allowed");
-        require(_amount > availableReserve, "Too low available reserves");
+        require(_amount <= availableReserve, "Too low available reserves");
 
-        Service storage service = services[_powerToken];
+        Service memory service = services[_powerToken];
 
         uint112 C0 = uint112((uint256(_amount) * _duration * service.factor) >> (112 - _refundCurvature));
         uint112 halfLife =
@@ -170,7 +200,7 @@ contract RentingPool is Ownable {
         uint32 _estimateAt
     ) public view returns (address paymentToken, uint112 amount) {
         (uint32 from, uint32 to, uint8 curvature, uint16 tokenIndex, uint112 interest) = _extractTokenId(_tokenId);
-        paymentToken = supportedInterestTokens[tokenIndex];
+        paymentToken = supportedInterestTokens[tokenIndex - 1];
 
         uint256 balance = _powerToken.balanceOf(_tokenHolder, _tokenId);
         if (balance == 0) {
@@ -200,15 +230,15 @@ contract RentingPool is Ownable {
     function lend(uint256 _liquidityAmount, uint32 _halfWithdrawPeriod) external {
         liquidityToken.safeTransferFrom(msg.sender, address(this), _liquidityAmount);
 
+        reserve += _liquidityAmount;
+        availableReserve += _liquidityAmount;
+
         uint256 totalLiquidity = getTotalLiquidity();
         uint256 newShares = (totalShares * _liquidityAmount) / totalLiquidity;
         uint256 tokenId = _halfWithdrawPeriod;
 
         iToken.mint(msg.sender, tokenId, newShares);
         totalShares += newShares;
-
-        reserve += _liquidityAmount;
-        availableReserve += _liquidityAmount;
     }
 
     function withdrawLiquidity(
@@ -241,19 +271,14 @@ contract RentingPool is Ownable {
 
     function _updateState(uint256 _tokenId) internal returns (State storage state) {
         (uint32 from, uint32 to, uint8 curvature, uint16 tokenIndex, ) = _extractTokenId(_tokenId);
-        address interestPaymentToken = supportedInterestTokens[tokenIndex];
+        address interestPaymentToken = supportedInterestTokens[tokenIndex - 1];
         uint32 duration = uint32(to - from);
 
         state = states[interestPaymentToken][duration][curvature];
 
         uint112 interest =
             state.plannedBalance -
-                ExpMath.halfLife(
-                    state.timestamp,
-                    state.plannedBalance,
-                    duration / curvature,
-                    uint32(block.timestamp - state.timestamp)
-                );
+                ExpMath.halfLife(state.timestamp, state.plannedBalance, duration / curvature, uint32(block.timestamp));
 
         if (interestPaymentToken == address(liquidityToken)) {
             reserve += interest;
