@@ -1,7 +1,8 @@
 import { task } from 'hardhat/config';
 import 'solidity-coverage';
-// import 'hardhat-typechain';
+import '@typechain/hardhat';
 import '@nomiclabs/hardhat-waffle';
+import 'hardhat-log-remover';
 import { HardhatUserConfig } from 'hardhat/types';
 
 // task action function receives the Hardhat Runtime Environment as second argument
@@ -19,11 +20,10 @@ const buidlerConfig: HardhatUserConfig = {
       },
     },
   },
-  // Typechain fails to create types for DiamondCut event
-  // typechain: {
-  //   outDir: 'types',
-  //   target: 'ethers-v5',
-  // },
+  typechain: {
+    outDir: 'types',
+    target: 'ethers-v5',
+  },
   defaultNetwork: 'hardhat',
   networks: {
     hardhat: {},
