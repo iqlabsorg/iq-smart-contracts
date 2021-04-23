@@ -1,42 +1,100 @@
-import { task } from 'hardhat/config';
-import 'solidity-coverage';
+import 'dotenv/config';
+import {HardhatUserConfig} from 'hardhat/types';
+import 'hardhat-deploy';
+import '@nomiclabs/hardhat-ethers';
+import 'hardhat-gas-reporter';
 import '@typechain/hardhat';
-import '@nomiclabs/hardhat-waffle';
-import 'hardhat-log-remover';
-import { HardhatUserConfig } from 'hardhat/types';
+import 'solidity-coverage';
+import 'hardhat-contract-sizer';
+import {node_url, accounts} from './utils/network';
 
-// task action function receives the Hardhat Runtime Environment as second argument
-task('accounts', 'Prints accounts', async (_, { ethers }) => {
-  console.log(await ethers.getSigners());
-});
-
-const buidlerConfig: HardhatUserConfig = {
+const config: HardhatUserConfig = {
   solidity: {
     version: '0.7.6',
     settings: {
       optimizer: {
         enabled: true,
-        runs: 1000,
+        runs: 200,
       },
     },
   },
-  typechain: {
-    outDir: 'types',
-    target: 'ethers-v5',
+  contractSizer: {
+    runOnCompile: true,
+    disambiguatePaths: false,
   },
-  defaultNetwork: 'hardhat',
+  namedAccounts: {
+    deployer: 0,
+  },
   networks: {
-    hardhat: {},
+    hardhat: {
+      // process.env.HARDHAT_FORK will specify the network that the fork is made from.
+      // this line ensure the use of the corresponding accounts
+      accounts: accounts(process.env.HARDHAT_FORK),
+      forking: process.env.HARDHAT_FORK
+        ? {
+            url: node_url(process.env.HARDHAT_FORK),
+            blockNumber: process.env.HARDHAT_FORK_NUMBER
+              ? parseInt(process.env.HARDHAT_FORK_NUMBER)
+              : undefined,
+          }
+        : undefined,
+    },
+    localhost: {
+      url: node_url('localhost'),
+      accounts: accounts(),
+    },
+    staging: {
+      url: node_url('rinkeby'),
+      accounts: accounts('rinkeby'),
+    },
+    production: {
+      url: node_url('mainnet'),
+      accounts: accounts('mainnet'),
+    },
+    mainnet: {
+      url: node_url('mainnet'),
+      accounts: accounts('mainnet'),
+    },
+    rinkeby: {
+      url: node_url('rinkeby'),
+      accounts: accounts('rinkeby'),
+    },
+    kovan: {
+      url: node_url('kovan'),
+      accounts: accounts('kovan'),
+    },
+    goerli: {
+      url: node_url('goerli'),
+      accounts: accounts('goerli'),
+    },
   },
   paths: {
-    sources: './contracts',
-    tests: './test',
-    cache: './cache',
-    artifacts: './artifacts',
+    sources: 'contracts',
+  },
+  gasReporter: {
+    currency: 'USD',
+    gasPrice: 100,
+    enabled: process.env.REPORT_GAS ? true : false,
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
+    maxMethodDiff: 10,
+  },
+  typechain: {
+    outDir: 'typechain',
+    target: 'ethers-v5',
   },
   mocha: {
-    timeout: 20000,
+    timeout: 0,
   },
+  external: process.env.HARDHAT_FORK
+    ? {
+        deployments: {
+          // process.env.HARDHAT_FORK will specify the network that the fork is made from.
+          // these lines allow it to fetch the deployments from the network being forked from both for node and deploy task
+          hardhat: ['deployments/' + process.env.HARDHAT_FORK],
+          localhost: ['deployments/' + process.env.HARDHAT_FORK],
+        },
+      }
+    : undefined,
 };
 
-export default buidlerConfig;
+export default config;

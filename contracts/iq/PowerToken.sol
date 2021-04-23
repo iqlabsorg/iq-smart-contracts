@@ -2,13 +2,9 @@
 
 pragma solidity 0.7.6;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./ERC1155Base.sol";
 
 contract PowerToken is ERC1155Base {
-    using SafeERC20 for ERC20;
-
     struct State {
         uint112 balance;
         uint112 energy;

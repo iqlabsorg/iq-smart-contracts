@@ -1,11 +1,18 @@
 {
   "compilerOptions": {
-    "target": "es2020",
+    "target": "es5",
     "module": "commonjs",
     "strict": true,
     "esModuleInterop": true,
+    "moduleResolution": "node",
+    "forceConsistentCasingInFileNames": true,
     "outDir": "dist"
   },
-  "include": ["./scripts", "./test"],
-  "files": ["./hardhat.config.ts"]
+  "include": [
+    "hardhat.config.ts",
+    "./scripts",
+    "./deploy",
+    "./test",
+    "typechain/**/*"
+  ]
 }
