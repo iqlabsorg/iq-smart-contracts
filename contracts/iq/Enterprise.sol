@@ -3,14 +3,17 @@ pragma solidity 0.7.6;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import "../token/IERC20Detailed.sol";
-import "./InterestToken.sol";
-import "./PowerToken.sol";
+import "./interfaces/IEnterprise.sol";
+import "./interfaces/IInterestToken.sol";
+import "./interfaces/IPowerToken.sol";
 import "./ExpMath.sol";
 
-contract Enterprise is Ownable {
+contract Enterprise is Ownable, IEnterprise {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Detailed;
+    using Clones for address;
 
     struct Service {
         uint32[] allowedLoanDurations;
@@ -27,14 +30,15 @@ contract Enterprise is Ownable {
         uint32 timestamp;
     }
 
-    IERC20Detailed public immutable liquidityToken;
-    InterestToken public immutable iToken;
+    IERC20Detailed public liquidityToken;
+    IInterestToken public iToken;
+    address private powerTokenImpl;
     uint256 public reserve;
     uint256 public availableReserve;
     uint256 public totalShares;
     string public baseUri;
     string public name;
-    mapping(PowerToken => Service) public services;
+    mapping(IPowerToken => Service) public services;
     mapping(address => mapping(uint32 => mapping(uint8 => State))) public states;
     mapping(address => int16) public supportedInterestTokensIndex;
     address[] public supportedInterestTokens;
@@ -49,11 +53,16 @@ contract Enterprise is Ownable {
 
     event Borrowed(address indexed powerToken, uint256 tokenId);
 
-    constructor(
+    function initialize(
         string memory _name,
         address _liquidityToken,
-        string memory _baseUri
-    ) {
+        string memory _baseUri,
+        address _interestTokenImpl,
+        address _powerTokenImpl
+    ) public override {
+        require(address(liquidityToken) == address(0), "Contract already initialized");
+        require(_liquidityToken != address(0), "Invalid liquidity token address");
+
         liquidityToken = IERC20Detailed(_liquidityToken);
         baseUri = _baseUri;
         name = _name;
@@ -63,7 +72,9 @@ contract Enterprise is Ownable {
         string memory iTokenName = string(abi.encodePacked("Interest Bearing ", symbol));
         string memory iTokenSymbol = string(abi.encodePacked("i", symbol));
 
-        iToken = new InterestToken(this, iTokenName, iTokenSymbol, _baseUri);
+        iToken = IInterestToken(_interestTokenImpl.clone());
+        iToken.initialize(address(this), iTokenName, iTokenSymbol, _baseUri);
+        powerTokenImpl = _powerTokenImpl;
     }
 
     // Test sequence
@@ -88,7 +99,8 @@ contract Enterprise is Ownable {
         string memory tokenSymbol = liquidityToken.symbol();
         string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", _symbol));
 
-        PowerToken powerToken = new PowerToken(_name, powerTokenSymbol, baseUri, _halfLife);
+        IPowerToken powerToken = IPowerToken(powerTokenImpl.clone());
+        powerToken.initialize(_name, powerTokenSymbol, baseUri, _halfLife);
 
         services[powerToken].allowedLoanDurations = _allowedLoanDurations;
         services[powerToken].allowedRefundCurvatures = _allowedRefundCurvatures;
@@ -100,7 +112,7 @@ contract Enterprise is Ownable {
     }
 
     function borrow(
-        PowerToken _powerToken,
+        IPowerToken _powerToken,
         IERC20 _interestPaymentToken,
         uint112 _amount,
         uint256 _maximumInterest,
@@ -149,7 +161,7 @@ contract Enterprise is Ownable {
     }
 
     function estimateBorrow(
-        PowerToken _powerToken,
+        IPowerToken _powerToken,
         IERC20 _interestPaymentToken,
         uint112 _amount,
         uint32 _duration,
@@ -177,7 +189,7 @@ contract Enterprise is Ownable {
     }
 
     function burn(
-        PowerToken _powerToken,
+        IPowerToken _powerToken,
         uint256 _tokenId,
         uint112 _amount
     ) external {
@@ -200,7 +212,7 @@ contract Enterprise is Ownable {
     }
 
     function estimateRefund(
-        PowerToken _powerToken,
+        IPowerToken _powerToken,
         address _tokenHolder,
         uint256 _tokenId,
         uint112 _amountToBurn,
@@ -340,7 +352,7 @@ contract Enterprise is Ownable {
         require(interest > 0, "Invalid interest");
     }
 
-    function isAllowedLoanDuration(PowerToken _token, uint32 _duration) public view returns (bool) {
+    function isAllowedLoanDuration(IPowerToken _token, uint32 _duration) public view returns (bool) {
         Service storage service = services[_token];
         uint256 n = service.allowedLoanDurations.length;
         for (uint256 i = 0; i < n; i++) {
@@ -349,7 +361,7 @@ contract Enterprise is Ownable {
         return false;
     }
 
-    function isAllowedRefundCurvatures(PowerToken _token, uint8 curvature) public view returns (bool) {
+    function isAllowedRefundCurvatures(IPowerToken _token, uint8 curvature) public view returns (bool) {
         Service storage service = services[_token];
         uint256 n = service.allowedRefundCurvatures.length;
         for (uint256 i = 0; i < n; i++) {

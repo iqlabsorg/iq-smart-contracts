@@ -1451,7 +1451,7 @@ chai-ethers@^0.0.1:
   dependencies:
     ethers "^5.0.0"
 
-chai@^4.2.0:
+chai@^4.3.4:
   version "4.3.4"
   resolved "https://registry.yarnpkg.com/chai/-/chai-4.3.4.tgz#b55e655b31e1eac7099be4c08c21964fce2e6c49"
   integrity sha512-yS5H68VYOCtN1cjfwumDSuzn/9c+yza4f3reKXlE5rUg7SFcCEy90gJvydNgOYtblyf4Zi6jIWRnXOgErta0KA==
@@ -2616,7 +2616,7 @@ ethers@^4.0.32, ethers@^4.0.40:
     uuid "2.0.1"
     xmlhttprequest "1.8.0"
 
-ethers@^5.0.0, ethers@^5.1.0:
+ethers@^5.0.0, ethers@^5.1.3:
   version "5.1.3"
   resolved "https://registry.yarnpkg.com/ethers/-/ethers-5.1.3.tgz#68eb48742b8a8ca53480bca2e53fb314c23fea7f"
   integrity sha512-QAj+LG3z5HsK6UDAOdCjDEthWioZ7sTzAcMWyVrQF+ACioalQ99NrrSxIq5qS0c+hoy3TAIjqpYteHgC2Iqy+w==
@@ -3349,7 +3349,7 @@ hardhat-contract-sizer@^2.0.3:
     cli-table3 "^0.6.0"
     colors "^1.4.0"
 
-hardhat-deploy@^0.7.4:
+hardhat-deploy@^0.7.5:
   version "0.7.5"
   resolved "https://registry.yarnpkg.com/hardhat-deploy/-/hardhat-deploy-0.7.5.tgz#d31edcca709e9a8314efeaecb9a35792c295bc77"
   integrity sha512-b+raIZBhrlw3lzkj7La8wyfczgxRsSWo8IHQM4STY4VUw0I/zjjeMm1naIvtGuebdrW/63ADLsucXZUZ8yVLkQ==
@@ -3383,7 +3383,7 @@ hardhat-gas-reporter@^1.0.4:
     eth-gas-reporter "^0.2.20"
     sha1 "^1.1.1"
 
-hardhat@^2.0.10:
+hardhat@^2.2.1:
   version "2.2.1"
   resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.2.1.tgz#bef0031b994e3f60a88d428f2097195c58cf9ed2"
   integrity sha512-8s7MtGXdh0NDwQKdlA8m8QdloVIN1+hv5aFpn0G5Ljj9vfNY9kUoc0a9pMboeGbd9WrS+XrZs5YlsPgQjaW/Tg==

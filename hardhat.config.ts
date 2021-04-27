@@ -14,16 +14,19 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 1000,
       },
     },
   },
   contractSizer: {
-    runOnCompile: true,
+    runOnCompile: process.env.REPORT_SIZE ? true : false,
     disambiguatePaths: false,
   },
   namedAccounts: {
     deployer: 0,
+    user: 1,
+    user2: 2,
+    stranger: 3,
   },
   networks: {
     hardhat: {

@@ -19,20 +19,21 @@ contract ERC1155Base is IERC1155, CommonConstants, ERC1155Metadata_URI {
     mapping(uint256 => mapping(address => uint256)) internal balances;
     mapping(address => mapping(address => bool)) private operatorApprovals;
 
-    constructor(
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not an owner");
+        _;
+    }
+
+    function initialize(
         string memory _name,
         string memory _symbol,
         string memory _baseUri
-    ) {
+    ) internal virtual {
+        require(bytes(name).length == 0, "Contract already initialized");
         name = _name;
         symbol = _symbol;
         baseUri = _baseUri;
         owner = msg.sender;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not an owner");
-        _;
     }
 
     function uri(uint256) public view override returns (string memory) {

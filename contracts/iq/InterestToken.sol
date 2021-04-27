@@ -3,18 +3,19 @@
 pragma solidity 0.7.6;
 
 import "./ERC1155Base.sol";
-import "./Enterprise.sol";
+import "./interfaces/IEnterprise.sol";
 
 contract InterestToken is ERC1155Base {
-    Enterprise public enterprise;
+    IEnterprise public enterprise;
 
-    constructor(
-        Enterprise _enterprise,
+    function initialize(
+        address _enterprise,
         string memory _name,
         string memory _symbol,
         string memory _baseUri
-    ) ERC1155Base(_name, _symbol, _baseUri) {
-        enterprise = _enterprise;
+    ) public {
+        enterprise = IEnterprise(_enterprise);
+        initialize(_name, _symbol, _baseUri);
     }
 
     function mint(
