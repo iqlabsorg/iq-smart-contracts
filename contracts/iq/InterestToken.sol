@@ -2,21 +2,20 @@
 
 pragma solidity 0.7.6;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./ERC1155Base.sol";
-import "./RentingPool.sol";
+import "./interfaces/IEnterprise.sol";
 
 contract InterestToken is ERC1155Base {
-    RentingPool public rentingPool;
+    IEnterprise public enterprise;
 
-    constructor(
-        RentingPool _rentingPool,
+    function initialize(
+        address _enterprise,
         string memory _name,
         string memory _symbol,
         string memory _baseUri
-    ) ERC1155Base(_name, _symbol, _baseUri) {
-        rentingPool = _rentingPool;
+    ) public {
+        enterprise = IEnterprise(_enterprise);
+        initialize(_name, _symbol, _baseUri);
     }
 
     function mint(

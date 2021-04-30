@@ -2,13 +2,10 @@
 
 pragma solidity 0.7.6;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./ERC1155Base.sol";
+import "./interfaces/IPowerToken.sol";
 
-contract PowerToken is ERC1155Base {
-    using SafeERC20 for ERC20;
-
+contract PowerToken is ERC1155Base, IPowerToken {
     struct State {
         uint112 balance;
         uint112 energy;
@@ -19,13 +16,14 @@ contract PowerToken is ERC1155Base {
 
     mapping(address => State) private states;
 
-    constructor(
+    function initialize(
         string memory _name,
         string memory _symbol,
         string memory _baseUri,
         uint32 _halfLife
-    ) ERC1155Base(_name, _symbol, _baseUri) {
+    ) external override {
         halfLife = _halfLife;
+        initialize(_name, _symbol, _baseUri);
     }
 
     function mint(
@@ -33,7 +31,7 @@ contract PowerToken is ERC1155Base {
         uint256 _id,
         uint256 _value,
         bytes memory _data
-    ) external onlyOwner {
+    ) external override onlyOwner {
         //TODO: checks
         _mint(_to, _id, uint112(_value), _data);
     }
@@ -42,7 +40,7 @@ contract PowerToken is ERC1155Base {
         address _account,
         uint256 _id,
         uint256 _value
-    ) external onlyOwner {
+    ) external override onlyOwner {
         _burn(_account, _id, _value);
     }
 

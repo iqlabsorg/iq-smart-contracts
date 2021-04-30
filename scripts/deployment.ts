@@ -1,6 +1,7 @@
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { ethers } from 'hardhat';
-import { FacetCutAction, getSelectors } from './utils';
+import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
+import {ethers} from 'hardhat';
+import {Enterprise} from '../typechain';
+import {FacetCutAction, getSelectors} from './utils';
 
 export async function deployDiamond() {
   const [admin] = await ethers.getSigners();
@@ -9,7 +10,9 @@ export async function deployDiamond() {
   // We get the contract to deploy
   const DiamondCutFacet = await ethers.getContractFactory('DiamondCutFacet');
   const diamondCutFacetProxy = await DiamondCutFacet.deploy();
-  const DiamondLoupeFacet = await ethers.getContractFactory('DiamondLoupeFacet');
+  const DiamondLoupeFacet = await ethers.getContractFactory(
+    'DiamondLoupeFacet'
+  );
   const diamondLoupeFacetProxy = await DiamondLoupeFacet.deploy();
   const OwnershipFacet = await ethers.getContractFactory('OwnershipFacet');
   const ownershipFacetProxy = await OwnershipFacet.deploy();
@@ -17,9 +20,21 @@ export async function deployDiamond() {
   const Diamond = await ethers.getContractFactory('Diamond');
   const diamond = await Diamond.deploy(
     [
-      [diamondCutFacetProxy.address, FacetCutAction.Add, getSelectors(diamondCutFacetProxy)],
-      [diamondLoupeFacetProxy.address, FacetCutAction.Add, getSelectors(diamondLoupeFacetProxy)],
-      [ownershipFacetProxy.address, FacetCutAction.Add, getSelectors(ownershipFacetProxy)],
+      [
+        diamondCutFacetProxy.address,
+        FacetCutAction.Add,
+        getSelectors(diamondCutFacetProxy),
+      ],
+      [
+        diamondLoupeFacetProxy.address,
+        FacetCutAction.Add,
+        getSelectors(diamondLoupeFacetProxy),
+      ],
+      [
+        ownershipFacetProxy.address,
+        FacetCutAction.Add,
+        getSelectors(ownershipFacetProxy),
+      ],
       [erc1155Proxy.address, FacetCutAction.Add, getSelectors(erc1155Proxy)],
     ],
     {
@@ -27,10 +42,4 @@ export async function deployDiamond() {
     }
   );
   console.log('Diamond deployed to:', diamond.address);
-}
-
-export async function deploy(account: SignerWithAddress, liquidityToken: string, baseUri: string) {
-  const RentingPool = await ethers.getContractFactory('RentingPool', account);
-  const pool = await RentingPool.deploy(liquidityToken, baseUri);
-  return pool;
 }
