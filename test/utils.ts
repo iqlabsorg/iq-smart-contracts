@@ -24,7 +24,7 @@ export const getEnterprise = async (
     receipt.blockNumber
   );
 
-  const enterpriseAddress = events[0].args?.[3];
+  const enterpriseAddress = events[0].args?.[4];
 
   const Enterprise = await ethers.getContractFactory('Enterprise');
 

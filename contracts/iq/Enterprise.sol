@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.7.6;
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "../token/IERC20Detailed.sol";
+import "./InitializableOwnable.sol";
 import "./interfaces/IEnterprise.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IPowerToken.sol";
 import "./ExpMath.sol";
 
-contract Enterprise is Ownable, IEnterprise {
+contract Enterprise is InitializableOwnable, IEnterprise {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Detailed;
     using Clones for address;
@@ -41,6 +43,7 @@ contract Enterprise is Ownable, IEnterprise {
     mapping(IPowerToken => Service) public services;
     mapping(address => mapping(uint32 => mapping(uint8 => State))) public states;
     mapping(address => int16) public supportedInterestTokensIndex;
+    IPowerToken[] public powerTokens;
     address[] public supportedInterestTokens;
     mapping(address => uint112) public collectedInterest;
 
@@ -58,10 +61,12 @@ contract Enterprise is Ownable, IEnterprise {
         address _liquidityToken,
         string memory _baseUri,
         address _interestTokenImpl,
-        address _powerTokenImpl
+        address _powerTokenImpl,
+        address _owner
     ) public override {
         require(address(liquidityToken) == address(0), "Contract already initialized");
         require(_liquidityToken != address(0), "Invalid liquidity token address");
+        this.initialize(_owner);
 
         liquidityToken = IERC20Detailed(_liquidityToken);
         baseUri = _baseUri;
@@ -77,16 +82,6 @@ contract Enterprise is Ownable, IEnterprise {
         powerTokenImpl = _powerTokenImpl;
     }
 
-    // Test sequence
-    // 1. Mint tokens
-    // 2. Create service
-    // 2.1. Approvals
-    // 3. Lend
-    // 4. Borrow
-    // 5. Burn
-    // 6. Withdraw all
-    // 7. Profit!
-
     function registerService(
         string memory _name,
         string memory _symbol,
@@ -95,7 +90,7 @@ contract Enterprise is Ownable, IEnterprise {
         uint32 _interestRateHalvingPeriod,
         uint32[] memory _allowedLoanDurations,
         uint8[] memory _allowedRefundCurvatures
-    ) public {
+    ) external onlyOwner {
         string memory tokenSymbol = liquidityToken.symbol();
         string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", _symbol));
 
@@ -107,6 +102,8 @@ contract Enterprise is Ownable, IEnterprise {
         services[powerToken].factor = _factor;
         services[powerToken].interestRateHalvingPeriod = _interestRateHalvingPeriod;
         services[powerToken].lastDeal = uint32(block.timestamp);
+
+        powerTokens.push(powerToken);
 
         emit ServiceRegistered(address(powerToken), _halfLife, _factor, _interestRateHalvingPeriod);
     }
@@ -262,8 +259,15 @@ contract Enterprise is Ownable, IEnterprise {
         uint256 tokenId = _halfWithdrawPeriod;
 
         iToken.mint(msg.sender, tokenId, newShares);
+        // emit Lend event
         totalShares += newShares;
     }
+
+    function estimateWithdrawLiquidity(
+        uint256 _sharesAmount,
+        uint256 _tokenId,
+        address _interestToken
+    ) external view returns (uint256) {}
 
     function withdrawLiquidity(
         uint256 _sharesAmount,
@@ -368,6 +372,30 @@ contract Enterprise is Ownable, IEnterprise {
             if (service.allowedRefundCurvatures[i] == curvature) return true;
         }
         return false;
+    }
+
+    function getServices() external view returns (Service[] memory) {
+        uint256 tokenCount = powerTokens.length;
+        Service[] memory result = new Service[](tokenCount);
+        for (uint256 i = 0; i < powerTokens.length; i++) {
+            result[i] = services[powerTokens[i]];
+        }
+        return result;
+    }
+
+    function getInfo()
+        external
+        view
+        returns (
+            uint256,
+            uint256,
+            uint256,
+            string memory,
+            string memory,
+            address
+        )
+    {
+        return (reserve, availableReserve, totalShares, baseUri, name, owner());
     }
 
     function _enableInterestToken(address _token) internal {

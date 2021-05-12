@@ -29,6 +29,11 @@
           "internalType": "address",
           "name": "_powerTokenImpl",
           "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
         }
       ],
       "name": "initialize",

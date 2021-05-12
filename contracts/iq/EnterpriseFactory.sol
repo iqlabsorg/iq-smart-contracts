@@ -7,7 +7,13 @@ import "./interfaces/IEnterprise.sol";
 contract EnterpriseFactory {
     using Clones for address;
 
-    event EnterpriseDeployed(address indexed liquidityToken, string name, string baseUrl, address deployed);
+    event EnterpriseDeployed(
+        address indexed creator,
+        address indexed liquidityToken,
+        string name,
+        string baseUrl,
+        address deployed
+    );
 
     address public immutable powerTokenImpl;
     address public immutable interestTokenImpl;
@@ -32,8 +38,8 @@ contract EnterpriseFactory {
         string calldata baseUrl
     ) external {
         IEnterprise enterprise = IEnterprise(enterpriseImpl.clone());
-        enterprise.initialize(name, liquidityToken, baseUrl, interestTokenImpl, powerTokenImpl);
+        enterprise.initialize(name, liquidityToken, baseUrl, interestTokenImpl, powerTokenImpl, msg.sender);
 
-        emit EnterpriseDeployed(liquidityToken, name, baseUrl, address(enterprise));
+        emit EnterpriseDeployed(msg.sender, liquidityToken, name, baseUrl, address(enterprise));
     }
 }

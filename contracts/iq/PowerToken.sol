@@ -14,7 +14,7 @@ contract PowerToken is ERC1155Base, IPowerToken {
 
     uint32 public halfLife;
 
-    mapping(address => State) private states;
+    mapping(address => State) public states;
 
     function initialize(
         string memory _name,

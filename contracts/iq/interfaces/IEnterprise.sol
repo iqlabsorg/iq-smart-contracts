@@ -8,6 +8,7 @@ interface IEnterprise {
         address _liquidityToken,
         string memory _baseUri,
         address _interestTokenImpl,
-        address _powerTokenImpl
+        address _powerTokenImpl,
+        address _owner
     ) external;
 }
