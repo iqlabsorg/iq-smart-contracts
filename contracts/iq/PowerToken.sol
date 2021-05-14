@@ -3,9 +3,10 @@
 pragma solidity 0.7.6;
 
 import "./ERC1155Base.sol";
+import "./ExpMath.sol";
 import "./interfaces/IPowerToken.sol";
 
-contract PowerToken is ERC1155Base, IPowerToken {
+contract PowerToken is IPowerToken, ERC1155Base {
     struct State {
         uint112 balance;
         uint112 energy;

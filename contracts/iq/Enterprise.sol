@@ -6,20 +6,21 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "../token/IERC20Detailed.sol";
+import "./ExpMath.sol";
 import "./InitializableOwnable.sol";
 import "./interfaces/IEnterprise.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IPowerToken.sol";
-import "./ExpMath.sol";
 
 contract Enterprise is InitializableOwnable, IEnterprise {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Detailed;
     using Clones for address;
 
+    uint8 internal constant REFUND_CURVATURE = 1;
+
     struct Service {
         uint32[] allowedLoanDurations;
-        uint8[] allowedRefundCurvatures;
         uint256 borrowed;
         uint112 factor;
         uint32 lastDeal;
@@ -32,20 +33,20 @@ contract Enterprise is InitializableOwnable, IEnterprise {
         uint32 timestamp;
     }
 
-    IERC20Detailed public liquidityToken;
-    IInterestToken public iToken;
-    address private powerTokenImpl;
-    uint256 public reserve;
-    uint256 public availableReserve;
-    uint256 public totalShares;
-    string public baseUri;
-    string public name;
-    mapping(IPowerToken => Service) public services;
-    mapping(address => mapping(uint32 => mapping(uint8 => State))) public states;
-    mapping(address => int16) public supportedInterestTokensIndex;
-    IPowerToken[] public powerTokens;
-    address[] public supportedInterestTokens;
-    mapping(address => uint112) public collectedInterest;
+    IERC20Detailed private _liquidityToken;
+    IInterestToken private _iToken;
+    address private _powerTokenImpl;
+    uint256 private _reserve;
+    uint256 private _availableReserve;
+    uint256 private _totalShares;
+    string private _baseUri;
+    string private _name;
+    mapping(IPowerToken => Service) private _services;
+    mapping(address => mapping(uint32 => mapping(uint8 => State))) private _states;
+    mapping(address => int16) private _supportedInterestTokensIndex;
+    address[] private _supportedInterestTokens;
+    IPowerToken[] private _powerTokens;
+    mapping(address => uint112) private _collectedInterest;
 
     event ServiceRegistered(
         address indexed powerToken,
@@ -53,266 +54,249 @@ contract Enterprise is InitializableOwnable, IEnterprise {
         uint112 factor,
         uint32 interestRateHalvingPeriod
     );
-
     event Borrowed(address indexed powerToken, uint256 tokenId);
+    event Lended(address indexed lender, uint256 liquidityAmount, uint256 shares, uint256 tokenId);
+    event Withdraw(address indexed lender, uint256 liquidityAmount, uint256 shares, uint256 tokenId);
 
     function initialize(
-        string memory _name,
-        address _liquidityToken,
-        string memory _baseUri,
-        address _interestTokenImpl,
-        address _powerTokenImpl,
-        address _owner
+        string memory enterpriseName,
+        address liquidityToken_,
+        string memory baseUri_,
+        address interestTokenImpl,
+        address powerTokenImpl,
+        address owner
     ) public override {
-        require(address(liquidityToken) == address(0), "Contract already initialized");
-        require(_liquidityToken != address(0), "Invalid liquidity token address");
-        this.initialize(_owner);
+        require(address(_liquidityToken) == address(0), "Contract already initialized");
+        require(liquidityToken_ != address(0), "Invalid liquidity token address");
+        this.initialize(owner);
 
-        liquidityToken = IERC20Detailed(_liquidityToken);
-        baseUri = _baseUri;
-        name = _name;
-        _enableInterestToken(address(_liquidityToken));
-        string memory symbol = IERC20Detailed(_liquidityToken).symbol();
+        _liquidityToken = IERC20Detailed(liquidityToken_);
+        _baseUri = baseUri_;
+        _name = enterpriseName;
+        _enableInterestToken(address(liquidityToken_));
+        string memory symbol = _liquidityToken.symbol();
 
         string memory iTokenName = string(abi.encodePacked("Interest Bearing ", symbol));
         string memory iTokenSymbol = string(abi.encodePacked("i", symbol));
 
-        iToken = IInterestToken(_interestTokenImpl.clone());
-        iToken.initialize(address(this), iTokenName, iTokenSymbol, _baseUri);
-        powerTokenImpl = _powerTokenImpl;
+        _iToken = IInterestToken(interestTokenImpl.clone());
+        _iToken.initialize(address(this), iTokenName, iTokenSymbol, _baseUri);
+        _powerTokenImpl = powerTokenImpl;
     }
 
     function registerService(
-        string memory _name,
-        string memory _symbol,
-        uint32 _halfLife,
-        uint112 _factor,
-        uint32 _interestRateHalvingPeriod,
-        uint32[] memory _allowedLoanDurations,
-        uint8[] memory _allowedRefundCurvatures
+        string memory serviceName,
+        string memory symbol,
+        uint32 halfLife,
+        uint112 factor,
+        uint32 interestRateHalvingPeriod,
+        uint32[] memory _allowedLoanDurations
     ) external onlyOwner {
-        string memory tokenSymbol = liquidityToken.symbol();
-        string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", _symbol));
+        string memory tokenSymbol = _liquidityToken.symbol();
+        string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", symbol));
 
-        IPowerToken powerToken = IPowerToken(powerTokenImpl.clone());
-        powerToken.initialize(_name, powerTokenSymbol, baseUri, _halfLife);
+        IPowerToken powerToken = IPowerToken(_powerTokenImpl.clone());
+        powerToken.initialize(serviceName, powerTokenSymbol, _baseUri, halfLife);
 
-        services[powerToken].allowedLoanDurations = _allowedLoanDurations;
-        services[powerToken].allowedRefundCurvatures = _allowedRefundCurvatures;
-        services[powerToken].factor = _factor;
-        services[powerToken].interestRateHalvingPeriod = _interestRateHalvingPeriod;
-        services[powerToken].lastDeal = uint32(block.timestamp);
+        _services[powerToken].allowedLoanDurations = _allowedLoanDurations;
+        _services[powerToken].factor = factor;
+        _services[powerToken].interestRateHalvingPeriod = interestRateHalvingPeriod;
+        _services[powerToken].lastDeal = uint32(block.timestamp);
 
-        powerTokens.push(powerToken);
+        _powerTokens.push(powerToken);
 
-        emit ServiceRegistered(address(powerToken), _halfLife, _factor, _interestRateHalvingPeriod);
+        emit ServiceRegistered(address(powerToken), halfLife, factor, interestRateHalvingPeriod);
     }
 
     function borrow(
-        IPowerToken _powerToken,
-        IERC20 _interestPaymentToken,
-        uint112 _amount,
-        uint256 _maximumInterest,
-        uint32 _duration,
-        uint8 _refundCurvature
+        IPowerToken powerToken,
+        IERC20 interestPaymentToken,
+        uint112 amount,
+        uint256 maximumInterest,
+        uint32 duration
     ) external {
         require(
-            supportedInterestTokensIndex[address(_interestPaymentToken)] > 0,
+            _supportedInterestTokensIndex[address(interestPaymentToken)] > 0,
             "Interest payment token is disabled or not supported"
         );
-        require(isAllowedLoanDuration(_powerToken, _duration), "Duration not allowed");
-        require(isAllowedRefundCurvatures(_powerToken, _refundCurvature), "Curvature not allowed");
-        require(_amount <= availableReserve, "Insufficient reserves");
+        require(isAllowedLoanDuration(powerToken, duration), "Duration not allowed");
+        require(amount <= _availableReserve, "Insufficient reserves");
 
-        uint112 interest =
-            estimateBorrow(
-                _powerToken,
-                _interestPaymentToken,
-                _amount,
-                _duration,
-                _refundCurvature,
-                uint32(block.timestamp)
-            );
-        require(interest <= _maximumInterest, "Slippage too big");
+        uint112 interest = estimateBorrow(powerToken, interestPaymentToken, amount, duration, uint32(block.timestamp));
+        require(interest <= maximumInterest, "Slippage too big");
 
-        _interestPaymentToken.safeTransferFrom(msg.sender, address(this), interest);
+        interestPaymentToken.safeTransferFrom(msg.sender, address(this), interest);
 
-        availableReserve -= _amount;
-        services[_powerToken].borrowed += _amount;
+        _availableReserve -= amount;
+        _services[powerToken].borrowed += amount;
 
         uint256 tokenId =
             _getTokenId(
                 uint32(block.timestamp),
-                uint32(block.timestamp) + _duration,
-                _refundCurvature,
-                uint16(supportedInterestTokensIndex[address(_interestPaymentToken)]),
+                uint32(block.timestamp) + duration,
+                REFUND_CURVATURE,
+                uint16(_supportedInterestTokensIndex[address(interestPaymentToken)]),
                 interest
             );
 
-        _powerToken.mint(msg.sender, tokenId, _amount, "");
+        powerToken.mint(msg.sender, tokenId, amount, "");
 
         State storage state = _updateState(tokenId);
         state.plannedBalance += interest;
 
-        emit Borrowed(address(_powerToken), tokenId);
+        emit Borrowed(address(powerToken), tokenId);
     }
 
     function estimateBorrow(
-        IPowerToken _powerToken,
-        IERC20 _interestPaymentToken,
-        uint112 _amount,
-        uint32 _duration,
-        uint8 _refundCurvature,
-        uint32 _estimateAtTimestamp
-    ) public view returns (uint112) {
-        require(isAllowedLoanDuration(_powerToken, _duration), "Duration not allowed");
-        require(isAllowedRefundCurvatures(_powerToken, _refundCurvature), "Curvature not allowed");
-        require(_amount <= availableReserve, "Too low available reserves");
+        IPowerToken powerToken,
+        IERC20 interestPaymentToken,
+        uint112 amount,
+        uint32 duration,
+        uint32 estimateAtTimestamp
+    ) public view returns (uint112 result) {
+        require(isAllowedLoanDuration(powerToken, duration), "Duration not allowed");
+        require(amount <= _availableReserve, "Too low available reserves");
 
-        Service memory service = services[_powerToken];
+        Service memory service = _services[powerToken];
 
-        uint112 C0 = uint112((uint256(_amount) * _duration * service.factor) >> (112 - _refundCurvature));
+        uint112 c0 = uint112((uint256(amount) * duration * service.factor) >> (112 - REFUND_CURVATURE));
         uint112 halfLife =
-            ExpMath.halfLife(service.lastDeal, C0, service.interestRateHalvingPeriod, _estimateAtTimestamp);
+            ExpMath.halfLife(service.lastDeal, c0, service.interestRateHalvingPeriod, estimateAtTimestamp);
 
         // TODO: SafeMath, analyze bits
-        uint256 UintInterestInLiquidityTokens = (halfLife * reserve) / (availableReserve - _amount);
+        uint256 uintInterestInLiquidityTokens = (halfLife * _reserve) / (_availableReserve - amount);
         uint112 interestInLiquidityTokens =
-            UintInterestInLiquidityTokens > type(uint112).max
+            uintInterestInLiquidityTokens > type(uint112).max
                 ? type(uint112).max
-                : uint112(UintInterestInLiquidityTokens);
+                : uint112(uintInterestInLiquidityTokens);
 
-        return convertTo(interestInLiquidityTokens, _interestPaymentToken);
+        return convertTo(interestInLiquidityTokens, interestPaymentToken);
     }
 
     function burn(
-        IPowerToken _powerToken,
-        uint256 _tokenId,
-        uint112 _amount
+        IPowerToken powerToken,
+        uint256 tokenId,
+        uint112 amount
     ) external {
         //TODO: allow burn other users token (if it is expired)
-        uint256 balance = _powerToken.balanceOf(msg.sender, _tokenId);
-        require(_amount <= balance, "Can't burn more that balance");
+        uint256 balance = powerToken.balanceOf(msg.sender, tokenId);
+        require(amount <= balance, "Can't burn more that balance");
 
         (address paymentToken, uint112 refund) =
-            estimateRefund(_powerToken, msg.sender, _tokenId, _amount, uint32(block.timestamp));
+            estimateRefund(powerToken, msg.sender, tokenId, amount, uint32(block.timestamp));
 
-        State storage state = _updateState(_tokenId);
+        State storage state = _updateState(tokenId);
         state.plannedBalance -= refund;
 
-        availableReserve += _amount;
-        services[_powerToken].borrowed -= _amount;
+        _availableReserve += amount;
+        _services[powerToken].borrowed -= amount;
 
         IERC20(paymentToken).safeTransfer(msg.sender, refund);
 
-        _powerToken.burn(msg.sender, _tokenId, refund);
+        powerToken.burn(msg.sender, tokenId, refund);
     }
 
     function estimateRefund(
-        IPowerToken _powerToken,
-        address _tokenHolder,
-        uint256 _tokenId,
-        uint112 _amountToBurn,
-        uint32 _estimateAt
+        IPowerToken powerToken,
+        address tokenHolder,
+        uint256 tokenId,
+        uint112 amountToBurn,
+        uint32 estimateAt
     ) public view returns (address paymentToken, uint112 amount) {
-        (uint32 from, uint32 to, uint8 curvature, uint16 tokenIndex, uint112 interest) = _extractTokenId(_tokenId);
-        paymentToken = supportedInterestTokens[tokenIndex - 1];
+        (uint32 from, uint32 to, uint8 curvature, uint16 tokenIndex, uint112 interest) = _extractTokenId(tokenId);
+        paymentToken = _supportedInterestTokens[tokenIndex - 1];
 
-        uint256 balance = _powerToken.balanceOf(_tokenHolder, _tokenId);
+        uint256 balance = powerToken.balanceOf(tokenHolder, tokenId);
         if (balance == 0) {
             return (paymentToken, 0);
         }
 
         amount = uint112(
-            (ExpMath.halfLife(uint32(from), interest, uint32(to - from) / curvature, _estimateAt) * _amountToBurn) /
+            (ExpMath.halfLife(uint32(from), interest, uint32(to - from) / curvature, estimateAt) * amountToBurn) /
                 balance
         );
     }
 
-    function convertTo(uint112 _liquidityAmount, IERC20 _payment) internal view returns (uint112) {
+    function convertTo(uint112 liquidityAmount, IERC20 payment) internal view returns (uint112) {
         //TODO: apply convertation
-        require(address(_payment) == address(liquidityToken), "Other payment options are not supported yet");
+        require(address(payment) == address(_liquidityToken), "Other payment options are not supported yet");
 
-        return _liquidityAmount;
+        return liquidityAmount;
     }
 
-    function convertFrom(uint112 _interestAmount, IERC20 _payment) internal view returns (uint112) {
+    function convertFrom(uint112 interestAmount, IERC20 payment) internal view returns (uint112) {
         //TODO: apply convertation
-        require(address(_payment) == address(liquidityToken), "Other payment options are not supported yet");
+        require(address(payment) == address(_liquidityToken), "Other payment options are not supported yet");
 
-        return _interestAmount;
+        return interestAmount;
     }
 
-    function lend(uint256 _liquidityAmount, uint32 _halfWithdrawPeriod) external {
-        liquidityToken.safeTransferFrom(msg.sender, address(this), _liquidityAmount);
+    function lend(uint256 liquidityAmount, uint32 halfWithdrawPeriod) external {
+        _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
 
-        reserve += _liquidityAmount;
-        availableReserve += _liquidityAmount;
+        _reserve += liquidityAmount;
+        _availableReserve += liquidityAmount;
 
         uint256 totalLiquidity = getTotalLiquidity();
         uint256 newShares = 0;
-        if (totalShares == 0) {
-            newShares = _liquidityAmount;
+        if (_totalShares == 0) {
+            newShares = liquidityAmount;
         } else {
-            newShares = (totalShares * _liquidityAmount) / totalLiquidity;
+            newShares = (_totalShares * liquidityAmount) / totalLiquidity;
         }
-        uint256 tokenId = _halfWithdrawPeriod;
+        uint256 tokenId = halfWithdrawPeriod;
 
-        iToken.mint(msg.sender, tokenId, newShares);
-        // emit Lend event
-        totalShares += newShares;
+        _iToken.mint(msg.sender, tokenId, newShares);
+        _totalShares += newShares;
+        emit Lended(msg.sender, liquidityAmount, newShares, tokenId);
     }
 
-    function estimateWithdrawLiquidity(
-        uint256 _sharesAmount,
-        uint256 _tokenId,
-        address _interestToken
-    ) external view returns (uint256) {}
-
     function withdrawLiquidity(
-        uint256 _sharesAmount,
-        uint256 _tokenId,
-        address _interestToken
+        uint256 sharesAmount,
+        uint256 tokenId,
+        address interestToken
     ) external {
-        uint256 balance = iToken.balanceOf(msg.sender, _tokenId);
-        require(balance >= _sharesAmount, "Insufficient balance");
+        uint256 balance = _iToken.balanceOf(msg.sender, tokenId);
+        require(balance >= sharesAmount, "Insufficient balance");
 
-        uint256 liquidityWithInterest = (getTotalLiquidity() * _sharesAmount) / totalShares;
-        require(_interestToken == address(liquidityToken), "Not supported yet");
-        require(liquidityWithInterest <= availableReserve, "Insufficient liquidity");
+        uint256 liquidityWithInterest = (getTotalLiquidity() * sharesAmount) / _totalShares;
+        require(interestToken == address(_liquidityToken), "Not supported yet");
+        require(liquidityWithInterest <= _availableReserve, "Insufficient liquidity");
 
-        liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
+        _liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
 
-        reserve -= liquidityWithInterest;
-        availableReserve -= liquidityWithInterest;
+        _reserve -= liquidityWithInterest;
+        _availableReserve -= liquidityWithInterest;
+
+        emit Withdraw(msg.sender, liquidityWithInterest, sharesAmount, tokenId);
     }
 
     function getTotalLiquidity() internal view returns (uint256 result) {
-        result = reserve;
-        uint256 n = supportedInterestTokens.length;
+        result = _reserve;
+        uint256 n = _supportedInterestTokens.length;
         for (uint256 i = 0; i < n; i++) {
-            address tokenAddress = supportedInterestTokens[i];
+            address tokenAddress = _supportedInterestTokens[i];
 
-            result += convertFrom(collectedInterest[tokenAddress], IERC20(tokenAddress));
+            result += convertFrom(_collectedInterest[tokenAddress], IERC20(tokenAddress));
         }
     }
 
-    function _updateState(uint256 _tokenId) internal returns (State storage state) {
-        (uint32 from, uint32 to, uint8 curvature, uint16 tokenIndex, ) = _extractTokenId(_tokenId);
-        address interestPaymentToken = supportedInterestTokens[tokenIndex - 1];
+    function _updateState(uint256 tokenId) internal returns (State storage state) {
+        (uint32 from, uint32 to, uint8 curvature, uint16 tokenIndex, ) = _extractTokenId(tokenId);
+        address interestPaymentToken = _supportedInterestTokens[tokenIndex - 1];
         uint32 duration = uint32(to - from);
 
-        state = states[interestPaymentToken][duration][curvature];
+        state = _states[interestPaymentToken][duration][curvature];
 
         uint112 interest =
             state.plannedBalance -
                 ExpMath.halfLife(state.timestamp, state.plannedBalance, duration / curvature, uint32(block.timestamp));
 
-        if (interestPaymentToken == address(liquidityToken)) {
-            reserve += interest;
-            availableReserve += interest;
+        if (interestPaymentToken == address(_liquidityToken)) {
+            _reserve += interest;
+            _availableReserve += interest;
         } else {
-            collectedInterest[interestPaymentToken] += interest;
+            _collectedInterest[interestPaymentToken] += interest;
         }
 
         state.plannedBalance -= interest;
@@ -320,21 +304,21 @@ contract Enterprise is InitializableOwnable, IEnterprise {
     }
 
     function _getTokenId(
-        uint32 _from,
-        uint32 _to,
-        uint8 _curvature,
-        uint16 _tokenIndex,
-        uint112 _interest
-    ) internal pure returns (uint256 _tokenId) {
-        _tokenId =
-            (uint256(_from) << 224) |
-            (uint256(_to) << 192) |
-            (uint256(_curvature) << 184) |
-            (uint256(_tokenIndex) << 168) |
-            _interest;
+        uint32 from,
+        uint32 to,
+        uint8 curvature,
+        uint16 tokenIndex,
+        uint112 interest
+    ) internal pure returns (uint256 tokenId) {
+        tokenId =
+            (uint256(from) << 224) |
+            (uint256(to) << 192) |
+            (uint256(curvature) << 184) |
+            (uint256(tokenIndex) << 168) |
+            interest;
     }
 
-    function _extractTokenId(uint256 _tokenId)
+    function _extractTokenId(uint256 tokenId)
         internal
         pure
         returns (
@@ -345,40 +329,31 @@ contract Enterprise is InitializableOwnable, IEnterprise {
             uint112 interest
         )
     {
-        from = uint32((_tokenId >> 224) & type(uint32).max);
-        to = uint32((_tokenId >> 192) & type(uint32).max);
-        curvature = uint8((_tokenId >> 184) & type(uint8).max);
-        tokenIndex = uint16((_tokenId >> 168) & type(uint16).max);
-        interest = uint112(_tokenId & type(uint112).max);
+        from = uint32((tokenId >> 224) & type(uint32).max);
+        to = uint32((tokenId >> 192) & type(uint32).max);
+        curvature = uint8((tokenId >> 184) & type(uint8).max);
+        tokenIndex = uint16((tokenId >> 168) & type(uint16).max);
+        interest = uint112(tokenId & type(uint112).max);
         require(from > 0, "Invalid from");
         require(to > 0, "Invalid to");
         require(curvature > 0, "Invalid curvature");
         require(interest > 0, "Invalid interest");
     }
 
-    function isAllowedLoanDuration(IPowerToken _token, uint32 _duration) public view returns (bool) {
-        Service storage service = services[_token];
+    function isAllowedLoanDuration(IPowerToken token, uint32 duration) public view returns (bool allowed) {
+        Service storage service = _services[token];
         uint256 n = service.allowedLoanDurations.length;
         for (uint256 i = 0; i < n; i++) {
-            if (service.allowedLoanDurations[i] == _duration) return true;
-        }
-        return false;
-    }
-
-    function isAllowedRefundCurvatures(IPowerToken _token, uint8 curvature) public view returns (bool) {
-        Service storage service = services[_token];
-        uint256 n = service.allowedRefundCurvatures.length;
-        for (uint256 i = 0; i < n; i++) {
-            if (service.allowedRefundCurvatures[i] == curvature) return true;
+            if (service.allowedLoanDurations[i] == duration) return true;
         }
         return false;
     }
 
     function getServices() external view returns (Service[] memory) {
-        uint256 tokenCount = powerTokens.length;
+        uint256 tokenCount = _powerTokens.length;
         Service[] memory result = new Service[](tokenCount);
-        for (uint256 i = 0; i < powerTokens.length; i++) {
-            result[i] = services[powerTokens[i]];
+        for (uint256 i = 0; i < tokenCount; i++) {
+            result[i] = _services[_powerTokens[i]];
         }
         return result;
     }
@@ -387,31 +362,67 @@ contract Enterprise is InitializableOwnable, IEnterprise {
         external
         view
         returns (
-            uint256,
-            uint256,
-            uint256,
-            string memory,
-            string memory,
-            address
+            uint256 reserve,
+            uint256 availableReserve,
+            uint256 totalShares,
+            string memory baseUri,
+            string memory name,
+            address owner
         )
     {
-        return (reserve, availableReserve, totalShares, baseUri, name, owner());
+        return (_reserve, _availableReserve, _totalShares, _baseUri, _name, this.owner());
     }
 
-    function _enableInterestToken(address _token) internal {
-        if (supportedInterestTokensIndex[_token] == 0) {
-            supportedInterestTokens.push(_token);
-            supportedInterestTokensIndex[_token] = int16(supportedInterestTokens.length);
-        } else if (supportedInterestTokensIndex[_token] < 0) {
-            supportedInterestTokensIndex[_token] = -supportedInterestTokensIndex[_token];
+    function liquidityToken() external view returns (IERC20Detailed) {
+        return _liquidityToken;
+    }
+
+    function iToken() external view returns (IInterestToken) {
+        return _iToken;
+    }
+
+    function services(IPowerToken powerToken) external view returns (Service memory) {
+        return _services[powerToken];
+    }
+
+    function states(
+        address token,
+        uint32 duration,
+        uint8 curvature
+    ) external view returns (State memory) {
+        return _states[token][duration][curvature];
+    }
+
+    function supportedInterestTokensIndex(address token) external view returns (int16) {
+        return _supportedInterestTokensIndex[token];
+    }
+
+    function supportedInterestTokens(uint256 index) external view returns (address) {
+        return _supportedInterestTokens[index];
+    }
+
+    function powerTokens(uint256 index) external view returns (IPowerToken) {
+        return _powerTokens[index];
+    }
+
+    function collectedInterest(address account) external view returns (uint112) {
+        return _collectedInterest[account];
+    }
+
+    function _enableInterestToken(address token) internal {
+        if (_supportedInterestTokensIndex[token] == 0) {
+            _supportedInterestTokens.push(token);
+            _supportedInterestTokensIndex[token] = int16(_supportedInterestTokens.length);
+        } else if (_supportedInterestTokensIndex[token] < 0) {
+            _supportedInterestTokensIndex[token] = -_supportedInterestTokensIndex[token];
         }
     }
 
-    function _disableInterestToken(address _token) internal {
-        require(supportedInterestTokensIndex[_token] != 0, "Invalid token");
+    function _disableInterestToken(address token) internal {
+        require(_supportedInterestTokensIndex[token] != 0, "Invalid token");
 
-        if (supportedInterestTokensIndex[_token] > 0) {
-            supportedInterestTokensIndex[_token] = -supportedInterestTokensIndex[_token];
+        if (_supportedInterestTokensIndex[token] > 0) {
+            _supportedInterestTokensIndex[token] = -_supportedInterestTokensIndex[token];
         }
     }
 }
