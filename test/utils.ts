@@ -1,5 +1,6 @@
 import {Contract} from '@ethersproject/contracts';
 import {ethers} from 'hardhat';
+import {Enterprise, Enterprise__factory, PowerToken} from '../typechain';
 
 export const evmSnapshot = async () => ethers.provider.send('evm_snapshot', []);
 export const evmRevert = async (id: string) =>
@@ -16,7 +17,7 @@ export const currentTime = async (): Promise<number> => {
 export const getEnterprise = async (
   enterpriseFactory: Contract,
   deployTx: any
-): Promise<Contract> => {
+): Promise<Enterprise> => {
   const receipt = await deployTx.wait(1);
 
   const events = await enterpriseFactory.queryFilter(
@@ -24,17 +25,17 @@ export const getEnterprise = async (
     receipt.blockNumber
   );
 
-  const enterpriseAddress = events[0].args?.[4];
+  const enterpriseAddress = events[0].args?.deployed;
 
   const Enterprise = await ethers.getContractFactory('Enterprise');
 
-  return Enterprise.attach(enterpriseAddress);
+  return Enterprise.attach(enterpriseAddress) as Enterprise;
 };
 
 export const getPowerToken = async (
   enterprise: Contract,
   registerServiceTx: any
-): Promise<Contract> => {
+): Promise<PowerToken> => {
   const receipt = await registerServiceTx.wait(1);
 
   const events = await enterprise.queryFilter(
@@ -46,7 +47,7 @@ export const getPowerToken = async (
 
   const PowerToken = await ethers.getContractFactory('PowerToken');
 
-  return PowerToken.attach(powerTokenAddress);
+  return PowerToken.attach(powerTokenAddress) as PowerToken;
 };
 
 export const getTokenId = async (

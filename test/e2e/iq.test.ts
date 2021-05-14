@@ -5,12 +5,13 @@ import {ethers, getNamedAccounts} from 'hardhat';
 import {getEnterprise, getPowerToken, getTokenId, increaseTime} from '../utils';
 import {Address} from 'hardhat-deploy/types';
 import {Contract} from '@ethersproject/contracts';
+import {Enterprise} from '../../typechain';
 
 describe('IQ Protocol E2E', () => {
   let deployer: Address;
   let user: Address;
   let token: Contract;
-  let enterprise: Contract;
+  let enterprise: Enterprise;
 
   const ONE_TOKEN = ethers.utils.parseEther('1');
 
@@ -72,8 +73,7 @@ describe('IQ Protocol E2E', () => {
         HALF_LIFE,
         FACTOR,
         INTEREST_RATE_HALVING_PERIOD,
-        ALLOWED_LOAN_DURATIONS,
-        ALLOWED_REFUND_CURVATURES
+        ALLOWED_LOAN_DURATIONS
       );
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
@@ -97,8 +97,7 @@ describe('IQ Protocol E2E', () => {
         HALF_LIFE,
         FACTOR,
         INTEREST_RATE_HALVING_PERIOD,
-        ALLOWED_LOAN_DURATIONS,
-        ALLOWED_REFUND_CURVATURES
+        ALLOWED_LOAN_DURATIONS
       );
 
       const powerToken = await getPowerToken(enterprise, tx);
@@ -122,8 +121,7 @@ describe('IQ Protocol E2E', () => {
         token.address,
         BORROW_AMOUNT,
         ONE_TOKEN,
-        86400,
-        1
+        86400
       );
 
       await increaseTime(86400);
