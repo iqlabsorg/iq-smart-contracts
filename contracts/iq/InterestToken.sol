@@ -18,10 +18,10 @@ contract InterestToken is IInterestToken {
     string private _symbol;
     uint8 private _decimals;
 
-    function initialize(string memory name_, string memory symbol_) external override {
+    function initialize(string memory name, string memory symbol) external override {
         require(bytes(_name).length == 0, "Contract already initialized");
-        _name = name_;
-        _symbol = symbol_;
+        _name = name;
+        _symbol = symbol;
         _decimals = 18;
     }
 

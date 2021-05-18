@@ -59,24 +59,24 @@ contract Enterprise is InitializableOwnable, IEnterprise {
     ) public override {
         require(address(_liquidityToken) == address(0), "Contract already initialized");
         require(liquidityToken != address(0), "Invalid liquidity token address");
-        this.initialize(owner);
+        InitializableOwnable.initialize(owner);
 
         _liquidityToken = IERC20Detailed(liquidityToken);
         _name = enterpriseName;
         _enableInterestToken(address(liquidityToken));
         string memory symbol = _liquidityToken.symbol();
 
-        string memory iTokenName = string(abi.encodePacked("Interest Bearing ", symbol));
-        string memory iTokenSymbol = string(abi.encodePacked("i", symbol));
+        string memory interestTokenName = string(abi.encodePacked("Interest Bearing ", symbol));
+        string memory interestTokenSymbol = string(abi.encodePacked("i", symbol));
 
         _interestToken = IInterestToken(interestTokenImpl.clone());
-        _interestToken.initialize(iTokenName, iTokenSymbol);
+        _interestToken.initialize(interestTokenName, interestTokenSymbol);
 
-        string memory bTokenName = string(abi.encodePacked("Borrow ", symbol));
-        string memory bTokenSymbol = string(abi.encodePacked("b", symbol));
+        string memory borrowTokenName = string(abi.encodePacked("Borrow ", symbol));
+        string memory borrowTokenSymbol = string(abi.encodePacked("b", symbol));
 
         _borrowToken = IBorrowToken(borrowTokenImpl.clone());
-        _borrowToken.initialize(this, bTokenName, bTokenSymbol, baseUri, address(this));
+        _borrowToken.initialize(this, borrowTokenName, borrowTokenSymbol, baseUri);
 
         _powerTokenImpl = powerTokenImpl;
     }

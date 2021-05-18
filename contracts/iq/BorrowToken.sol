@@ -16,11 +16,10 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
         IEnterprise enterprise,
         string memory name,
         string memory symbol,
-        string memory baseUri,
-        address owner
+        string memory baseUri
     ) external override {
-        initialize(owner);
-        initialize(name, symbol);
+        InitializableOwnable.initialize(address(enterprise));
+        ERC721.initialize(name, symbol);
         _setBaseURI(baseUri);
         _enterprise = enterprise;
     }

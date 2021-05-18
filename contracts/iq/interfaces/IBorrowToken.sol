@@ -10,8 +10,7 @@ interface IBorrowToken is IERC721 {
         IEnterprise enterprise,
         string memory name,
         string memory symbol,
-        string memory baseUri,
-        address owner
+        string memory baseUri
     ) external;
 
     function mint(address to) external returns (uint256);
