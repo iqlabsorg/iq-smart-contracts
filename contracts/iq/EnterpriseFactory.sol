@@ -18,17 +18,21 @@ contract EnterpriseFactory {
     address public immutable powerTokenImpl;
     address public immutable interestTokenImpl;
     address public immutable enterpriseImpl;
+    address public immutable bTokenImpl;
 
     constructor(
         address _powerTokenImpl,
         address _interestTokenImpl,
+        address _bTokenImpl,
         address _enterpriseImpl
     ) {
         require(_powerTokenImpl != address(0), "Invalid PowerToken address");
         require(_interestTokenImpl != address(0), "Invalid InterestToken address");
+        require(_bTokenImpl != address(0), "Invalid BToken address");
         require(_enterpriseImpl != address(0), "Invalid Enterprise address");
         powerTokenImpl = _powerTokenImpl;
         interestTokenImpl = _interestTokenImpl;
+        bTokenImpl = _bTokenImpl;
         enterpriseImpl = _enterpriseImpl;
     }
 
@@ -38,7 +42,7 @@ contract EnterpriseFactory {
         string calldata baseUrl
     ) external {
         IEnterprise enterprise = IEnterprise(enterpriseImpl.clone());
-        enterprise.initialize(name, liquidityToken, baseUrl, interestTokenImpl, powerTokenImpl, msg.sender);
+        enterprise.initialize(name, liquidityToken, baseUrl, interestTokenImpl, powerTokenImpl, bTokenImpl, msg.sender);
 
         emit EnterpriseDeployed(msg.sender, liquidityToken, name, baseUrl, address(enterprise));
     }

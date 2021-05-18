@@ -6,37 +6,96 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getBorrowInfo",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "contract IPowerToken",
+              "name": "powerToken",
+              "type": "address"
+            },
+            {
+              "internalType": "uint32",
+              "name": "from",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "to",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint112",
+              "name": "amount",
+              "type": "uint112"
+            }
+          ],
+          "internalType": "struct IEnterprise.BorrowInfo",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "string",
-          "name": "_name",
+          "name": "name",
           "type": "string"
         },
         {
           "internalType": "address",
-          "name": "_liquidityToken",
+          "name": "liquidityToken",
           "type": "address"
         },
         {
           "internalType": "string",
-          "name": "_baseUri",
+          "name": "baseUri",
           "type": "string"
         },
         {
           "internalType": "address",
-          "name": "_interestTokenImpl",
+          "name": "interestTokenImpl",
           "type": "address"
         },
         {
           "internalType": "address",
-          "name": "_powerTokenImpl",
+          "name": "powerTokenImpl",
           "type": "address"
         },
         {
           "internalType": "address",
-          "name": "_owner",
+          "name": "bTokenImpl",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
           "type": "address"
         }
       ],
       "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "returnBorrowed",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

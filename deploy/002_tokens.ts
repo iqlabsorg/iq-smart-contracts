@@ -17,6 +17,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [],
     log: true,
   });
+  await deploy('BorrowToken', {
+    from: deployer,
+    args: [],
+    log: true,
+  });
 };
 export default func;
-func.tags = ['PowerToken', 'InterestToken'];
+func.tags = ['PowerToken', 'InterestToken', 'BorrowToken'];

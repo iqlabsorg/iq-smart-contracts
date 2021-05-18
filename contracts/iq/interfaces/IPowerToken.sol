@@ -2,26 +2,45 @@
 
 pragma solidity 0.7.6;
 
-import "../../erc1155/IERC1155.sol";
+import "../../token/IERC20Detailed.sol";
+import "../interfaces/IInitializableOwnable.sol";
 
-interface IPowerToken is IERC1155 {
+interface IPowerToken is IERC20Detailed, IInitializableOwnable {
     function initialize(
-        string memory _name,
-        string memory _symbol,
-        string memory _baseUri,
-        uint32 _halfLife
+        string memory name,
+        string memory symbol,
+        uint32 halfLife,
+        uint32[] memory allowedLoanDurations,
+        uint112 factor,
+        uint32 interestRateHalvingPeriod,
+        address owner
     ) external;
+
+    function transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) external returns (bool);
 
     function mint(
-        address _to,
-        uint256 _id,
-        uint256 _value,
-        bytes memory _data
+        address account,
+        uint256 amount,
+        bool withLocks
     ) external;
 
-    function burn(
-        address _account,
-        uint256 _id,
-        uint256 _value
+    function burnFrom(
+        address account,
+        uint256 amount,
+        bool withLocks
     ) external;
+
+    function getHalfLife() external view returns (uint32);
+
+    function getLastDeal() external view returns (uint32);
+
+    function getFactor() external view returns (uint112);
+
+    function getInterestRateHalvingPeriod() external view returns (uint32);
+
+    function isAllowedLoanDuration(uint32 duration) external view returns (bool);
 }
