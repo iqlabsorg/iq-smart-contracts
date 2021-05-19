@@ -36,8 +36,8 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
         _lastDeal = uint32(block.timestamp);
         _factor = factor;
         _interestRateHalvingPeriod = interestRateHalvingPeriod;
-        initialize(owner);
-        initialize(name, symbol);
+        InitializableOwnable.initialize(owner);
+        ERC20.initialize(name, symbol);
     }
 
     function getHalfLife() external view override returns (uint32) {

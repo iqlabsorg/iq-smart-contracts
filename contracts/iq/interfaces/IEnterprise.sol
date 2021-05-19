@@ -21,7 +21,7 @@ interface IEnterprise {
         string memory baseUri,
         address interestTokenImpl,
         address powerTokenImpl,
-        address bTokenImpl,
+        address borrowTokenImpl,
         address owner
     ) external;
 

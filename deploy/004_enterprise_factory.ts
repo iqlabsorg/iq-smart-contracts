@@ -18,10 +18,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   await deploy('EnterpriseFactory', {
     from: deployer,
     args: [
+      enterprise.address,
       powerToken.address,
       interestToken.address,
       borrowToken.address,
-      enterprise.address,
     ],
     log: true,
   });

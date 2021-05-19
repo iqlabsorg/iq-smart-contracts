@@ -11,39 +11,55 @@ contract EnterpriseFactory {
         address indexed creator,
         address indexed liquidityToken,
         string name,
-        string baseUrl,
+        string baseUri,
         address deployed
     );
 
-    address public immutable powerTokenImpl;
-    address public immutable interestTokenImpl;
-    address public immutable enterpriseImpl;
-    address public immutable bTokenImpl;
+    address private immutable _enterpriseImpl;
+    address private immutable _powerTokenImpl;
+    address private immutable _interestTokenImpl;
+    address private immutable _borrowTokenImpl;
 
     constructor(
-        address _powerTokenImpl,
-        address _interestTokenImpl,
-        address _bTokenImpl,
-        address _enterpriseImpl
+        address enterpriseImpl,
+        address powerTokenImpl,
+        address interestTokenImpl,
+        address borrowTokenImpl
     ) {
-        require(_powerTokenImpl != address(0), "Invalid PowerToken address");
-        require(_interestTokenImpl != address(0), "Invalid InterestToken address");
-        require(_bTokenImpl != address(0), "Invalid BToken address");
-        require(_enterpriseImpl != address(0), "Invalid Enterprise address");
-        powerTokenImpl = _powerTokenImpl;
-        interestTokenImpl = _interestTokenImpl;
-        bTokenImpl = _bTokenImpl;
-        enterpriseImpl = _enterpriseImpl;
+        require(enterpriseImpl != address(0), "Invalid Enterprise address");
+        require(powerTokenImpl != address(0), "Invalid PowerToken address");
+        require(interestTokenImpl != address(0), "Invalid InterestToken address");
+        require(borrowTokenImpl != address(0), "Invalid BorrowToken address");
+        _enterpriseImpl = enterpriseImpl;
+        _powerTokenImpl = powerTokenImpl;
+        _interestTokenImpl = interestTokenImpl;
+        _borrowTokenImpl = borrowTokenImpl;
     }
 
     function deploy(
         string calldata name,
         address liquidityToken,
-        string calldata baseUrl
+        string calldata baseUri
     ) external {
-        IEnterprise enterprise = IEnterprise(enterpriseImpl.clone());
-        enterprise.initialize(name, liquidityToken, baseUrl, interestTokenImpl, powerTokenImpl, bTokenImpl, msg.sender);
+        IEnterprise enterprise = IEnterprise(_enterpriseImpl.clone());
+        enterprise.initialize(name, liquidityToken, baseUri, _interestTokenImpl, _powerTokenImpl, _borrowTokenImpl, msg.sender);
 
-        emit EnterpriseDeployed(msg.sender, liquidityToken, name, baseUrl, address(enterprise));
+        emit EnterpriseDeployed(msg.sender, liquidityToken, name, baseUri, address(enterprise));
+    }
+
+    function getEnterpriseImpl() external view returns (address) {
+        return _enterpriseImpl;
+    }
+
+    function getPowerTokenImpl() external view returns (address) {
+        return _powerTokenImpl;
+    }
+
+    function getInterestTokenImpl() external view returns (address) {
+        return _interestTokenImpl;
+    }
+
+    function getBorrowTokenImpl() external view returns (address) {
+        return _borrowTokenImpl;
     }
 }

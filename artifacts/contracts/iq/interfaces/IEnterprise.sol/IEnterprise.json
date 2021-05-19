@@ -73,7 +73,7 @@
         },
         {
           "internalType": "address",
-          "name": "bTokenImpl",
+          "name": "borrowTokenImpl",
           "type": "address"
         },
         {

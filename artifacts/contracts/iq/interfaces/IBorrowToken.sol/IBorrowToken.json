@@ -168,11 +168,6 @@
           "internalType": "string",
           "name": "baseUri",
           "type": "string"
-        },
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
         }
       ],
       "name": "initialize",
