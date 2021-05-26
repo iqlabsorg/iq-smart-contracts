@@ -9,6 +9,7 @@ import "./math/SafeMath112.sol";
 import "./token/ERC20.sol";
 import "./interfaces/IPowerToken.sol";
 import "./InitializableOwnable.sol";
+import "./EnterpriseConfigurator.sol";
 
 contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
     using SafeMath for uint256;
@@ -21,55 +22,19 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
         uint32 timestamp;
     }
 
-    uint32 private _halfLife;
     mapping(address => State) private _states;
-    uint112 private _factor;
-    IERC20 private _factorCurrency;
-    uint32 private _lastDeal;
-    uint32 private _minLoanPeriod;
-    uint32 private _maxLoanPeriod;
+    EnterpriseConfigurator private _configurator;
 
     function initialize(
         string memory name,
         string memory symbol,
-        uint32 halfLife,
-        uint112 factor,
-        uint32 minLoanPeriod,
-        uint32 maxLoanPeriod
+        EnterpriseConfigurator configurator
     ) external override {
-        require(_lastDeal == 0, "Already initialized");
-        require(minLoanPeriod <= maxLoanPeriod, "Invalid min and max periods");
-        _halfLife = halfLife;
-        _lastDeal = uint32(block.timestamp);
-        _factor = factor;
-        _minLoanPeriod = minLoanPeriod;
-        _maxLoanPeriod = maxLoanPeriod;
+        require(address(_configurator) == address(0), "Already initialized");
+        require(address(configurator) != address(0), "Invalid configurator");
         InitializableOwnable.initialize(msg.sender);
         ERC20.initialize(name, symbol);
-    }
-
-    function getHalfLife() external view override returns (uint32) {
-        return _halfLife;
-    }
-
-    function getLastDeal() external view override returns (uint32) {
-        return _lastDeal;
-    }
-
-    function getFactor() external view override returns (uint112) {
-        return _factor;
-    }
-
-    function getMinLoanPeriod() external view override returns (uint32) {
-        return _minLoanPeriod;
-    }
-
-    function getMaxLoanPeriod() external view override returns (uint32) {
-        return _maxLoanPeriod;
-    }
-
-    function isAllowedLoanDuration(uint32 duration) external view override returns (bool) {
-        return _minLoanPeriod <= duration && duration <= _maxLoanPeriod;
+        _configurator = configurator;
     }
 
     function availableBalanceOf(address account) external view returns (uint256) {
@@ -116,9 +81,13 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
     ) internal view returns (uint112) {
         uint112 balance = uint112(balanceOf(who));
         if (balance > state.energy) {
-            return balance - ExpMath.halfLife(state.timestamp, balance - state.energy, _halfLife, timestamp);
+            return
+                balance -
+                ExpMath.halfLife(state.timestamp, balance - state.energy, _configurator.getHalfLife(this), timestamp);
         } else {
-            return balance + ExpMath.halfLife(state.timestamp, state.energy - balance, _halfLife, timestamp);
+            return
+                balance +
+                ExpMath.halfLife(state.timestamp, state.energy - balance, _configurator.getHalfLife(this), timestamp);
         }
     }
 

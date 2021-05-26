@@ -199,7 +199,7 @@ contract InterestToken is IInterestToken, InitializableOwnable {
         bytes32 r,
         bytes32 s
     ) external {
-        require(deadline >= block.timestamp, "UniswapV2: EXPIRED");
+        require(deadline >= block.timestamp, "InterestToken: EXPIRED");
         bytes32 digest =
             keccak256(
                 abi.encodePacked(
@@ -209,7 +209,7 @@ contract InterestToken is IInterestToken, InitializableOwnable {
                 )
             );
         address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "UniswapV2: INVALID_SIGNATURE");
+        require(recoveredAddress != address(0) && recoveredAddress == owner, "InterestToken: INVALID_SIGNATURE");
         _approve(owner, spender, value);
     }
 

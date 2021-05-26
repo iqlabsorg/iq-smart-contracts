@@ -3,26 +3,30 @@ pragma solidity 0.7.6;
 pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "./interfaces/IEnterprise.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/IPowerToken.sol";
 import "./InitializableOwnable.sol";
 import "./token/ERC721.sol";
+import "./EnterpriseConfigurator.sol";
 
 contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
     using SafeERC20 for IERC20;
     IEnterprise private _enterprise;
+    EnterpriseConfigurator private _configurator;
     uint256 private _counter = 1;
 
     function initialize(
         string memory name,
         string memory symbol,
-        string memory baseUri
+        string memory baseUri,
+        EnterpriseConfigurator configurator,
+        IEnterprise enterprise
     ) external override {
         InitializableOwnable.initialize(msg.sender);
         ERC721.initialize(name, symbol);
         _setBaseURI(baseUri);
-        _enterprise = IEnterprise(msg.sender);
+        _configurator = configurator;
+        _enterprise = enterprise;
     }
 
     function getCounter() external view override returns (uint256) {
@@ -39,7 +43,7 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
     function burn(uint256 tokenId, address burner) external override onlyOwner {
         _burn(tokenId);
         IEnterprise.LoanInfo memory loan = _enterprise.getLoanInfo(tokenId);
-        IERC20 lienToken = IERC20(_enterprise.supportedInterestTokens(loan.lienTokenIndex));
+        IERC20 lienToken = IERC20(_configurator.supportedPaymentTokens(loan.lienTokenIndex));
 
         lienToken.safeTransfer(burner, loan.lien);
     }

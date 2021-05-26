@@ -181,6 +181,16 @@
           "internalType": "string",
           "name": "baseUri",
           "type": "string"
+        },
+        {
+          "internalType": "contract EnterpriseConfigurator",
+          "name": "configurator",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IEnterprise",
+          "name": "enterprise",
+          "type": "address"
         }
       ],
       "name": "initialize",

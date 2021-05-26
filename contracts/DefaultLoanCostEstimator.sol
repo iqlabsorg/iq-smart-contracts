@@ -19,7 +19,9 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
         uint112 amount,
         uint32 duration
     ) external view override returns (uint112) {
-        uint256 totalCost = uint112((uint256(amount) * duration * powerToken.getFactor()));
+        EnterpriseConfigurator configurator = _enterprise.getConfigurator();
+
+        uint256 totalCost = uint112((uint256(amount) * duration * configurator.getFactor(powerToken)));
 
         // loanReturnLien = totalCost * 0.05;
 
@@ -29,7 +31,7 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
 
         // uint112 interestInLiquidityTokens = interest > type(uint112).max ? type(uint112).max : uint112(interest);
 
-        //uint256 uintInterestInLiquidityTokens = _reserve / (_availableReserve - amount); BONDING
+        // uint256 uintInterestInLiquidityTokens = _reserve / (_availableReserve - amount); BONDING
 
         // convertTo(interestInLiquidityTokens, interestPaymentToken),
 

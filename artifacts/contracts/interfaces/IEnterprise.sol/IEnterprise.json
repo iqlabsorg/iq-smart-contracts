@@ -17,6 +17,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "getConfigurator",
+      "outputs": [
+        {
+          "internalType": "contract EnterpriseConfigurator",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -98,70 +111,12 @@
           "type": "string"
         },
         {
-          "internalType": "address",
-          "name": "liquidityToken",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "baseUri",
-          "type": "string"
-        },
-        {
-          "internalType": "address",
-          "name": "interestTokenImpl",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "borrowTokenImpl",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "owner",
+          "internalType": "contract EnterpriseConfigurator",
+          "name": "configurator",
           "type": "address"
         }
       ],
       "name": "initialize",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "enterpriseFee",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "powerTokenImpl",
-          "type": "address"
-        },
-        {
-          "internalType": "uint32",
-          "name": "borrowerLoanReturnGracePeriod",
-          "type": "uint32"
-        },
-        {
-          "internalType": "uint32",
-          "name": "enterpriseLoanCollectGracePeriod",
-          "type": "uint32"
-        },
-        {
-          "internalType": "contract ILoanCostEstimator",
-          "name": "estimator",
-          "type": "address"
-        },
-        {
-          "internalType": "contract IConverter",
-          "name": "converter",
-          "type": "address"
-        }
-      ],
-      "name": "initialize2",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -187,25 +142,6 @@
       "name": "loanTransfer",
       "outputs": [],
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "index",
-          "type": "uint256"
-        }
-      ],
-      "name": "supportedInterestTokens",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
       "type": "function"
     }
   ],

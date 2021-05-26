@@ -3,10 +3,7 @@
 pragma solidity 0.7.6;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./IPowerToken.sol";
-import "./ILoanCostEstimator.sol";
-import "./IConverter.sol";
+import "../EnterpriseConfigurator.sol";
 
 interface IEnterprise {
     struct LoanInfo {
@@ -22,23 +19,7 @@ interface IEnterprise {
         // slot 2, 16 bytes left
     }
 
-    function initialize(
-        string memory enterpriseName,
-        address liquidityToken,
-        string memory baseUri,
-        address interestTokenImpl,
-        address borrowTokenImpl,
-        address owner
-    ) external;
-
-    function initialize2(
-        uint256 enterpriseFee,
-        address powerTokenImpl,
-        uint32 borrowerLoanReturnGracePeriod,
-        uint32 enterpriseLoanCollectGracePeriod,
-        ILoanCostEstimator estimator,
-        IConverter converter
-    ) external;
+    function initialize(string memory enterpriseName, EnterpriseConfigurator configurator) external;
 
     function loanTransfer(
         address from,
@@ -46,9 +27,9 @@ interface IEnterprise {
         uint256 tokenId
     ) external;
 
-    function getLoanInfo(uint256 tokenId) external view returns (LoanInfo memory);
+    function getConfigurator() external view returns (EnterpriseConfigurator);
 
-    function supportedInterestTokens(uint256 index) external view returns (address);
+    function getLoanInfo(uint256 tokenId) external view returns (LoanInfo memory);
 
     function getReserve() external view returns (uint256);
 
