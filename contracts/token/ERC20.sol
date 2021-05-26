@@ -113,7 +113,7 @@ contract ERC20 is IERC20Detailed {
      * - the caller must have a balance of at least `amount`.
      */
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-        _transfer(msg.sender, recipient, amount);
+        _transfer(msg.sender, recipient, amount, false);
         return true;
     }
 
@@ -154,7 +154,7 @@ contract ERC20 is IERC20Detailed {
         address recipient,
         uint256 amount
     ) public virtual override returns (bool) {
-        _transfer(sender, recipient, amount);
+        _transfer(sender, recipient, amount, false);
         _approve(
             sender,
             msg.sender,
@@ -220,12 +220,13 @@ contract ERC20 is IERC20Detailed {
     function _transfer(
         address sender,
         address recipient,
-        uint256 amount
+        uint256 amount,
+        bool withLocks
     ) internal virtual {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
-        _beforeTokenTransfer(sender, recipient, amount, true);
+        _beforeTokenTransfer(sender, recipient, amount, withLocks);
 
         _balances[sender] = _balances[sender].sub(amount, "ERC20: transfer amount exceeds balance");
         _balances[recipient] = _balances[recipient].add(amount);

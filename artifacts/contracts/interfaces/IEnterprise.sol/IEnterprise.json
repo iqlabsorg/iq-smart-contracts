@@ -1,0 +1,216 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IEnterprise",
+  "sourceName": "contracts/interfaces/IEnterprise.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "getAvailableReserve",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getLoanInfo",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint112",
+              "name": "amount",
+              "type": "uint112"
+            },
+            {
+              "internalType": "uint16",
+              "name": "powerTokenIndex",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint32",
+              "name": "borrowingTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maturityTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "borrowerReturnGraceTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "enterpriseCollectGraceTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint112",
+              "name": "lien",
+              "type": "uint112"
+            },
+            {
+              "internalType": "uint16",
+              "name": "lienTokenIndex",
+              "type": "uint16"
+            }
+          ],
+          "internalType": "struct IEnterprise.LoanInfo",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getReserve",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "enterpriseName",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "liquidityToken",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "baseUri",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "interestTokenImpl",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "borrowTokenImpl",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "enterpriseFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "powerTokenImpl",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "borrowerLoanReturnGracePeriod",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "enterpriseLoanCollectGracePeriod",
+          "type": "uint32"
+        },
+        {
+          "internalType": "contract ILoanCostEstimator",
+          "name": "estimator",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IConverter",
+          "name": "converter",
+          "type": "address"
+        }
+      ],
+      "name": "initialize2",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "loanTransfer",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        }
+      ],
+      "name": "supportedInterestTokens",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
