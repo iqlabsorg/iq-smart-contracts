@@ -56,12 +56,14 @@ contract EnterpriseFactory {
 
         EnterpriseConfigurator configurator = EnterpriseConfigurator(_configuratorImpl.clone());
         {
+            // scope to avoid stack too deep error
             IInterestToken interestToken = deployInterestToken(symbol);
             IBorrowToken borrowToken = deployBorrowToken(symbol, baseUri, configurator, enterprise);
 
             configurator.initialize(enterprise, liquidityToken, interestToken, borrowToken, msg.sender);
         }
         {
+            // scope to avoid stack too deep error
             configurator.initialize2(
                 _powerTokenImpl,
                 borrowerLoanReturnGracePeriod,

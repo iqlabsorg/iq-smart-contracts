@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 
 pragma solidity 0.7.6;
+// prettier-ignore
 pragma abicoder v2;
 
 import "../EnterpriseConfigurator.sol";
@@ -15,7 +16,7 @@ interface IEnterprise {
         uint32 enterpriseCollectGraceTime; // 4 bytes
         // slot 1, 0 bytes left
         uint112 lien; // 14 bytes, loan return reward
-        uint16 lienTokenIndex; // 2 bytes, index in supportedInterestTokens array
+        uint16 lienTokenIndex; // 2 bytes, index in supportedPaymentTokens array
         // slot 2, 16 bytes left
     }
 

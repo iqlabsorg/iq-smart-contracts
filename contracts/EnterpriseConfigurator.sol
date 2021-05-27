@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.7.6;
+// prettier-ignore
 pragma abicoder v2;
 
 import "./interfaces/IPowerToken.sol";
@@ -12,17 +13,17 @@ import "./InitializableOwnable.sol";
 
 contract EnterpriseConfigurator is InitializableOwnable {
     uint32 private constant ENTERPRISE_CONFIG_CHANGE_MINIMUM_GRACE_PERIOD = 24 hours;
-    uint16 private constant MAX_ENTERPRISE_FEE = 5000; // 50%
+    uint16 private constant MAX_SERVICE_FEE_PERCENT = 5000; // 50%
 
     struct ServiceConfig {
         // 1 slot
         uint112 factor;
         uint32 halfLife;
-        uint16 serviceFee; // 100 is 1%, fee which goes to the enterprise on each loan to cover service operational costs
-        uint16 previousServiceFee;
+        uint16 serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise on each loan to cover service operational costs
+        uint16 previousServiceFeePercent;
         // 2 slot
-        IERC20 factorToken;
-        uint32 serviceFeeChangeTime;
+        IERC20Detailed factorToken;
+        uint32 serviceFeePercentChangeTime; // scheduled service fee change time (if scheduled)
         uint32 minLoanPeriod;
         uint32 maxLoanPeriod;
     }
@@ -50,19 +51,20 @@ contract EnterpriseConfigurator is InitializableOwnable {
     address private _enterpriseVault;
     uint32 private _borrowerLoanReturnGracePeriod;
     uint32 private _enterpriseLoanCollectGracePeriod;
+    uint16 private _lienPercent; // 100 is 1%, 10_000 is 100%
+    uint16 private _previousLienPercent;
+    uint112 private _minimumLien;
+    uint112 private _previousMinimumLien;
+    uint32 private _lienTermsChangeTime;
 
     mapping(address => int16) private _supportedPaymentTokensIndex;
     address[] private _supportedPaymentTokens;
 
-    mapping(IPowerToken => ServiceConfig) serviceConfig;
+    mapping(IPowerToken => ServiceConfig) private _serviceConfig;
 
     modifier registeredPowerToken(IPowerToken powerToken) {
         require(isRegisteredPowerToken(powerToken), "Unknown PowerToken");
         _;
-    }
-
-    function isRegisteredPowerToken(IPowerToken powerToken) internal view returns (bool) {
-        return serviceConfig[powerToken].halfLife != 0;
     }
 
     function initialize(
@@ -111,7 +113,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
         return (address(_loanCostEstimator), address(_previousLoanCostEstimator), _loanCostEstimatorChangeTime);
     }
 
-    function setEnterpriseFeeGracePeriod(uint32 newPeriod) public onlyOwner {
+    function setEnterpriseConfigChangeGracePeriod(uint32 newPeriod) public onlyOwner {
         _enterpriseConfigChangeGracePeriod = newPeriod;
     }
 
@@ -124,6 +126,10 @@ contract EnterpriseConfigurator is InitializableOwnable {
         _loanCostEstimatorChangeTime = uint32(block.timestamp) + _enterpriseConfigChangeGracePeriod;
 
         //TODO: emit event
+    }
+
+    function isRegisteredPowerToken(IPowerToken powerToken) internal view returns (bool) {
+        return _serviceConfig[powerToken].halfLife != 0;
     }
 
     function getLoanCostEstimator() public view returns (ILoanCostEstimator) {
@@ -176,15 +182,15 @@ contract EnterpriseConfigurator is InitializableOwnable {
         return _powerTokenImpl;
     }
 
-    function getServiceFee(IPowerToken powerToken) public view returns (uint112) {
-        ServiceConfig storage config = serviceConfig[powerToken];
-        if (block.timestamp < config.serviceFeeChangeTime) return config.previousServiceFee;
+    function getServiceFeePercent(IPowerToken powerToken) public view returns (uint112) {
+        ServiceConfig storage config = _serviceConfig[powerToken];
+        if (block.timestamp < config.serviceFeePercentChangeTime) return config.previousServiceFeePercent;
 
-        return config.serviceFee;
+        return config.serviceFeePercent;
     }
 
     function getHalfLife(IPowerToken powerToken) public view returns (uint32) {
-        return serviceConfig[powerToken].halfLife;
+        return _serviceConfig[powerToken].halfLife;
     }
 
     function setEnterpriseCollector(address newCollector) public onlyOwner {
@@ -197,77 +203,99 @@ contract EnterpriseConfigurator is InitializableOwnable {
         _enterpriseVault = newVault;
     }
 
-    function scheduleEnterpriseFee(IPowerToken powerToken, uint16 newFee)
+    function scheduleServiceFeePercent(IPowerToken powerToken, uint16 newFeePercent)
         public
         onlyOwner
         registeredPowerToken(powerToken)
     {
-        _scheduleServiceFee(powerToken, newFee, uint32(block.timestamp) + _enterpriseConfigChangeGracePeriod);
+        _scheduleServiceFeePercent(
+            powerToken,
+            newFeePercent,
+            uint32(block.timestamp) + _enterpriseConfigChangeGracePeriod
+        );
     }
 
-    function scheduleEnterpriseFeeBatch(IPowerToken[] calldata powerToken, uint16[] calldata newFee)
+    function scheduleServiceFeePercentBatch(IPowerToken[] calldata powerToken, uint16[] calldata newFeePercent)
         external
         onlyOwner
     {
-        require(powerToken.length == newFee.length, "Invalid array length");
+        require(powerToken.length == newFeePercent.length, "Invalid array length");
 
         uint32 changeTime = uint32(block.timestamp) + _enterpriseConfigChangeGracePeriod;
         for (uint256 i = 0; i < powerToken.length; i++) {
             require(isRegisteredPowerToken(powerToken[i]), "Unknown PowerToken");
-            _scheduleServiceFee(powerToken[i], newFee[i], changeTime);
+            _scheduleServiceFeePercent(powerToken[i], newFeePercent[i], changeTime);
         }
     }
 
-    function _scheduleServiceFee(
+    function _scheduleServiceFeePercent(
         IPowerToken powerToken,
-        uint16 newFee,
+        uint16 newServiceFeePercent,
         uint32 changeTime
     ) internal {
-        ServiceConfig storage config = serviceConfig[powerToken];
+        require(newServiceFeePercent <= MAX_SERVICE_FEE_PERCENT, "Maximum service fee percent threshold");
 
-        if (config.serviceFeeChangeTime <= block.timestamp) {
-            config.previousServiceFee = config.serviceFee;
+        ServiceConfig storage config = _serviceConfig[powerToken];
+
+        if (config.serviceFeePercentChangeTime <= block.timestamp) {
+            config.previousServiceFeePercent = config.serviceFeePercent;
         }
-        config.serviceFee = newFee;
-        config.serviceFeeChangeTime = changeTime;
+        config.serviceFeePercent = newServiceFeePercent;
+        config.serviceFeePercentChangeTime = changeTime;
         //TODO: emit event
     }
 
     function addService(IPowerToken powerToken, ServiceConfig memory config) public {
         require(msg.sender == address(_enterprise), "Not an enterprise");
-        serviceConfig[powerToken] = config;
+        _serviceConfig[powerToken] = config;
     }
 
     function setFactor(
         IPowerToken powerToken,
         uint112 factor,
-        IERC20 factorToken
+        IERC20Detailed factorToken
     ) public onlyOwner registeredPowerToken(powerToken) {
         require(address(factorToken) != address(0), "Invalid Factor Token");
-        ServiceConfig storage config = serviceConfig[powerToken];
+        ServiceConfig storage config = _serviceConfig[powerToken];
 
         config.factor = factor;
         config.factorToken = factorToken;
     }
 
-    function getFactor(IPowerToken powerToken) external view returns (uint112) {
-        return serviceConfig[powerToken].factor;
+    function scheduleLienTerms(uint16 newLienPercent, uint112 newMinimumLien) external onlyOwner {
+        if (_lienTermsChangeTime <= block.timestamp) {
+            _previousLienPercent = _lienPercent;
+            _previousMinimumLien = _minimumLien;
+        }
+        _lienPercent = newLienPercent;
+        _minimumLien = newMinimumLien;
+        _lienTermsChangeTime = uint32(block.timestamp) + _enterpriseConfigChangeGracePeriod;
     }
 
-    function getFactorToken(IPowerToken powerToken) external view returns (IERC20) {
-        return serviceConfig[powerToken].factorToken;
+    function getLienTerms() external view returns (uint32 lienPercent, uint112 minimumLien) {
+        if (block.timestamp < _lienTermsChangeTime) return (_previousLienPercent, _previousMinimumLien);
+
+        return (_lienPercent, _minimumLien);
+    }
+
+    function getFactor(IPowerToken powerToken) external view returns (uint112) {
+        return _serviceConfig[powerToken].factor;
+    }
+
+    function getFactorToken(IPowerToken powerToken) external view returns (IERC20Detailed) {
+        return _serviceConfig[powerToken].factorToken;
     }
 
     function getMinLoanPeriod(IPowerToken powerToken) external view returns (uint32) {
-        return serviceConfig[powerToken].minLoanPeriod;
+        return _serviceConfig[powerToken].minLoanPeriod;
     }
 
     function getMaxLoanPeriod(IPowerToken powerToken) external view returns (uint32) {
-        return serviceConfig[powerToken].maxLoanPeriod;
+        return _serviceConfig[powerToken].maxLoanPeriod;
     }
 
     function isAllowedLoanDuration(IPowerToken powerToken, uint32 duration) external view returns (bool) {
-        ServiceConfig storage config = serviceConfig[powerToken];
+        ServiceConfig storage config = _serviceConfig[powerToken];
         return config.minLoanPeriod <= duration && duration <= config.maxLoanPeriod;
     }
 
