@@ -2,7 +2,7 @@
 
 pragma solidity 0.7.6;
 
-import "../iq/ExpMath.sol";
+import "../math/ExpMath.sol";
 
 contract ExpMathMock {
     uint112 public result;

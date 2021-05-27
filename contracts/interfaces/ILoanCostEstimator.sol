@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.7.6;
+
+import "./IPowerToken.sol";
+import "./IEnterprise.sol";
+
+interface ILoanCostEstimator {
+    function initialize(IEnterprise enterprise) external;
+
+    function estimateCost(
+        IPowerToken powerToken,
+        uint112 amount,
+        uint32 duration
+    ) external view returns (uint112);
+
+    function estimateLien(
+        IPowerToken powerToken,
+        IERC20 paymentToken,
+        uint112 amount,
+        uint32 duration
+    ) external view returns (uint112);
+
+    function notifyNewLoan(uint256 tokenId) external;
+}

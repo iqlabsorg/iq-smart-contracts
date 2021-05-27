@@ -7,4 +7,6 @@ interface IERC20Detailed is IERC20 {
     function symbol() external view returns (string memory);
 
     function name() external view returns (string memory);
+
+    function decimals() external view returns (uint8);
 }
