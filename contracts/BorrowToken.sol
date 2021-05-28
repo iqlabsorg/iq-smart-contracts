@@ -22,7 +22,7 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
         EnterpriseConfigurator configurator,
         IEnterprise enterprise
     ) external override {
-        InitializableOwnable.initialize(msg.sender);
+        InitializableOwnable.initialize(address(enterprise));
         ERC721.initialize(name, symbol);
         _baseUri = baseUri;
         _configurator = configurator;

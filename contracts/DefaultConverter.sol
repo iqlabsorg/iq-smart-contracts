@@ -18,11 +18,16 @@ contract DefaultConverter is IConverter {
         return amount;
     }
 
+    /**
+     * @dev Converts `source` tokens to `target` tokens.
+     * Converted tokens must be on `msg.sender` address after exiting this function
+     */
     function convert(
         IERC20 source,
-        uint256,
+        uint256 amount,
         IERC20 target
-    ) external pure override {
+    ) external pure override returns (uint256) {
         require(address(source) == address(target), "Not supported");
+        return amount;
     }
 }

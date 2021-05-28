@@ -27,9 +27,13 @@ contract InterestToken is IInterestToken, InitializableOwnable {
     bytes32 public constant PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
     mapping(address => uint256) public nonces;
 
-    function initialize(string memory name_, string memory symbol_) external override {
+    function initialize(
+        string memory name_,
+        string memory symbol_,
+        address owner
+    ) external override {
         require(bytes(_name).length == 0, "Contract already initialized");
-        InitializableOwnable.initialize(msg.sender);
+        InitializableOwnable.initialize(owner);
         _name = name_;
         _symbol = symbol_;
         uint256 chainId;

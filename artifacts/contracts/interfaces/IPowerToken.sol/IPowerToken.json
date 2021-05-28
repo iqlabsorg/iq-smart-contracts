@@ -225,7 +225,7 @@
         },
         {
           "internalType": "uint256",
-          "name": "amoun",
+          "name": "amount",
           "type": "uint256"
         }
       ],

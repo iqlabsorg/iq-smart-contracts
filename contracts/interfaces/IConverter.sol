@@ -25,5 +25,5 @@ interface IConverter {
         IERC20 source,
         uint256 amount,
         IERC20 target
-    ) external;
+    ) external returns (uint256);
 }

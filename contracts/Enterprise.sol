@@ -68,11 +68,12 @@ contract Enterprise is IEnterprise {
         string memory serviceName,
         string memory symbol,
         uint32 halfLife,
-        uint112 factor,
-        IERC20Metadata factorToken,
+        uint112 baseRate,
+        IERC20Metadata baseToken,
         uint16 serviceFee,
         uint32 minLoanDuration,
-        uint32 maxLoanDuration
+        uint32 maxLoanDuration,
+        uint112 minGCFee
     ) external onlyOwner {
         require(_powerTokens.length < type(uint16).max, "Cannot register more services");
         require(minLoanDuration <= maxLoanDuration, "Invalid min and max periods");
@@ -85,14 +86,13 @@ contract Enterprise is IEnterprise {
 
         EnterpriseConfigurator.ServiceConfig memory config =
             EnterpriseConfigurator.ServiceConfig(
-                factor,
+                baseRate,
+                minGCFee,
                 halfLife,
-                serviceFee,
-                serviceFee,
-                factorToken,
-                uint32(block.timestamp),
+                baseToken,
                 minLoanDuration,
-                maxLoanDuration
+                maxLoanDuration,
+                serviceFee
             );
 
         _configurator.addService(powerToken, config);
@@ -102,7 +102,7 @@ contract Enterprise is IEnterprise {
         _powerTokens.push(powerToken);
         _powerTokenIndexMap[powerToken] = _powerTokens.length;
 
-        emit ServiceRegistered(address(powerToken), halfLife, factor);
+        emit ServiceRegistered(address(powerToken), halfLife, baseRate);
     }
 
     function borrow(
@@ -119,26 +119,33 @@ contract Enterprise is IEnterprise {
         require(_configurator.isAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
         require(amount <= _availableReserve, "Insufficient reserves");
 
-        IBorrowToken borrowToken = _configurator.getBorrowToken();
-        uint112 lienAmount;
+        uint112 gcFee;
         {
-            // scope to avoid stack too deep error
-            (uint112 interest, uint112 serviceFee, uint112 lien) =
-                estimateLoan(powerToken, paymentToken, amount, duration);
-            lienAmount = lien;
+            // scope to avaid stack too deep errors
+            (uint112 interest, uint112 serviceFee, uint112 gcFeeAmount) =
+                _estimateLoan(powerToken, paymentToken, amount, duration);
+            gcFee = gcFeeAmount;
 
-            require(interest + serviceFee + lien <= maximumPayment, "Slippage is too big");
+            uint256 loanCost = interest + serviceFee;
+            require(loanCost + gcFee <= maximumPayment, "Slippage is too big");
 
-            //TODO: send to enterpriseVault according to serviceFee
-            //TODO: convert to liquidity tokens
-            paymentToken.safeTransferFrom(msg.sender, address(this), interest);
+            paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
 
-            //uint112 lien = 0; //TODO: store loan return lien
-            paymentToken.safeTransfer(address(borrowToken), lien);
+            IERC20 liquidityToken = _configurator.getLiquidityToken();
 
-            _availableReserve = _availableReserve - amount + interest;
+            uint256 convertedLiquidityTokens =
+                _configurator.getConverter().convert(paymentToken, loanCost, liquidityToken);
+
+            uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
+            liquidityToken.safeTransfer(_configurator.getEnterpriseVault(), serviceLiquidity);
+
+            uint256 poolInterest = convertedLiquidityTokens - serviceLiquidity;
+
+            _availableReserve = _availableReserve - amount + poolInterest;
+            _reserve += poolInterest;
         }
-
+        IBorrowToken borrowToken = _configurator.getBorrowToken();
+        paymentToken.safeTransferFrom(msg.sender, address(borrowToken), gcFee);
         uint32 borrowingTime = uint32(block.timestamp);
         uint32 maturiryTime = borrowingTime + duration;
         uint256 tokenId = borrowToken.getCounter();
@@ -149,12 +156,26 @@ contract Enterprise is IEnterprise {
             maturiryTime,
             maturiryTime + _configurator.getBorrowerLoanReturnGracePeriod(),
             maturiryTime + _configurator.getEnterpriseLoanCollectGracePeriod(),
-            lienAmount,
+            gcFee,
             uint16(_configurator.supportedPaymentTokensIndex(paymentToken))
         );
         emit Borrowed(address(powerToken), tokenId, borrowingTime, maturiryTime);
 
+        _configurator.getLoanCostEstimator().notifyNewLoan(tokenId);
+
         borrowToken.mint(msg.sender); // also mints PowerTokens
+    }
+
+    function estimateLoan(
+        IPowerToken powerToken,
+        IERC20 paymentToken,
+        uint112 amount,
+        uint32 duration
+    ) external view registeredPowerToken(powerToken) returns (uint256) {
+        (uint112 interest, uint112 serviceFee, uint112 gcFee) =
+            _estimateLoan(powerToken, paymentToken, amount, duration);
+
+        return interest + serviceFee + gcFee;
     }
 
     /**
@@ -162,31 +183,58 @@ contract Enterprise is IEnterprise {
      *  1) Pool interest
      *  2) Service operational fee
      *  3) Loan return lien
-     *
-     * Denominated in `interestPaymentToken` units
      */
-    function estimateLoan(
+    function _estimateLoan(
         IPowerToken powerToken,
         IERC20 paymentToken,
         uint112 amount,
         uint32 duration
     )
-        public
+        internal
         view
-        registeredPowerToken(powerToken)
         returns (
             uint112 interest,
             uint112 serviceFee,
-            uint112 lien
+            uint112 gcFee
         )
     {
-        ILoanCostEstimator estimator = _configurator.getLoanCostEstimator();
-        uint256 loanCost = estimator.estimateCost(powerToken, amount, duration);
+        uint112 loanCostBase = _configurator.getLoanCostEstimator().estimateCost(powerToken, amount, duration);
 
-        serviceFee = uint112((uint256(loanCost) * _configurator.getServiceFeePercent(powerToken)) / 10_000);
+        uint112 serviceFeeBase = estimateServiceFee(powerToken, loanCostBase);
+
+        uint256 loanCost =
+            _configurator.getConverter().estimateConvert(
+                _configurator.getBaseToken(powerToken),
+                loanCostBase,
+                paymentToken
+            );
+
+        serviceFee = uint112((uint256(serviceFeeBase) * loanCost) / loanCostBase);
         interest = uint112(loanCost - serviceFee);
+        gcFee = estimateGCFee(powerToken, paymentToken, amount);
+    }
 
-        lien = estimator.estimateLien(powerToken, paymentToken, amount, duration);
+    function estimateServiceFee(IPowerToken powerToken, uint112 loanCost) internal view returns (uint112) {
+        return uint112((uint256(loanCost) * _configurator.getServiceFeePercent(powerToken)) / 10_000);
+    }
+
+    function estimateGCFee(
+        IPowerToken powerToken,
+        IERC20 paymentToken,
+        uint112 amount
+    ) internal view returns (uint112) {
+        uint16 gcFeePercent = _configurator.getGCFeePercent();
+        uint112 gcFeeAmount = uint112((uint256(amount) * gcFeePercent) / 10_000);
+        IConverter converter = _configurator.getConverter();
+        uint112 minGcFee =
+            uint112(
+                converter.estimateConvert(
+                    _configurator.getBaseToken(powerToken),
+                    _configurator.getMinGCFee(powerToken),
+                    paymentToken
+                )
+            );
+        return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
     }
 
     function reborrow(
@@ -205,16 +253,29 @@ contract Enterprise is IEnterprise {
         require(_configurator.isAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
         require(loan.maturityTime + duration >= block.timestamp, "Invalid duration");
 
-        (uint112 interest, uint112 lean, uint112 enterpriseFee) =
-            estimateLoan(powerToken, paymentToken, loan.amount, duration);
-        require(interest <= maximumPayment, "Slippage is too big");
+        (uint112 interest, uint112 serviceFee, ) = _estimateLoan(powerToken, paymentToken, loan.amount, duration);
+        uint256 loanCost = interest + serviceFee;
+        require(loanCost <= maximumPayment, "Slippage is too big");
 
-        paymentToken.safeTransferFrom(msg.sender, address(this), interest);
+        paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
+
+        IERC20 liquidityToken = _configurator.getLiquidityToken();
+
+        uint256 convertedLiquidityTokens = _configurator.getConverter().convert(paymentToken, loanCost, liquidityToken);
+
+        uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
+        liquidityToken.safeTransfer(_configurator.getEnterpriseVault(), serviceLiquidity);
+        uint256 poolInterest = convertedLiquidityTokens - serviceLiquidity;
+
+        _availableReserve += poolInterest;
+        _reserve += poolInterest;
 
         uint32 borrowingTime = loan.maturityTime;
         loan.maturityTime = loan.maturityTime + duration;
         loan.borrowerReturnGraceTime = loan.maturityTime + _configurator.getBorrowerLoanReturnGracePeriod();
         loan.enterpriseCollectGraceTime = loan.maturityTime + _configurator.getEnterpriseLoanCollectGracePeriod();
+
+        _configurator.getLoanCostEstimator().notifyNewLoan(tokenId);
 
         emit Borrowed(address(powerToken), tokenId, borrowingTime, loan.maturityTime);
     }
@@ -241,7 +302,7 @@ contract Enterprise is IEnterprise {
 
         _availableReserve += loan.amount;
 
-        borrowToken.burn(tokenId, msg.sender); // burns PowerTokens, returns lien
+        borrowToken.burn(tokenId, msg.sender); // burns PowerTokens, returns gc fee
 
         delete _loanInfo[tokenId];
     }
@@ -327,7 +388,7 @@ contract Enterprise is IEnterprise {
         } else if (isBurning) {
             powerToken.burnFrom(from, loan.amount);
         } else if (isMinting) {
-            powerToken.mint(from, loan.amount);
+            powerToken.mint(to, loan.amount);
         } else if (!isExpiredBorrow) {
             powerToken.forceTransfer(from, to, loan.amount);
         } else {

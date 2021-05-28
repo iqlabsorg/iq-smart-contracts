@@ -3,6 +3,7 @@
 pragma solidity 0.8.4;
 import "./interfaces/ILoanCostEstimator.sol";
 import "./interfaces/IEnterprise.sol";
+import "hardhat/console.sol";
 
 contract DefaultLoanCostEstimator is ILoanCostEstimator {
     IEnterprise private _enterprise;
@@ -20,20 +21,39 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
         uint112 amount,
         uint32 duration
     ) external view override returns (uint112) {
+        uint256 availableReserve = _enterprise.getAvailableReserve();
+        if (availableReserve <= amount) return type(uint112).max;
+
         EnterpriseConfigurator configurator = _enterprise.getConfigurator();
-        uint256 minPrice = uint256(amount) * duration * configurator.getFactor(powerToken);
+        uint256 basePrice = (uint256(amount) * duration * configurator.getBaseRate(powerToken));
+        console.log("BASE", basePrice);
 
         uint256 reserve = _enterprise.getReserve();
-        uint256 availableReserve = _enterprise.getAvailableReserve();
+
         uint256 R0 = uint256(5 << 64) / 100; // 5% in 64 bits
         uint256 ONE = uint256(1 << 64);
         uint256 LAMBDA = uint256(2 << 64);
 
-        uint256 X = (availableReserve << 64) / reserve;
+        uint256 X = ((availableReserve - amount) << 64) / reserve;
+        if (X < R0) {
+            X = R0;
+        }
 
-        int128 F = log_2(int128(uint128(((ONE - R0) << 64) / (ONE - X))));
+        console.log("X   ", X);
+        console.log("ONE ", ONE);
+        console.log("R0  ", R0);
+        console.log("O-R0", ONE - R0);
+        uint128 D = (ONE - X == 0) ? uint128(type(int128).max) : uint128(((ONE - R0) << 64) / (ONE - X));
+        console.log("D   ", D);
 
-        return uint112((((ONE << 64) / (uint256(LAMBDA * uint256(uint128(F))) >> 64) + ONE) * ONE * minPrice) >> 64);
+        int128 F = log_2(int128(D));
+        console.log("F   ", uint128(F));
+        uint256 LAMBDA_F = (LAMBDA * uint256(uint128(F))) >> 64;
+        console.log("LF  ", uint128(LAMBDA_F));
+        uint256 DF = (ONE << 64) / LAMBDA_F;
+        console.log("DF  ", DF);
+
+        return uint112(((DF + ONE) * basePrice) >> 128);
 
         // uint112 effectiveK = ;
 
@@ -55,59 +75,48 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
     }
 
     function log_2(int128 x) internal pure returns (int128) {
-        require(x > 0);
+        unchecked {
+            require(x > 0);
 
-        int256 msb = 0;
-        int256 xc = x;
-        if (xc >= 0x10000000000000000) {
-            xc >>= 64;
-            msb += 64;
-        }
-        if (xc >= 0x100000000) {
-            xc >>= 32;
-            msb += 32;
-        }
-        if (xc >= 0x10000) {
-            xc >>= 16;
-            msb += 16;
-        }
-        if (xc >= 0x100) {
-            xc >>= 8;
-            msb += 8;
-        }
-        if (xc >= 0x10) {
-            xc >>= 4;
-            msb += 4;
-        }
-        if (xc >= 0x4) {
-            xc >>= 2;
-            msb += 2;
-        }
-        if (xc >= 0x2) msb += 1; // No need to shift xc anymore
+            int256 msb = 0;
+            int256 xc = x;
+            if (xc >= 0x10000000000000000) {
+                xc >>= 64;
+                msb += 64;
+            }
+            if (xc >= 0x100000000) {
+                xc >>= 32;
+                msb += 32;
+            }
+            if (xc >= 0x10000) {
+                xc >>= 16;
+                msb += 16;
+            }
+            if (xc >= 0x100) {
+                xc >>= 8;
+                msb += 8;
+            }
+            if (xc >= 0x10) {
+                xc >>= 4;
+                msb += 4;
+            }
+            if (xc >= 0x4) {
+                xc >>= 2;
+                msb += 2;
+            }
+            if (xc >= 0x2) msb += 1; // No need to shift xc anymore
 
-        int256 result = (msb - 64) << 64;
-        uint256 ux = uint256(int256(x)) << uint256(127 - msb);
-        for (int256 bit = 0x8000000000000000; bit > 0; bit >>= 1) {
-            ux *= ux;
-            uint256 b = ux >> 255;
-            ux >>= 127 + b;
-            result += bit * int256(b);
+            int256 result = (msb - 64) << 64;
+            uint256 ux = uint256(int256(x)) << uint256(127 - msb);
+            for (int256 bit = 0x8000000000000000; bit > 0; bit >>= 1) {
+                ux *= ux;
+                uint256 b = ux >> 255;
+                ux >>= 127 + b;
+                result += bit * int256(b);
+            }
+
+            return int128(result);
         }
-
-        return int128(result);
-    }
-
-    function estimateLien(
-        IPowerToken,
-        IERC20 paymentToken,
-        uint112 amount,
-        uint32 duration
-    ) external view override returns (uint112) {
-        (uint32 lienPercent, uint112 minLienAmount) = _enterprise.getConfigurator().getLienTerms();
-
-        uint256 lien = (uint256(amount) * lienPercent) / 10_000;
-
-        return uint112(lien);
     }
 
     function notifyNewLoan(uint256 tokenId) external override {}

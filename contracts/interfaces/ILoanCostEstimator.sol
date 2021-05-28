@@ -13,12 +13,5 @@ interface ILoanCostEstimator {
         uint32 duration
     ) external view returns (uint112);
 
-    function estimateLien(
-        IPowerToken powerToken,
-        IERC20 paymentToken,
-        uint112 amount,
-        uint32 duration
-    ) external view returns (uint112);
-
     function notifyNewLoan(uint256 tokenId) external;
 }

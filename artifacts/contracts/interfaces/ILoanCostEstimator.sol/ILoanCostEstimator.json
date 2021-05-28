@@ -35,40 +35,6 @@
     {
       "inputs": [
         {
-          "internalType": "contract IPowerToken",
-          "name": "powerToken",
-          "type": "address"
-        },
-        {
-          "internalType": "contract IERC20",
-          "name": "paymentToken",
-          "type": "address"
-        },
-        {
-          "internalType": "uint112",
-          "name": "amount",
-          "type": "uint112"
-        },
-        {
-          "internalType": "uint32",
-          "name": "duration",
-          "type": "uint32"
-        }
-      ],
-      "name": "estimateLien",
-      "outputs": [
-        {
-          "internalType": "uint112",
-          "name": "",
-          "type": "uint112"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "contract IEnterprise",
           "name": "enterprise",
           "type": "address"

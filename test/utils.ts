@@ -1,3 +1,4 @@
+import {BigNumber, BigNumberish} from '@ethersproject/bignumber';
 import {Contract} from '@ethersproject/contracts';
 import {ethers} from 'hardhat';
 import {Enterprise, Enterprise__factory, PowerToken} from '../typechain';
@@ -72,4 +73,10 @@ export const getInterestToken = async (
   const iToken = await ethers.getContractFactory('InterestToken');
 
   return iToken.attach(iTokenAddress);
+};
+
+export const toTokens = (amount: BigNumberish, decimals = 2): string => {
+  const a = BigInt(amount.toString());
+  const dec = 10n ** BigInt(18 - decimals);
+  return (Number(a / dec) / 10 ** decimals).toFixed(decimals);
 };
