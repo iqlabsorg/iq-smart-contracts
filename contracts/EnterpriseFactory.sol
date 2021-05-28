@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.7.6;
+pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./interfaces/IEnterprise.sol";
@@ -44,7 +44,7 @@ contract EnterpriseFactory {
 
     function deploy(
         string calldata name,
-        IERC20Detailed liquidityToken,
+        IERC20Metadata liquidityToken,
         string calldata baseUri,
         uint32 borrowerLoanReturnGracePeriod,
         uint32 enterpriseLoanCollectGracePeriod,

@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 
-pragma solidity 0.7.6;
+pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./math/ExpMath.sol";
-import "./math/SafeMath112.sol";
 import "./token/ERC20.sol";
 import "./interfaces/IPowerToken.sol";
 import "./InitializableOwnable.sol";
 import "./EnterpriseConfigurator.sol";
 
 contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
-    using SafeMath for uint256;
-    using SafeMath112 for uint112;
     using SafeERC20 for IERC20;
 
     struct State {
@@ -39,7 +35,7 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
 
     function availableBalanceOf(address account) external view returns (uint256) {
         State storage state = _states[account];
-        return balanceOf(account).sub(state.lockedBalance);
+        return balanceOf(account) - state.lockedBalance;
     }
 
     function mint(address to, uint256 value) external override onlyOwner {
@@ -113,7 +109,7 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
             fromState.energy = _getEnergy(fromState, from, timestamp);
             fromState.timestamp = timestamp;
             if (!updateLockedBalance) {
-                require(balanceOf(from).sub(value) >= fromState.lockedBalance, "Insuffucient available balance");
+                require(balanceOf(from) - value >= fromState.lockedBalance, "Insuffucient available balance");
             } else {
                 fromState.lockedBalance -= uint112(value);
             }

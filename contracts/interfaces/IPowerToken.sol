@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 
-pragma solidity 0.7.6;
+pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../token/IERC20Detailed.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./IInitializableOwnable.sol";
 import "../EnterpriseConfigurator.sol";
 
-interface IPowerToken is IERC20Detailed, IInitializableOwnable {
+interface IPowerToken is IERC20Metadata, IInitializableOwnable {
     function initialize(
         string memory name,
         string memory symbol,

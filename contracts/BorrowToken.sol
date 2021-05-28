@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.7.6;
-pragma abicoder v2;
+pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/IPowerToken.sol";
 import "./InitializableOwnable.sol";
@@ -14,6 +13,7 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
     IEnterprise private _enterprise;
     EnterpriseConfigurator private _configurator;
     uint256 private _counter = 1;
+    string private _baseUri;
 
     function initialize(
         string memory name,
@@ -24,13 +24,17 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
     ) external override {
         InitializableOwnable.initialize(msg.sender);
         ERC721.initialize(name, symbol);
-        _setBaseURI(baseUri);
+        _baseUri = baseUri;
         _configurator = configurator;
         _enterprise = enterprise;
     }
 
     function getCounter() external view override returns (uint256) {
         return _counter;
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return _baseUri;
     }
 
     function mint(address to) external override onlyOwner returns (uint256) {

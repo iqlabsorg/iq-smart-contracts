@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 
-pragma solidity 0.7.6;
+pragma solidity 0.8.4;
 import "./interfaces/ILoanCostEstimator.sol";
 import "./interfaces/IEnterprise.sol";
-import "./math/MulDiv.sol";
 
 contract DefaultLoanCostEstimator is ILoanCostEstimator {
-    using MulDiv for uint256;
     IEnterprise private _enterprise;
 
     function initialize(IEnterprise enterprise) external override {
@@ -16,6 +14,7 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
         _enterprise = enterprise;
     }
 
+    // y = (1 / (2 * log(2, ((100 - 5) / (100 - x)))) + 1) * 100, x = 5 to 100
     function estimateCost(
         IPowerToken powerToken,
         uint112 amount,
@@ -32,13 +31,9 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
 
         uint256 X = (availableReserve << 64) / reserve;
 
-        int128 F = log_2(int128(((ONE - R0) << 64) / (ONE - X)));
+        int128 F = log_2(int128(uint128(((ONE - R0) << 64) / (ONE - X))));
 
-        return uint112((((ONE << 64) / (uint256(LAMBDA * uint256(F)) >> 64) + ONE) * ONE * minPrice) >> 64);
-
-        // uint112 R0 = ;
-        // (R - R0) * (EK - K) = const
-        //
+        return uint112((((ONE << 64) / (uint256(LAMBDA * uint256(uint128(F))) >> 64) + ONE) * ONE * minPrice) >> 64);
 
         // uint112 effectiveK = ;
 
@@ -56,7 +51,7 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
 
         // convertTo(interestInLiquidityTokens, interestPaymentToken),
 
-        return uint112(reserve);
+        //return uint112(reserve);
     }
 
     function log_2(int128 x) internal pure returns (int128) {
@@ -106,12 +101,11 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
         IPowerToken,
         IERC20 paymentToken,
         uint112 amount,
-        uint32
+        uint32 duration
     ) external view override returns (uint112) {
-        EnterpriseConfigurator configurator = _enterprise.getConfigurator();
-        (uint32 lienPercent, ) = configurator.getLienTerms();
+        (uint32 lienPercent, uint112 minLienAmount) = _enterprise.getConfigurator().getLienTerms();
 
-        uint256 lien = uint256(amount).muldiv(lienPercent, 10_000);
+        uint256 lien = (uint256(amount) * lienPercent) / 10_000;
 
         return uint112(lien);
     }

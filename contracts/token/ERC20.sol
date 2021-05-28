@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.7.6;
+pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./IERC20Detailed.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -29,9 +28,7 @@ import "./IERC20Detailed.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract ERC20 is IERC20Detailed {
-    using SafeMath for uint256;
-
+contract ERC20 is IERC20Metadata {
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;
@@ -40,28 +37,26 @@ contract ERC20 is IERC20Detailed {
 
     string private _name;
     string private _symbol;
-    uint8 private _decimals;
 
     /**
-     * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
-     * a default value of 18.
+     * @dev Sets the values for {name} and {symbol}.
      *
-     * To select a different value for {decimals}, use {_setupDecimals}.
+     * The defaut value of {decimals} is 18. To select a different value for
+     * {decimals} you should overload it.
      *
-     * All three of these values are immutable: they can only be set once during
+     * All two of these values are immutable: they can only be set once during
      * construction.
      */
     function initialize(string memory name_, string memory symbol_) public {
         require(bytes(_name).length == 0, "Already initialized");
         _name = name_;
         _symbol = symbol_;
-        _decimals = 18;
     }
 
     /**
      * @dev Returns the name of the token.
      */
-    function name() external view override returns (string memory) {
+    function name() public view virtual override returns (string memory) {
         return _name;
     }
 
@@ -69,7 +64,7 @@ contract ERC20 is IERC20Detailed {
      * @dev Returns the symbol of the token, usually a shorter version of the
      * name.
      */
-    function symbol() external view override returns (string memory) {
+    function symbol() public view virtual override returns (string memory) {
         return _symbol;
     }
 
@@ -79,15 +74,15 @@ contract ERC20 is IERC20Detailed {
      * be displayed to a user as `5,05` (`505 / 10 ** 2`).
      *
      * Tokens usually opt for a value of 18, imitating the relationship between
-     * Ether and Wei. This is the value {ERC20} uses, unless {_setupDecimals} is
-     * called.
+     * Ether and Wei. This is the value {ERC20} uses, unless this function is
+     * overridden;
      *
      * NOTE: This information is only used for _display_ purposes: it in
      * no way affects any of the arithmetic of the contract, including
      * {IERC20-balanceOf} and {IERC20-transfer}.
      */
     function decimals() public view virtual override returns (uint8) {
-        return _decimals;
+        return 18;
     }
 
     /**
@@ -155,11 +150,11 @@ contract ERC20 is IERC20Detailed {
         uint256 amount
     ) public virtual override returns (bool) {
         _transfer(sender, recipient, amount, false);
-        _approve(
-            sender,
-            msg.sender,
-            _allowances[sender][msg.sender].sub(amount, "ERC20: transfer amount exceeds allowance")
-        );
+
+        uint256 currentAllowance = _allowances[sender][msg.sender];
+        require(currentAllowance >= amount, "ERC20: transfer amount exceeds allowance");
+        _approve(sender, msg.sender, currentAllowance - amount);
+
         return true;
     }
 
@@ -176,7 +171,7 @@ contract ERC20 is IERC20Detailed {
      * - `spender` cannot be the zero address.
      */
     function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
-        _approve(msg.sender, spender, _allowances[msg.sender][spender].add(addedValue));
+        _approve(msg.sender, spender, _allowances[msg.sender][spender] + addedValue);
         return true;
     }
 
@@ -195,11 +190,10 @@ contract ERC20 is IERC20Detailed {
      * `subtractedValue`.
      */
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
-        _approve(
-            msg.sender,
-            spender,
-            _allowances[msg.sender][spender].sub(subtractedValue, "ERC20: decreased allowance below zero")
-        );
+        uint256 currentAllowance = _allowances[msg.sender][spender];
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        _approve(msg.sender, spender, currentAllowance - subtractedValue);
+
         return true;
     }
 
@@ -221,15 +215,18 @@ contract ERC20 is IERC20Detailed {
         address sender,
         address recipient,
         uint256 amount,
-        bool withLocks
+        bool updateLockedBalance
     ) internal virtual {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
-        _beforeTokenTransfer(sender, recipient, amount, withLocks);
+        _beforeTokenTransfer(sender, recipient, amount, updateLockedBalance);
 
-        _balances[sender] = _balances[sender].sub(amount, "ERC20: transfer amount exceeds balance");
-        _balances[recipient] = _balances[recipient].add(amount);
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        _balances[sender] = senderBalance - amount;
+        _balances[recipient] += amount;
+
         emit Transfer(sender, recipient, amount);
     }
 
@@ -245,14 +242,14 @@ contract ERC20 is IERC20Detailed {
     function _mint(
         address account,
         uint256 amount,
-        bool withLocks
+        bool updateLockedBalance
     ) internal virtual {
         require(account != address(0), "ERC20: mint to the zero address");
 
-        _beforeTokenTransfer(address(0), account, amount, withLocks);
+        _beforeTokenTransfer(address(0), account, amount, updateLockedBalance);
 
-        _totalSupply = _totalSupply.add(amount);
-        _balances[account] = _balances[account].add(amount);
+        _totalSupply += amount;
+        _balances[account] += amount;
         emit Transfer(address(0), account, amount);
     }
 
@@ -270,14 +267,17 @@ contract ERC20 is IERC20Detailed {
     function _burn(
         address account,
         uint256 amount,
-        bool withLocks
+        bool updateLockedBalance
     ) internal virtual {
         require(account != address(0), "ERC20: burn from the zero address");
 
-        _beforeTokenTransfer(account, address(0), amount, withLocks);
+        _beforeTokenTransfer(account, address(0), amount, updateLockedBalance);
 
-        _balances[account] = _balances[account].sub(amount, "ERC20: burn amount exceeds balance");
-        _totalSupply = _totalSupply.sub(amount);
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
         emit Transfer(account, address(0), amount);
     }
 
@@ -307,17 +307,6 @@ contract ERC20 is IERC20Detailed {
     }
 
     /**
-     * @dev Sets {decimals} to a value other than the default one of 18.
-     *
-     * WARNING: This function should only be called from the constructor. Most
-     * applications that interact with token contracts will not expect
-     * {decimals} to ever change, and may work incorrectly if it does.
-     */
-    function _setupDecimals(uint8 decimals_) internal virtual {
-        _decimals = decimals_;
-    }
-
-    /**
      * @dev Hook that is called before any transfer of tokens. This includes
      * minting and burning.
      *
@@ -335,6 +324,6 @@ contract ERC20 is IERC20Detailed {
         address from,
         address to,
         uint256 amount,
-        bool withLocks
+        bool updateLockedBalance
     ) internal virtual {}
 }

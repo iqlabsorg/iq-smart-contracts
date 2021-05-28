@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.7.6;
-// prettier-ignore
-pragma abicoder v2;
+pragma solidity 0.8.4;
 
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./interfaces/IPowerToken.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/ILoanCostEstimator.sol";
 import "./interfaces/IConverter.sol";
-import "./token/IERC20Detailed.sol";
 import "./InitializableOwnable.sol";
 
 contract EnterpriseConfigurator is InitializableOwnable {
@@ -22,7 +20,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
         uint16 serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise on each loan to cover service operational costs
         uint16 previousServiceFeePercent;
         // 2 slot
-        IERC20Detailed factorToken;
+        IERC20Metadata factorToken;
         uint32 serviceFeePercentChangeTime; // scheduled service fee change time (if scheduled)
         uint32 minLoanPeriod;
         uint32 maxLoanPeriod;
@@ -31,7 +29,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
     /**
      * @dev ERC20 token backed by enterprise services
      */
-    IERC20Detailed private _liquidityToken;
+    IERC20Metadata private _liquidityToken;
 
     IInterestToken private _interestToken;
     /**
@@ -69,7 +67,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
 
     function initialize(
         IEnterprise enterprise,
-        IERC20Detailed liquidityToken,
+        IERC20Metadata liquidityToken,
         IInterestToken interestToken,
         IBorrowToken borrowToken,
         address owner
@@ -138,7 +136,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
         return _loanCostEstimator;
     }
 
-    function getLiquidityToken() external view returns (IERC20Detailed) {
+    function getLiquidityToken() external view returns (IERC20Metadata) {
         return _liquidityToken;
     }
 
@@ -253,7 +251,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
     function setFactor(
         IPowerToken powerToken,
         uint112 factor,
-        IERC20Detailed factorToken
+        IERC20Metadata factorToken
     ) public onlyOwner registeredPowerToken(powerToken) {
         require(address(factorToken) != address(0), "Invalid Factor Token");
         ServiceConfig storage config = _serviceConfig[powerToken];
@@ -282,7 +280,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
         return _serviceConfig[powerToken].factor;
     }
 
-    function getFactorToken(IPowerToken powerToken) external view returns (IERC20Detailed) {
+    function getFactorToken(IPowerToken powerToken) external view returns (IERC20Metadata) {
         return _serviceConfig[powerToken].factorToken;
     }
 
@@ -302,7 +300,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
     function _enablePaymentToken(address token) internal {
         if (_supportedPaymentTokensIndex[token] == 0) {
             _supportedPaymentTokens.push(token);
-            _supportedPaymentTokensIndex[token] = int16(_supportedPaymentTokens.length);
+            _supportedPaymentTokensIndex[token] = int16(uint16(_supportedPaymentTokens.length));
         } else if (_supportedPaymentTokensIndex[token] < 0) {
             _supportedPaymentTokensIndex[token] = -_supportedPaymentTokensIndex[token];
         }

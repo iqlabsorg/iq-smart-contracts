@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.7.6;
-// prettier-ignore
-pragma abicoder v2;
+pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "./token/IERC20Detailed.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./math/ExpMath.sol";
-import "./math/MulDiv.sol";
 import "./InitializableOwnable.sol";
 import "./interfaces/IEnterprise.sol";
 import "./interfaces/IInterestToken.sol";
@@ -19,9 +16,8 @@ import "./EnterpriseConfigurator.sol";
 
 contract Enterprise is IEnterprise {
     using SafeERC20 for IERC20;
-    using SafeERC20 for IERC20Detailed;
+    using SafeERC20 for IERC20Metadata;
     using Clones for address;
-    using MulDiv for uint256;
 
     EnterpriseConfigurator private _configurator;
 
@@ -73,7 +69,7 @@ contract Enterprise is IEnterprise {
         string memory symbol,
         uint32 halfLife,
         uint112 factor,
-        IERC20Detailed factorToken,
+        IERC20Metadata factorToken,
         uint16 serviceFee,
         uint32 minLoanDuration,
         uint32 maxLoanDuration
@@ -127,13 +123,11 @@ contract Enterprise is IEnterprise {
         uint112 lienAmount;
         {
             // scope to avoid stack too deep error
-            _configurator.getLoanCostEstimator().estimateCost(powerToken, amount, duration);
-
-            (uint112 interest, uint112 lien, uint112 serviceFee) =
+            (uint112 interest, uint112 serviceFee, uint112 lien) =
                 estimateLoan(powerToken, paymentToken, amount, duration);
             lienAmount = lien;
 
-            require(interest + lien + serviceFee <= maximumPayment, "Slippage is too big");
+            require(interest + serviceFee + lien <= maximumPayment, "Slippage is too big");
 
             //TODO: send to enterpriseVault according to serviceFee
             //TODO: convert to liquidity tokens
@@ -166,7 +160,7 @@ contract Enterprise is IEnterprise {
     /**
      * @dev Estimates loan cost divided into 3 parts:
      *  1) Pool interest
-     *  2) Enterprise operational fee
+     *  2) Service operational fee
      *  3) Loan return lien
      *
      * Denominated in `interestPaymentToken` units
@@ -182,14 +176,14 @@ contract Enterprise is IEnterprise {
         registeredPowerToken(powerToken)
         returns (
             uint112 interest,
-            uint112 lien,
-            uint112 serviceFee
+            uint112 serviceFee,
+            uint112 lien
         )
     {
         ILoanCostEstimator estimator = _configurator.getLoanCostEstimator();
         uint256 loanCost = estimator.estimateCost(powerToken, amount, duration);
 
-        serviceFee = uint112(loanCost.muldiv(_configurator.getServiceFeePercent(powerToken), 10_000));
+        serviceFee = uint112((uint256(loanCost) * _configurator.getServiceFeePercent(powerToken)) / 10_000);
         interest = uint112(loanCost - serviceFee);
 
         lien = estimator.estimateLien(powerToken, paymentToken, amount, duration);
