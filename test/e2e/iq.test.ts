@@ -50,8 +50,6 @@ describe.only('IQ Protocol E2E', () => {
       'Testing',
       token.address,
       'https://test.iq.io',
-      BORROWER_LOAN_RETURN_GRACE_PERIOD,
-      ENTERPRISE_LOAN_RETURN_GRACE_PERIOD,
       estimator.address,
       converter.address
     );
@@ -136,7 +134,7 @@ describe.only('IQ Protocol E2E', () => {
         300, // 3%
         43200, // 12 hours
         86400 * 60, // 2 months
-        ONE_TOKEN
+        0
       );
       powerToken = await getPowerToken(enterprise, tx);
 
@@ -193,8 +191,8 @@ describe.only('IQ Protocol E2E', () => {
     });
 
     it.only('should be possible to take 2 loans', async () => {
-      const BORROW1 = ONE_TOKEN.mul(900000);
-      const BORROW2 = ONE_TOKEN.mul(1);
+      const BORROW1 = ONE_TOKEN.mul(300000);
+      const BORROW2 = ONE_TOKEN.mul(200000);
 
       const userToken = await ethers.getContract('ERC20Mock', user);
       await userToken.approve(enterprise.address, MAX_PAYMENT_AMOUNT);
@@ -206,6 +204,19 @@ describe.only('IQ Protocol E2E', () => {
       )) as Enterprise;
 
       const balanceBefore = await token.balanceOf(user);
+
+      console.log(
+        'Loan --> ',
+        toTokens(
+          await userEnterprise.estimateLoan(
+            powerToken.address,
+            token.address,
+            BORROW1,
+            86400
+          ),
+          4
+        )
+      );
 
       const borrow1Tx = await userEnterprise.borrow(
         powerToken.address,
@@ -225,10 +236,10 @@ describe.only('IQ Protocol E2E', () => {
       const balanceAfter2 = await token.balanceOf(user);
 
       console.log(
-        toTokens(balanceBefore.sub(balanceAfter1)),
-        toTokens(balanceAfter1.sub(balanceAfter2)),
+        toTokens(balanceBefore.sub(balanceAfter1), 15),
+        toTokens(balanceAfter1.sub(balanceAfter2), 15),
         'Total',
-        toTokens(balanceBefore.sub(balanceAfter2))
+        toTokens(balanceBefore.sub(balanceAfter2), 15)
       );
     });
   });

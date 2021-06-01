@@ -178,11 +178,6 @@
           "type": "string"
         },
         {
-          "internalType": "string",
-          "name": "baseUri",
-          "type": "string"
-        },
-        {
           "internalType": "contract EnterpriseConfigurator",
           "name": "configurator",
           "type": "address"

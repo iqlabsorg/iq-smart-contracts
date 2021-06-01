@@ -73,12 +73,12 @@
             },
             {
               "internalType": "uint112",
-              "name": "lien",
+              "name": "gcFee",
               "type": "uint112"
             },
             {
               "internalType": "uint16",
-              "name": "lienTokenIndex",
+              "name": "gcFeeTokenIndex",
               "type": "uint16"
             }
           ],
@@ -124,6 +124,25 @@
     {
       "inputs": [
         {
+          "internalType": "contract IPowerToken",
+          "name": "powerToken",
+          "type": "address"
+        }
+      ],
+      "name": "isRegisteredPowerToken",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "address",
           "name": "from",
           "type": "address"
@@ -142,6 +161,19 @@
       "name": "loanTransfer",
       "outputs": [],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     }
   ],

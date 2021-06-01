@@ -6,7 +6,15 @@ import "./interfaces/IEnterprise.sol";
 import "hardhat/console.sol";
 
 contract DefaultLoanCostEstimator is ILoanCostEstimator {
+    uint256 internal constant ONE = 1 << 64;
+
     IEnterprise private _enterprise;
+    mapping(IPowerToken => uint256) private _serviceLambda;
+
+    modifier onlyOwner() {
+        require(msg.sender == _enterprise.owner(), "Not an owner");
+        _;
+    }
 
     function initialize(IEnterprise enterprise) external override {
         require(address(enterprise) != address(0), "Zero address");
@@ -15,7 +23,23 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
         _enterprise = enterprise;
     }
 
-    // y = (1 / (2 * log(2, ((100 - 5) / (100 - x)))) + 1) * 100, x = 5 to 100
+    function initializeService(IPowerToken powerToken) external override {
+        require(address(_enterprise) != address(0), "Not initialized");
+        require(_enterprise.isRegisteredPowerToken(powerToken), "Unknown Power Token");
+        _serviceLambda[powerToken] = ONE;
+    }
+
+    function setLambda(IPowerToken powerToken, uint256 lambda) external onlyOwner {
+        require(lambda > 0, "Cannot be zero");
+        _serviceLambda[powerToken] = lambda;
+    }
+
+    /**
+     * @dev
+     * f(x) = 1 - λln(x)
+     * h(x) = x * f((T - x) / T)
+     * g(x) = h(U + x) - h(U)
+     */
     function estimateCost(
         IPowerToken powerToken,
         uint112 amount,
@@ -24,54 +48,37 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
         uint256 availableReserve = _enterprise.getAvailableReserve();
         if (availableReserve <= amount) return type(uint112).max;
 
-        EnterpriseConfigurator configurator = _enterprise.getConfigurator();
-        uint256 basePrice = (uint256(amount) * duration * configurator.getBaseRate(powerToken));
-        console.log("BASE", basePrice);
+        console.log("AVAIL", availableReserve);
 
+        EnterpriseConfigurator configurator = _enterprise.getConfigurator();
+
+        uint256 basePrice = configurator.getBaseRate(powerToken);
+        console.log("BASE", basePrice);
+        uint256 lambda = _serviceLambda[powerToken];
+        console.log("L", lambda);
+
+        uint256 price = (g(amount, lambda) * basePrice * duration) >> 64;
+
+        return uint112(price);
+    }
+
+    function f(uint128 x, uint256 lambda) internal view returns (uint256) {
+        console.log("LOG", x, uint128(log_2(int128(x))));
+        return ONE + ((lambda * uint128(log_2(int128(x)))) >> 64);
+    }
+
+    function h(uint256 x, uint256 lambda) internal view returns (uint256) {
         uint256 reserve = _enterprise.getReserve();
 
-        uint256 R0 = uint256(5 << 64) / 100; // 5% in 64 bits
-        uint256 ONE = uint256(1 << 64);
-        uint256 LAMBDA = uint256(2 << 64);
+        console.log("H", x);
 
-        uint256 X = ((availableReserve - amount) << 64) / reserve;
-        if (X < R0) {
-            X = R0;
-        }
+        return (x * f(uint128((reserve << 64) / ((reserve - x))), lambda)) >> 64;
+    }
 
-        console.log("X   ", X);
-        console.log("ONE ", ONE);
-        console.log("R0  ", R0);
-        console.log("O-R0", ONE - R0);
-        uint128 D = (ONE - X == 0) ? uint128(type(int128).max) : uint128(((ONE - R0) << 64) / (ONE - X));
-        console.log("D   ", D);
+    function g(uint256 x, uint256 lambda) internal view returns (uint256) {
+        uint256 usedReserve = _enterprise.getReserve() - _enterprise.getAvailableReserve();
 
-        int128 F = log_2(int128(D));
-        console.log("F   ", uint128(F));
-        uint256 LAMBDA_F = (LAMBDA * uint256(uint128(F))) >> 64;
-        console.log("LF  ", uint128(LAMBDA_F));
-        uint256 DF = (ONE << 64) / LAMBDA_F;
-        console.log("DF  ", DF);
-
-        return uint112(((DF + ONE) * basePrice) >> 128);
-
-        // uint112 effectiveK = ;
-
-        // uint256 totalCost = uint112((uint256(amount) * duration * effectiveK));
-
-        // loanReturnLien = totalCost * 0.05;
-
-        // enterpriseFee = totalCost * _enterpriseFee;
-
-        // interest = totalCost - enterpriseFee;
-
-        // uint112 interestInLiquidityTokens = interest > type(uint112).max ? type(uint112).max : uint112(interest);
-
-        // uint256 uintInterestInLiquidityTokens = _reserve / (_availableReserve - amount); //BONDING
-
-        // convertTo(interestInLiquidityTokens, interestPaymentToken),
-
-        //return uint112(reserve);
+        return h(usedReserve + x, lambda) - h(usedReserve, lambda);
     }
 
     function log_2(int128 x) internal pure returns (int128) {

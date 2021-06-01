@@ -48,12 +48,13 @@ contract EnterpriseConfigurator is InitializableOwnable {
     address private _enterpriseCollector;
 
     address private _enterpriseVault;
-    uint32 private _borrowerLoanReturnGracePeriod;
-    uint32 private _enterpriseLoanCollectGracePeriod;
+    uint32 private _borrowerLoanReturnGracePeriod = 1 days;
+    uint32 private _enterpriseLoanCollectGracePeriod = 2 days;
     uint16 private _gcFeePercent; // 100 is 1%, 10_000 is 100%
 
     mapping(address => int16) private _paymentTokensIndex;
     address[] private _paymentTokens;
+    string private _baseUri;
 
     mapping(IPowerToken => ServiceConfig) private _serviceConfig;
 
@@ -68,7 +69,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
         IInterestToken interestToken,
         IBorrowToken borrowToken,
         address owner
-    ) public {
+    ) external {
         require(address(_interestToken) == address(0), "Already initialized");
         InitializableOwnable.initialize(owner);
         _enterprise = enterprise;
@@ -81,33 +82,16 @@ contract EnterpriseConfigurator is InitializableOwnable {
     }
 
     function initialize2(
+        string calldata baseUri,
         address powerTokenImpl,
-        uint32 borrowerLoanReturnGracePeriod,
-        uint32 enterpriseLoanCollectGracePeriod,
         ILoanCostEstimator estimator,
         IConverter converter
     ) public {
         require(_powerTokenImpl == address(0), "Already initialized");
-        require(borrowerLoanReturnGracePeriod <= enterpriseLoanCollectGracePeriod, "Invalid grace periods");
+        _baseUri = baseUri;
         _powerTokenImpl = powerTokenImpl;
-        _borrowerLoanReturnGracePeriod = borrowerLoanReturnGracePeriod;
-        _enterpriseLoanCollectGracePeriod = enterpriseLoanCollectGracePeriod;
         _loanCostEstimator = estimator;
         _converter = converter;
-    }
-
-    function setLoanCostEstimator(ILoanCostEstimator newEstimator) external onlyOwner {
-        require(address(newEstimator) != address(0), "Zero address");
-        _loanCostEstimator = newEstimator;
-        //TODO: emit event
-    }
-
-    function isRegisteredPowerToken(IPowerToken powerToken) internal view returns (bool) {
-        return _serviceConfig[powerToken].halfLife != 0;
-    }
-
-    function getLoanCostEstimator() external view returns (ILoanCostEstimator) {
-        return _loanCostEstimator;
     }
 
     function getLiquidityToken() external view returns (IERC20Metadata) {
@@ -120,6 +104,16 @@ contract EnterpriseConfigurator is InitializableOwnable {
 
     function getBorrowToken() external view returns (IBorrowToken) {
         return _borrowToken;
+    }
+
+    function setLoanCostEstimator(ILoanCostEstimator newEstimator) external onlyOwner {
+        require(address(newEstimator) != address(0), "Zero address");
+        _loanCostEstimator = newEstimator;
+        //TODO: emit event
+    }
+
+    function getLoanCostEstimator() external view returns (ILoanCostEstimator) {
+        return _loanCostEstimator;
     }
 
     function supportedPaymentTokensIndex(IERC20 token) external view returns (int16) {
@@ -166,6 +160,10 @@ contract EnterpriseConfigurator is InitializableOwnable {
         return _converter;
     }
 
+    function getBaseUri() external view returns (string memory) {
+        return _baseUri;
+    }
+
     function setEnterpriseCollector(address newCollector) public onlyOwner {
         require(newCollector != address(0), "Zero address");
         _enterpriseCollector = newCollector;
@@ -179,6 +177,22 @@ contract EnterpriseConfigurator is InitializableOwnable {
     function setConverter(IConverter newConverter) external onlyOwner {
         require(address(newConverter) != address(0), "Zero address");
         _converter = newConverter;
+    }
+
+    function setBorrowerLoanReturnGracePeriod(uint32 newPeriod) external onlyOwner {
+        require(newPeriod <= _enterpriseLoanCollectGracePeriod, "Invalid grace periods");
+
+        _borrowerLoanReturnGracePeriod = newPeriod;
+    }
+
+    function setEnterpriseLoanCollectGracePeriod(uint32 newPeriod) external onlyOwner {
+        require(_borrowerLoanReturnGracePeriod <= newPeriod, "Invalid grace periods");
+
+        _enterpriseLoanCollectGracePeriod = newPeriod;
+    }
+
+    function setBaseUri(string calldata baseUri) external onlyOwner {
+        _baseUri = baseUri;
     }
 
     function setServiceFeePercent(IPowerToken powerToken, uint16 newFeePercent)
@@ -213,7 +227,7 @@ contract EnterpriseConfigurator is InitializableOwnable {
         _serviceConfig[powerToken] = config;
     }
 
-    function setBaseRate(
+    function setServiceBaseRate(
         IPowerToken powerToken,
         uint112 baseRate,
         IERC20Metadata baseToken,
@@ -227,11 +241,12 @@ contract EnterpriseConfigurator is InitializableOwnable {
         config.minGCFee = minGCFee;
     }
 
-    function setLoanDurationLimits(
+    function setServiceLoanDurationLimits(
         IPowerToken powerToken,
         uint32 minLoanDuration,
         uint32 maxLoanDuration
     ) external onlyOwner registeredPowerToken(powerToken) {
+        require(minLoanDuration <= maxLoanDuration, "Invalid durations");
         ServiceConfig storage config = _serviceConfig[powerToken];
 
         config.minLoanDuration = minLoanDuration;
@@ -246,27 +261,27 @@ contract EnterpriseConfigurator is InitializableOwnable {
         return _gcFeePercent;
     }
 
-    function getBaseRate(IPowerToken powerToken) external view returns (uint112) {
+    function getServiceBaseRate(IPowerToken powerToken) external view returns (uint112) {
         return _serviceConfig[powerToken].baseRate;
     }
 
-    function getMinGCFee(IPowerToken powerToken) external view returns (uint112) {
+    function getServiceMinGCFee(IPowerToken powerToken) external view returns (uint112) {
         return _serviceConfig[powerToken].minGCFee;
     }
 
-    function getBaseToken(IPowerToken powerToken) external view returns (IERC20Metadata) {
+    function getServiceBaseToken(IPowerToken powerToken) external view returns (IERC20Metadata) {
         return _serviceConfig[powerToken].baseToken;
     }
 
-    function getMinLoanDuration(IPowerToken powerToken) external view returns (uint32) {
+    function getServiceMinLoanDuration(IPowerToken powerToken) external view returns (uint32) {
         return _serviceConfig[powerToken].minLoanDuration;
     }
 
-    function getMaxLoanDuration(IPowerToken powerToken) external view returns (uint32) {
+    function getServiceMaxLoanDuration(IPowerToken powerToken) external view returns (uint32) {
         return _serviceConfig[powerToken].maxLoanDuration;
     }
 
-    function isAllowedLoanDuration(IPowerToken powerToken, uint32 duration) external view returns (bool) {
+    function isServiceAllowedLoanDuration(IPowerToken powerToken, uint32 duration) external view returns (bool) {
         ServiceConfig storage config = _serviceConfig[powerToken];
         return config.minLoanDuration <= duration && duration <= config.maxLoanDuration;
     }
@@ -278,6 +293,10 @@ contract EnterpriseConfigurator is InitializableOwnable {
 
     function disablePaymentToken(address token) public onlyOwner {
         _disablePaymentToken(token);
+    }
+
+    function isRegisteredPowerToken(IPowerToken powerToken) internal view returns (bool) {
+        return _serviceConfig[powerToken].halfLife != 0;
     }
 
     function _enablePaymentToken(address token) internal {

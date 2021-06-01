@@ -46,8 +46,6 @@ contract EnterpriseFactory {
         string calldata name,
         IERC20Metadata liquidityToken,
         string calldata baseUri,
-        uint32 borrowerLoanReturnGracePeriod,
-        uint32 enterpriseLoanCollectGracePeriod,
         address estimator,
         IConverter converter
     ) external returns (IEnterprise) {
@@ -58,19 +56,13 @@ contract EnterpriseFactory {
         {
             // scope to avoid stack too deep error
             IInterestToken interestToken = deployInterestToken(liquidityToken.symbol(), enterprise);
-            IBorrowToken borrowToken = deployBorrowToken(liquidityToken.symbol(), baseUri, configurator, enterprise);
+            IBorrowToken borrowToken = deployBorrowToken(liquidityToken.symbol(), configurator, enterprise);
 
             configurator.initialize(enterprise, liquidityToken, interestToken, borrowToken, msg.sender);
         }
         {
             // scope to avoid stack too deep error
-            configurator.initialize2(
-                _powerTokenImpl,
-                borrowerLoanReturnGracePeriod,
-                enterpriseLoanCollectGracePeriod,
-                loanCostEstimator,
-                converter
-            );
+            configurator.initialize2(baseUri, _powerTokenImpl, loanCostEstimator, converter);
         }
         enterprise.initialize(name, configurator);
 
@@ -86,13 +78,12 @@ contract EnterpriseFactory {
         string memory interestTokenSymbol = string(abi.encodePacked("i", symbol));
 
         IInterestToken interestToken = IInterestToken(_interestTokenImpl.clone());
-        interestToken.initialize(interestTokenName, interestTokenSymbol, address(enterprise));
+        interestToken.initialize(interestTokenName, interestTokenSymbol, enterprise);
         return interestToken;
     }
 
     function deployBorrowToken(
         string memory symbol,
-        string memory baseUri,
         EnterpriseConfigurator configurator,
         IEnterprise enterprise
     ) internal returns (IBorrowToken) {
@@ -100,7 +91,7 @@ contract EnterpriseFactory {
         string memory borrowTokenSymbol = string(abi.encodePacked("b", symbol));
 
         IBorrowToken borrowToken = IBorrowToken(_borrowTokenImpl.clone());
-        borrowToken.initialize(borrowTokenName, borrowTokenSymbol, baseUri, configurator, enterprise);
+        borrowToken.initialize(borrowTokenName, borrowTokenSymbol, configurator, enterprise);
         return borrowToken;
     }
 

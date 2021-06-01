@@ -3,8 +3,10 @@
 pragma solidity 0.8.4;
 
 import "../EnterpriseConfigurator.sol";
+import "./IOwnable.sol";
+import "./IPowerToken.sol";
 
-interface IEnterprise {
+interface IEnterprise is IOwnable {
     struct LoanInfo {
         uint112 amount; // 14 bytes
         uint16 powerTokenIndex; // 2 bytes, index in powerToken array
@@ -13,9 +15,15 @@ interface IEnterprise {
         uint32 borrowerReturnGraceTime; // 4 bytes
         uint32 enterpriseCollectGraceTime; // 4 bytes
         // slot 1, 0 bytes left
-        uint112 lien; // 14 bytes, loan return reward
-        uint16 lienTokenIndex; // 2 bytes, index in supportedPaymentTokens array
+        uint112 gcFee; // 14 bytes, loan return reward
+        uint16 gcFeeTokenIndex; // 2 bytes, index in supportedPaymentTokens array
         // slot 2, 16 bytes left
+    }
+
+    struct LiquidityInfo {
+        uint256 amount;
+        uint256 shares;
+        uint256 block;
     }
 
     function initialize(string memory enterpriseName, EnterpriseConfigurator configurator) external;
@@ -33,4 +41,6 @@ interface IEnterprise {
     function getReserve() external view returns (uint256);
 
     function getAvailableReserve() external view returns (uint256);
+
+    function isRegisteredPowerToken(IPowerToken powerToken) external view returns (bool);
 }

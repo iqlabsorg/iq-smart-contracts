@@ -7,6 +7,8 @@ import "./IEnterprise.sol";
 interface ILoanCostEstimator {
     function initialize(IEnterprise enterprise) external;
 
+    function initializeService(IPowerToken powerToken) external;
+
     function estimateCost(
         IPowerToken powerToken,
         uint112 amount,

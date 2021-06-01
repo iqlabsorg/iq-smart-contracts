@@ -2,29 +2,27 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/IPowerToken.sol";
 import "./InitializableOwnable.sol";
-import "./token/ERC721.sol";
+import "./token/ERC721Enumerable.sol";
 import "./EnterpriseConfigurator.sol";
 
-contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
+contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721Enumerable {
     using SafeERC20 for IERC20;
     IEnterprise private _enterprise;
     EnterpriseConfigurator private _configurator;
     uint256 private _counter = 1;
-    string private _baseUri;
 
     function initialize(
         string memory name,
         string memory symbol,
-        string memory baseUri,
         EnterpriseConfigurator configurator,
         IEnterprise enterprise
     ) external override {
         InitializableOwnable.initialize(address(enterprise));
         ERC721.initialize(name, symbol);
-        _baseUri = baseUri;
         _configurator = configurator;
         _enterprise = enterprise;
     }
@@ -34,7 +32,8 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
     }
 
     function _baseURI() internal view override returns (string memory) {
-        return _baseUri;
+        string memory baseURI = _enterprise.getConfigurator().getBaseUri();
+        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, "borrow/")) : "";
     }
 
     function mint(address to) external override onlyOwner returns (uint256) {
@@ -47,9 +46,9 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
     function burn(uint256 tokenId, address burner) external override onlyOwner {
         _burn(tokenId);
         IEnterprise.LoanInfo memory loan = _enterprise.getLoanInfo(tokenId);
-        IERC20 lienToken = IERC20(_configurator.supportedPaymentTokens(loan.lienTokenIndex));
+        IERC20 paymentToken = IERC20(_configurator.supportedPaymentTokens(loan.gcFeeTokenIndex));
 
-        lienToken.safeTransfer(burner, loan.lien);
+        paymentToken.safeTransfer(burner, loan.gcFee);
     }
 
     function _beforeTokenTransfer(
@@ -57,6 +56,7 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721 {
         address to,
         uint256 tokenId
     ) internal override {
+        super._beforeTokenTransfer(from, to, tokenId);
         _enterprise.loanTransfer(from, to, tokenId);
     }
 }

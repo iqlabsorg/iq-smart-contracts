@@ -11,7 +11,6 @@ interface IBorrowToken is IERC721 {
     function initialize(
         string memory name,
         string memory symbol,
-        string memory baseUri,
         EnterpriseConfigurator configurator,
         IEnterprise enterprise
     ) external;

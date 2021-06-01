@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.4;
 
-interface IInitializableOwnable {
-    function initialize(address initialOwner) external;
+import "./IOwnable.sol";
 
-    function owner() external view returns (address);
+interface IInitializableOwnable is IOwnable {
+    function initialize(address initialOwner) external;
 }

@@ -35,6 +35,7 @@ contract Enterprise is IEnterprise {
 
     string private _name;
     mapping(uint256 => LoanInfo) private _loanInfo;
+    mapping(uint256 => LiquidityInfo) private _liquidityInfo;
     mapping(IPowerToken => uint256) private _powerTokenIndexMap; // 1 - based because empty value points to 0 index
     IPowerToken[] private _powerTokens;
 
@@ -47,12 +48,12 @@ contract Enterprise is IEnterprise {
     }
 
     modifier onlyOwner() {
-        require(msg.sender == _configurator.owner(), "Ownable: caller is not the owner");
+        require(msg.sender == owner(), "Ownable: caller is not the owner");
         _;
     }
 
     modifier registeredPowerToken(IPowerToken powerToken) {
-        require(_powerTokenIndexMap[powerToken] > 0, "Unknown PowerToken");
+        require(isRegisteredPowerToken(powerToken), "Unknown PowerToken");
         _;
     }
 
@@ -102,6 +103,7 @@ contract Enterprise is IEnterprise {
         _powerTokens.push(powerToken);
         _powerTokenIndexMap[powerToken] = _powerTokens.length;
 
+        _configurator.getLoanCostEstimator().initializeService(powerToken);
         emit ServiceRegistered(address(powerToken), halfLife, baseRate);
     }
 
@@ -172,6 +174,10 @@ contract Enterprise is IEnterprise {
         uint112 amount,
         uint32 duration
     ) external view registeredPowerToken(powerToken) returns (uint256) {
+        require(
+            _configurator.isSupportedPaymentToken(paymentToken),
+            "Interest payment token is disabled or not supported"
+        );
         (uint112 interest, uint112 serviceFee, uint112 gcFee) =
             _estimateLoan(powerToken, paymentToken, amount, duration);
 
@@ -198,18 +204,18 @@ contract Enterprise is IEnterprise {
             uint112 gcFee
         )
     {
-        uint112 loanCostBase = _configurator.getLoanCostEstimator().estimateCost(powerToken, amount, duration);
+        uint112 loanBaseCost = _configurator.getLoanCostEstimator().estimateCost(powerToken, amount, duration);
 
-        uint112 serviceFeeBase = estimateServiceFee(powerToken, loanCostBase);
+        uint112 serviceBaseFee = estimateServiceFee(powerToken, loanBaseCost);
 
         uint256 loanCost =
             _configurator.getConverter().estimateConvert(
                 _configurator.getBaseToken(powerToken),
-                loanCostBase,
+                loanBaseCost,
                 paymentToken
             );
 
-        serviceFee = uint112((uint256(serviceFeeBase) * loanCost) / loanCostBase);
+        serviceFee = uint112((uint256(serviceBaseFee) * loanCost) / loanBaseCost);
         interest = uint112(loanCost - serviceFee);
         gcFee = estimateGCFee(powerToken, paymentToken, amount);
     }
@@ -314,29 +320,64 @@ contract Enterprise is IEnterprise {
     function addLiquidity(uint256 liquidityAmount) external {
         _configurator.getLiquidityToken().safeTransferFrom(msg.sender, address(this), liquidityAmount);
 
-        _reserve += liquidityAmount;
-        _availableReserve += liquidityAmount;
-
         uint256 newShares = 0;
         if (_totalShares == 0) {
             newShares = liquidityAmount;
         } else {
-            newShares = (_totalShares * liquidityAmount) / _reserve;
+            newShares = sharesToLiquidity(liquidityAmount);
         }
 
-        _configurator.getInterestToken().mint(msg.sender, newShares);
+        _reserve += liquidityAmount;
+        _availableReserve += liquidityAmount;
+
+        uint256 tokenId = _configurator.getInterestToken().mint(msg.sender);
+
+        _liquidityInfo[tokenId] = LiquidityInfo(liquidityAmount, newShares, block.number);
+
         _totalShares += newShares;
     }
 
-    function removeLiquidity(uint256 sharesAmount) external {
-        uint256 liquidityWithInterest = (_reserve * sharesAmount) / _totalShares;
+    function withdrawInterest(uint256 tokenId) external {
+        LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+        uint256 shares = liquidityInfo.shares;
+
+        uint256 interest = sharesToLiquidity(shares) - liquidityInfo.amount;
+        require(interest <= _availableReserve, "Insufficient liquidity");
+
+        _configurator.getLiquidityToken().safeTransfer(msg.sender, interest);
+
+        uint256 newShares = liquidityToShares(liquidityInfo.amount);
+        liquidityInfo.shares = newShares;
+        _totalShares -= (shares - newShares);
+
+        _availableReserve -= interest;
+        _reserve -= interest;
+    }
+
+    function removeLiquidity(uint256 tokenId) external {
+        LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+        require(liquidityInfo.block < block.number, "Cannot add and remove liquidity in same block");
+        uint256 shares = liquidityInfo.shares;
+
+        uint256 liquidityWithInterest = sharesToLiquidity(shares);
         require(liquidityWithInterest <= _availableReserve, "Insufficient liquidity");
 
-        _configurator.getInterestToken().burnFrom(msg.sender, sharesAmount);
+        _configurator.getInterestToken().burn(tokenId);
         _configurator.getLiquidityToken().safeTransfer(msg.sender, liquidityWithInterest);
 
         _reserve -= liquidityWithInterest;
         _availableReserve -= liquidityWithInterest;
+
+        _totalShares -= shares;
+        delete _liquidityInfo[tokenId];
+    }
+
+    function liquidityToShares(uint256 amount) internal view returns (uint256) {
+        return (_totalShares * amount) / _reserve;
+    }
+
+    function sharesToLiquidity(uint256 shares) internal view returns (uint256) {
+        return (_reserve * shares) / _totalShares;
     }
 
     /**
@@ -442,12 +483,26 @@ contract Enterprise is IEnterprise {
         return _loanInfo[tokenId];
     }
 
+    function getLiquidityInfo(uint256 tokenId) external view returns (LiquidityInfo memory) {
+        return _liquidityInfo[tokenId];
+    }
+
     function getPowerToken(uint256 index) external view returns (IPowerToken) {
         return _powerTokens[index];
     }
 
     function getPowerTokenIndex(IPowerToken powerToken) external view returns (int256) {
         return _powerTokenIndexMap[powerToken] == 0 ? -1 : int256(_powerTokenIndexMap[powerToken] - 1);
+    }
+
+    function isRegisteredPowerToken(IPowerToken powerToken) public view override returns (bool) {
+        return _powerTokenIndexMap[powerToken] > 0;
+    }
+
+    function getOwedInterest(uint256 tokenId) external view returns (uint256) {
+        LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+
+        return sharesToLiquidity(liquidityInfo.shares) - liquidityInfo.amount;
     }
 
     function getReserve() external view override returns (uint256) {
@@ -460,5 +515,9 @@ contract Enterprise is IEnterprise {
 
     function getConfigurator() external view override returns (EnterpriseConfigurator) {
         return _configurator;
+    }
+
+    function owner() public view override returns (address) {
+        return _configurator.owner();
     }
 }
