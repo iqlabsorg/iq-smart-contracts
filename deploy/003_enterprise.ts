@@ -12,12 +12,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [],
     log: true,
   });
-
-  await deploy('EnterpriseConfigurator', {
-    from: deployer,
-    args: [],
-    log: true,
-  });
 };
 export default func;
-func.tags = ['Enterprise', 'EnterpriseConfigurator'];
+func.tags = ['Enterprise'];

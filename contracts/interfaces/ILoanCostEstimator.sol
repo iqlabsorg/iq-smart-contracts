@@ -2,10 +2,10 @@
 pragma solidity 0.8.4;
 
 import "./IPowerToken.sol";
-import "./IEnterprise.sol";
+import "../Enterprise.sol";
 
 interface ILoanCostEstimator {
-    function initialize(IEnterprise enterprise) external;
+    function initialize(Enterprise enterprise) external;
 
     function initializeService(IPowerToken powerToken) external;
 

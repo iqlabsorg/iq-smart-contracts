@@ -193,8 +193,8 @@
           "type": "string"
         },
         {
-          "internalType": "contract EnterpriseConfigurator",
-          "name": "configurator",
+          "internalType": "contract Enterprise",
+          "name": "enterprise",
           "type": "address"
         }
       ],

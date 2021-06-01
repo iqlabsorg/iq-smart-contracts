@@ -18,17 +18,12 @@ import {
   InterestToken,
   PowerToken,
 } from '../../typechain';
-import {
-  EnterpriseConfigurator,
-  EnterpriseConfiguratorInterface,
-} from '../../typechain/EnterpriseConfigurator';
 
 describe.only('IQ Protocol E2E', () => {
   let deployer: Address;
   let user: Address;
   let token: IERC20Metadata;
   let enterprise: Enterprise;
-  let configurator: EnterpriseConfigurator;
 
   const ONE_TOKEN = ethers.utils.parseEther('1');
   const BORROWER_LOAN_RETURN_GRACE_PERIOD = 3600; // 1 hour
@@ -49,24 +44,22 @@ describe.only('IQ Protocol E2E', () => {
     const tx = await factory.deploy(
       'Testing',
       token.address,
-      'https://test.iq.io',
+      'https://test.iq.space',
       estimator.address,
       converter.address
     );
 
+    console.log('Enterprise deploy: ', (await tx.wait()).gasUsed.toString());
+
     enterprise = await getEnterprise(factory, tx);
-    configurator = (await ethers.getContractAt(
-      'EnterpriseConfigurator',
-      await enterprise.getConfigurator()
-    )) as EnterpriseConfigurator;
   });
 
   describe('Basic', () => {
     it('should set liquidity token', async () => {
-      expect(await configurator.getLiquidityToken()).to.equal(token.address);
+      expect(await enterprise.getLiquidityToken()).to.equal(token.address);
     });
     it('should deploy interest token', async () => {
-      expect(await configurator.getInterestToken()).not.to.equal(
+      expect(await enterprise.getInterestToken()).not.to.equal(
         ethers.constants.AddressZero
       );
     });
@@ -74,7 +67,7 @@ describe.only('IQ Protocol E2E', () => {
     describe('InterestToken', async () => {
       let interestToken: InterestToken;
       before(async () => {
-        const token = await configurator.getInterestToken();
+        const token = await enterprise.getInterestToken();
         const InterestToken = await ethers.getContractFactory('InterestToken');
         interestToken = InterestToken.attach(token) as InterestToken;
       });
@@ -111,7 +104,7 @@ describe.only('IQ Protocol E2E', () => {
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
       const powerToken = await getPowerToken(enterprise, await txPromise);
-      expect(await configurator.getHalfLife(powerToken.address)).to.equal(
+      expect(await enterprise.getServiceHalfLife(powerToken.address)).to.equal(
         HALF_LIFE
       );
     });

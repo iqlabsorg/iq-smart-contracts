@@ -6,63 +6,24 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./math/ExpMath.sol";
 import "./InitializableOwnable.sol";
-import "./interfaces/IEnterprise.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IPowerToken.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/IConverter.sol";
 import "./interfaces/ILoanCostEstimator.sol";
-import "./EnterpriseConfigurator.sol";
+import "./EnterpriseStorage.sol";
 
-contract Enterprise is IEnterprise {
+contract Enterprise is EnterpriseStorage {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Metadata;
     using Clones for address;
-
-    EnterpriseConfigurator private _configurator;
-
-    /**
-     * @dev Total amount of `_liquidityToken`
-     */
-    uint256 private _reserve;
-
-    /**
-     * @dev Available to borrow reserves of `_liquidityToken`
-     */
-    uint256 private _availableReserve;
-
-    uint256 private _totalShares;
-
-    string private _name;
-    mapping(uint256 => LoanInfo) private _loanInfo;
-    mapping(uint256 => LiquidityInfo) private _liquidityInfo;
-    mapping(IPowerToken => uint256) private _powerTokenIndexMap; // 1 - based because empty value points to 0 index
-    IPowerToken[] private _powerTokens;
 
     event ServiceRegistered(address indexed powerToken, uint32 halfLife, uint112 factor);
     event Borrowed(address indexed powerToken, uint256 tokenId, uint32 from, uint32 to);
 
     modifier onlyBorrowToken() {
-        require(msg.sender == address(_configurator.getBorrowToken()), "Not BorrowToken");
+        require(msg.sender == address(_borrowToken), "Not BorrowToken");
         _;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner(), "Ownable: caller is not the owner");
-        _;
-    }
-
-    modifier registeredPowerToken(IPowerToken powerToken) {
-        require(isRegisteredPowerToken(powerToken), "Unknown PowerToken");
-        _;
-    }
-
-    function initialize(string memory enterpriseName, EnterpriseConfigurator configurator) public override {
-        require(address(_configurator) == address(0), "Already initialized");
-        require(address(configurator) != address(0), "Invalid configurator");
-
-        _name = enterpriseName;
-        _configurator = configurator;
     }
 
     function registerService(
@@ -76,34 +37,32 @@ contract Enterprise is IEnterprise {
         uint32 maxLoanDuration,
         uint112 minGCFee
     ) external onlyOwner {
+        require(address(baseToken) != address(0), "Invalid Base Token");
         require(_powerTokens.length < type(uint16).max, "Cannot register more services");
         require(minLoanDuration <= maxLoanDuration, "Invalid min and max periods");
         require(halfLife > 0, "Invalid half life");
 
-        string memory tokenSymbol = _configurator.getLiquidityToken().symbol();
+        IPowerToken powerToken = IPowerToken(_powerTokenImpl.clone());
+        string memory tokenSymbol = _liquidityToken.symbol();
         string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", symbol));
+        powerToken.initialize(serviceName, powerTokenSymbol, this);
 
-        IPowerToken powerToken = IPowerToken(_configurator.getPowerTokenImpl().clone());
-
-        EnterpriseConfigurator.ServiceConfig memory config =
-            EnterpriseConfigurator.ServiceConfig(
+        ServiceConfig memory config =
+            ServiceConfig(
                 baseRate,
                 minGCFee,
                 halfLife,
                 baseToken,
                 minLoanDuration,
                 maxLoanDuration,
-                serviceFee
+                serviceFee,
+                uint16(_powerTokens.length)
             );
 
-        _configurator.addService(powerToken, config);
-
-        powerToken.initialize(serviceName, powerTokenSymbol, _configurator);
-
+        _serviceConfig[powerToken] = config;
         _powerTokens.push(powerToken);
-        _powerTokenIndexMap[powerToken] = _powerTokens.length;
 
-        _configurator.getLoanCostEstimator().initializeService(powerToken);
+        _estimator.initializeService(powerToken);
         emit ServiceRegistered(address(powerToken), halfLife, baseRate);
     }
 
@@ -114,11 +73,8 @@ contract Enterprise is IEnterprise {
         uint256 maximumPayment,
         uint32 duration
     ) external registeredPowerToken(powerToken) {
-        require(
-            _configurator.isSupportedPaymentToken(paymentToken),
-            "Interest payment token is disabled or not supported"
-        );
-        require(_configurator.isAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
+        require(isSupportedPaymentToken(paymentToken), "Interest payment token is disabled or not supported");
+        require(isServiceAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
         require(amount <= _availableReserve, "Insufficient reserves");
 
         uint112 gcFee;
@@ -133,39 +89,37 @@ contract Enterprise is IEnterprise {
 
             paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
 
-            IERC20 liquidityToken = _configurator.getLiquidityToken();
+            IERC20 liquidityToken = _liquidityToken;
 
-            uint256 convertedLiquidityTokens =
-                _configurator.getConverter().convert(paymentToken, loanCost, liquidityToken);
+            uint256 convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, liquidityToken);
 
             uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
-            liquidityToken.safeTransfer(_configurator.getEnterpriseVault(), serviceLiquidity);
+            liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
 
             uint256 poolInterest = convertedLiquidityTokens - serviceLiquidity;
 
             _availableReserve = _availableReserve - amount + poolInterest;
             _reserve += poolInterest;
         }
-        IBorrowToken borrowToken = _configurator.getBorrowToken();
-        paymentToken.safeTransferFrom(msg.sender, address(borrowToken), gcFee);
+        paymentToken.safeTransferFrom(msg.sender, address(_borrowToken), gcFee);
         uint32 borrowingTime = uint32(block.timestamp);
         uint32 maturiryTime = borrowingTime + duration;
-        uint256 tokenId = borrowToken.getCounter();
+        uint256 tokenId = _borrowToken.getCounter();
         _loanInfo[tokenId] = LoanInfo(
             amount,
-            uint16(_powerTokenIndexMap[powerToken] - 1), // _powerTokenIndexMap is 1-based
+            _serviceConfig[powerToken].index,
             borrowingTime,
             maturiryTime,
-            maturiryTime + _configurator.getBorrowerLoanReturnGracePeriod(),
-            maturiryTime + _configurator.getEnterpriseLoanCollectGracePeriod(),
+            maturiryTime + _borrowerLoanReturnGracePeriod,
+            maturiryTime + _enterpriseLoanCollectGracePeriod,
             gcFee,
-            uint16(_configurator.supportedPaymentTokensIndex(paymentToken))
+            uint16(supportedPaymentTokensIndex(paymentToken))
         );
         emit Borrowed(address(powerToken), tokenId, borrowingTime, maturiryTime);
 
-        _configurator.getLoanCostEstimator().notifyNewLoan(tokenId);
+        _estimator.notifyNewLoan(tokenId);
 
-        borrowToken.mint(msg.sender); // also mints PowerTokens
+        _borrowToken.mint(msg.sender); // also mints PowerTokens
     }
 
     function estimateLoan(
@@ -174,10 +128,7 @@ contract Enterprise is IEnterprise {
         uint112 amount,
         uint32 duration
     ) external view registeredPowerToken(powerToken) returns (uint256) {
-        require(
-            _configurator.isSupportedPaymentToken(paymentToken),
-            "Interest payment token is disabled or not supported"
-        );
+        require(isSupportedPaymentToken(paymentToken), "Interest payment token is disabled or not supported");
         (uint112 interest, uint112 serviceFee, uint112 gcFee) =
             _estimateLoan(powerToken, paymentToken, amount, duration);
 
@@ -204,16 +155,11 @@ contract Enterprise is IEnterprise {
             uint112 gcFee
         )
     {
-        uint112 loanBaseCost = _configurator.getLoanCostEstimator().estimateCost(powerToken, amount, duration);
+        uint112 loanBaseCost = _estimator.estimateCost(powerToken, amount, duration);
 
         uint112 serviceBaseFee = estimateServiceFee(powerToken, loanBaseCost);
 
-        uint256 loanCost =
-            _configurator.getConverter().estimateConvert(
-                _configurator.getBaseToken(powerToken),
-                loanBaseCost,
-                paymentToken
-            );
+        uint256 loanCost = _converter.estimateConvert(getServiceBaseToken(powerToken), loanBaseCost, paymentToken);
 
         serviceFee = uint112((uint256(serviceBaseFee) * loanCost) / loanBaseCost);
         interest = uint112(loanCost - serviceFee);
@@ -221,7 +167,7 @@ contract Enterprise is IEnterprise {
     }
 
     function estimateServiceFee(IPowerToken powerToken, uint112 loanCost) internal view returns (uint112) {
-        return uint112((uint256(loanCost) * _configurator.getServiceFeePercent(powerToken)) / 10_000);
+        return uint112((uint256(loanCost) * getServiceFeePercent(powerToken)) / 10_000);
     }
 
     function estimateGCFee(
@@ -229,14 +175,12 @@ contract Enterprise is IEnterprise {
         IERC20 paymentToken,
         uint112 amount
     ) internal view returns (uint112) {
-        uint16 gcFeePercent = _configurator.getGCFeePercent();
-        uint112 gcFeeAmount = uint112((uint256(amount) * gcFeePercent) / 10_000);
-        IConverter converter = _configurator.getConverter();
+        uint112 gcFeeAmount = uint112((uint256(amount) * _gcFeePercent) / 10_000);
         uint112 minGcFee =
             uint112(
-                converter.estimateConvert(
-                    _configurator.getBaseToken(powerToken),
-                    _configurator.getMinGCFee(powerToken),
+                _converter.estimateConvert(
+                    getServiceBaseToken(powerToken),
+                    getServiceMinGCFee(powerToken),
                     paymentToken
                 )
             );
@@ -249,14 +193,11 @@ contract Enterprise is IEnterprise {
         uint256 maximumPayment,
         uint32 duration
     ) external {
-        require(
-            _configurator.isSupportedPaymentToken(paymentToken),
-            "Interest payment token is disabled or not supported"
-        );
+        require(isSupportedPaymentToken(paymentToken), "Interest payment token is disabled or not supported");
         LoanInfo storage loan = _loanInfo[tokenId];
         IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
         require(address(powerToken) != address(0), "Invalid tokenId");
-        require(_configurator.isAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
+        require(isServiceAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
         require(loan.maturityTime + duration >= block.timestamp, "Invalid duration");
 
         (uint112 interest, uint112 serviceFee, ) = _estimateLoan(powerToken, paymentToken, loan.amount, duration);
@@ -265,12 +206,10 @@ contract Enterprise is IEnterprise {
 
         paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
 
-        IERC20 liquidityToken = _configurator.getLiquidityToken();
-
-        uint256 convertedLiquidityTokens = _configurator.getConverter().convert(paymentToken, loanCost, liquidityToken);
+        uint256 convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
 
         uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
-        liquidityToken.safeTransfer(_configurator.getEnterpriseVault(), serviceLiquidity);
+        _liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
         uint256 poolInterest = convertedLiquidityTokens - serviceLiquidity;
 
         _availableReserve += poolInterest;
@@ -278,10 +217,10 @@ contract Enterprise is IEnterprise {
 
         uint32 borrowingTime = loan.maturityTime;
         loan.maturityTime = loan.maturityTime + duration;
-        loan.borrowerReturnGraceTime = loan.maturityTime + _configurator.getBorrowerLoanReturnGracePeriod();
-        loan.enterpriseCollectGraceTime = loan.maturityTime + _configurator.getEnterpriseLoanCollectGracePeriod();
+        loan.borrowerReturnGraceTime = loan.maturityTime + _borrowerLoanReturnGracePeriod;
+        loan.enterpriseCollectGraceTime = loan.maturityTime + _enterpriseLoanCollectGracePeriod;
 
-        _configurator.getLoanCostEstimator().notifyNewLoan(tokenId);
+        _estimator.notifyNewLoan(tokenId);
 
         emit Borrowed(address(powerToken), tokenId, borrowingTime, loan.maturityTime);
     }
@@ -290,8 +229,7 @@ contract Enterprise is IEnterprise {
         LoanInfo storage loan = _loanInfo[tokenId];
         IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
         require(address(powerToken) != address(0), "Invalid tokenId");
-        IBorrowToken borrowToken = _configurator.getBorrowToken();
-        address borrower = borrowToken.ownerOf(tokenId);
+        address borrower = _borrowToken.ownerOf(tokenId);
         //TODO: implement grace periods for loan borrower and enterprise
         uint32 timestamp = uint32(block.timestamp);
 
@@ -300,15 +238,13 @@ contract Enterprise is IEnterprise {
             "Only borrower can return within borrower grace period"
         );
         require(
-            loan.enterpriseCollectGraceTime < timestamp ||
-                msg.sender == borrower ||
-                msg.sender == _configurator.getEnterpriseCollector(),
+            loan.enterpriseCollectGraceTime < timestamp || msg.sender == borrower || msg.sender == _enterpriseCollector,
             "Only borrower or enterprise can return within enterprise grace period"
         );
 
         _availableReserve += loan.amount;
 
-        borrowToken.burn(tokenId, msg.sender); // burns PowerTokens, returns gc fee
+        _borrowToken.burn(tokenId, msg.sender); // burns PowerTokens, returns gc fee
 
         delete _loanInfo[tokenId];
     }
@@ -318,7 +254,7 @@ contract Enterprise is IEnterprise {
      * Enterprise address before calling this function
      */
     function addLiquidity(uint256 liquidityAmount) external {
-        _configurator.getLiquidityToken().safeTransferFrom(msg.sender, address(this), liquidityAmount);
+        _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
 
         uint256 newShares = 0;
         if (_totalShares == 0) {
@@ -330,7 +266,7 @@ contract Enterprise is IEnterprise {
         _reserve += liquidityAmount;
         _availableReserve += liquidityAmount;
 
-        uint256 tokenId = _configurator.getInterestToken().mint(msg.sender);
+        uint256 tokenId = _interestToken.mint(msg.sender);
 
         _liquidityInfo[tokenId] = LiquidityInfo(liquidityAmount, newShares, block.number);
 
@@ -344,7 +280,7 @@ contract Enterprise is IEnterprise {
         uint256 interest = sharesToLiquidity(shares) - liquidityInfo.amount;
         require(interest <= _availableReserve, "Insufficient liquidity");
 
-        _configurator.getLiquidityToken().safeTransfer(msg.sender, interest);
+        _liquidityToken.safeTransfer(msg.sender, interest);
 
         uint256 newShares = liquidityToShares(liquidityInfo.amount);
         liquidityInfo.shares = newShares;
@@ -362,8 +298,8 @@ contract Enterprise is IEnterprise {
         uint256 liquidityWithInterest = sharesToLiquidity(shares);
         require(liquidityWithInterest <= _availableReserve, "Insufficient liquidity");
 
-        _configurator.getInterestToken().burn(tokenId);
-        _configurator.getLiquidityToken().safeTransfer(msg.sender, liquidityWithInterest);
+        _interestToken.burn(tokenId);
+        _liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
 
         _reserve -= liquidityWithInterest;
         _availableReserve -= liquidityWithInterest;
@@ -401,12 +337,12 @@ contract Enterprise is IEnterprise {
         address to,
         uint256 amount
     ) public registeredPowerToken(powerToken) returns (bool) {
-        powerToken.wrap(_configurator.getLiquidityToken(), msg.sender, to, amount);
+        powerToken.wrap(_liquidityToken, msg.sender, to, amount);
         return true;
     }
 
     function unwrap(IPowerToken powerToken, uint256 amount) public registeredPowerToken(powerToken) returns (bool) {
-        powerToken.unwrap(_configurator.getLiquidityToken(), msg.sender, amount);
+        powerToken.unwrap(_liquidityToken, msg.sender, amount);
         return true;
     }
 
@@ -414,7 +350,7 @@ contract Enterprise is IEnterprise {
         address from,
         address to,
         uint256 tokenId
-    ) external override onlyBorrowToken {
+    ) external onlyBorrowToken {
         LoanInfo memory loan = _loanInfo[tokenId];
         IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
         require(address(powerToken) != address(0), "Invalid tokenId");
@@ -437,87 +373,9 @@ contract Enterprise is IEnterprise {
         }
     }
 
-    function getInfo()
-        external
-        view
-        returns (
-            uint256 reserve,
-            uint256 availableReserve,
-            uint256 totalShares,
-            string memory name
-        )
-    {
-        return (_reserve, _availableReserve, _totalShares, _name);
-    }
-
-    function getPowerTokens() external view returns (IPowerToken[] memory) {
-        return _powerTokens;
-    }
-
-    function getPowerTokensInfo()
-        external
-        view
-        returns (
-            address[] memory addresses,
-            string[] memory names,
-            string[] memory symbols,
-            uint32[] memory halfLifes
-        )
-    {
-        uint256 powerTokenCount = _powerTokens.length;
-        addresses = new address[](powerTokenCount);
-        names = new string[](powerTokenCount);
-        symbols = new string[](powerTokenCount);
-        halfLifes = new uint32[](powerTokenCount);
-
-        for (uint256 i = 0; i < powerTokenCount; i++) {
-            IPowerToken token = _powerTokens[i];
-            addresses[i] = address(token);
-            names[i] = token.name();
-            symbols[i] = token.symbol();
-            halfLifes[i] = _configurator.getHalfLife(token);
-        }
-    }
-
-    function getLoanInfo(uint256 tokenId) external view override returns (LoanInfo memory) {
-        return _loanInfo[tokenId];
-    }
-
-    function getLiquidityInfo(uint256 tokenId) external view returns (LiquidityInfo memory) {
-        return _liquidityInfo[tokenId];
-    }
-
-    function getPowerToken(uint256 index) external view returns (IPowerToken) {
-        return _powerTokens[index];
-    }
-
-    function getPowerTokenIndex(IPowerToken powerToken) external view returns (int256) {
-        return _powerTokenIndexMap[powerToken] == 0 ? -1 : int256(_powerTokenIndexMap[powerToken] - 1);
-    }
-
-    function isRegisteredPowerToken(IPowerToken powerToken) public view override returns (bool) {
-        return _powerTokenIndexMap[powerToken] > 0;
-    }
-
     function getOwedInterest(uint256 tokenId) external view returns (uint256) {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
 
         return sharesToLiquidity(liquidityInfo.shares) - liquidityInfo.amount;
-    }
-
-    function getReserve() external view override returns (uint256) {
-        return _reserve;
-    }
-
-    function getAvailableReserve() external view override returns (uint256) {
-        return _availableReserve;
-    }
-
-    function getConfigurator() external view override returns (EnterpriseConfigurator) {
-        return _configurator;
-    }
-
-    function owner() public view override returns (address) {
-        return _configurator.owner();
     }
 }

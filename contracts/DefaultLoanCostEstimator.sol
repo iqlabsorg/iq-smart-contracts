@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.4;
 import "./interfaces/ILoanCostEstimator.sol";
-import "./interfaces/IEnterprise.sol";
+import "./Enterprise.sol";
 import "hardhat/console.sol";
 
 contract DefaultLoanCostEstimator is ILoanCostEstimator {
     uint256 internal constant ONE = 1 << 64;
 
-    IEnterprise private _enterprise;
+    Enterprise private _enterprise;
     mapping(IPowerToken => uint256) private _serviceLambda;
 
     modifier onlyOwner() {
@@ -16,7 +16,7 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
         _;
     }
 
-    function initialize(IEnterprise enterprise) external override {
+    function initialize(Enterprise enterprise) external override {
         require(address(enterprise) != address(0), "Zero address");
         require(address(_enterprise) == address(0), "Already initialized");
 
@@ -50,9 +50,7 @@ contract DefaultLoanCostEstimator is ILoanCostEstimator {
 
         console.log("AVAIL", availableReserve);
 
-        EnterpriseConfigurator configurator = _enterprise.getConfigurator();
-
-        uint256 basePrice = configurator.getBaseRate(powerToken);
+        uint256 basePrice = _enterprise.getServiceBaseRate(powerToken);
         console.log("BASE", basePrice);
         uint256 lambda = _serviceLambda[powerToken];
         console.log("L", lambda);

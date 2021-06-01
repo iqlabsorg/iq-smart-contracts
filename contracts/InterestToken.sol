@@ -3,19 +3,19 @@
 pragma solidity 0.8.4;
 
 import "./interfaces/IInterestToken.sol";
-import "./interfaces/IEnterprise.sol";
+import "./Enterprise.sol";
 import "./InitializableOwnable.sol";
 import "./token/ERC721Enumerable.sol";
 
 contract InterestToken is IInterestToken, InitializableOwnable, ERC721Enumerable {
     uint256 private _counter;
-    IEnterprise private _enterprise;
+    Enterprise private _enterprise;
 
     function initialize(
         string memory name_,
         string memory symbol_,
-        IEnterprise enterprise
-    ) external override {
+        Enterprise enterprise
+    ) external {
         InitializableOwnable.initialize(address(enterprise));
         ERC721.initialize(name_, symbol_);
         _enterprise = enterprise;
@@ -26,7 +26,7 @@ contract InterestToken is IInterestToken, InitializableOwnable, ERC721Enumerable
     }
 
     function _baseURI() internal view override returns (string memory) {
-        string memory baseURI = _enterprise.getConfigurator().getBaseUri();
+        string memory baseURI = _enterprise.getBaseUri();
         return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, "interest/")) : "";
     }
 

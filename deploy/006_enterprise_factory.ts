@@ -7,13 +7,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const {deployer} = await getNamedAccounts();
 
-  const [enterprise, powerToken, interestToken, borrowToken, configurator] =
+  const [enterprise, powerToken, interestToken, borrowToken] =
     await Promise.all([
       deployments.get('Enterprise'),
       deployments.get('PowerToken'),
       deployments.get('InterestToken'),
       deployments.get('BorrowToken'),
-      deployments.get('EnterpriseConfigurator'),
     ]);
 
   await deploy('EnterpriseFactory', {
@@ -23,7 +22,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       powerToken.address,
       interestToken.address,
       borrowToken.address,
-      configurator.address,
     ],
     log: true,
   });
