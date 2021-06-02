@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.4;
 
-import "./interfaces/IInitializableOwnable.sol";
-
 /**
- * @dev Ownable contract with `initialize` function instead of contructor. Primary usage is for proxies like ERC-1167 with no constructor.
+ * @dev Ownable contract with `initialize` function instead of constructor. Primary usage is for proxies like ERC-1167 with no constructor.
  */
-abstract contract InitializableOwnable is IInitializableOwnable {
+abstract contract InitializableOwnable {
     address private _owner;
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -14,8 +12,9 @@ abstract contract InitializableOwnable is IInitializableOwnable {
     /**
      * @dev Initializes the owner of the contract. The inheritor of this contract *MUST* ensure this method is not called twice.
      */
-    function initialize(address initialOwner) public override {
+    function initialize(address initialOwner) public {
         require(_owner == address(0), "InitializableOwnable: already initialized");
+        require(initialOwner != address(0), "InitializableOwnable: invalid initial owner");
         _owner = initialOwner;
         emit OwnershipTransferred(address(0), initialOwner);
     }
@@ -23,7 +22,7 @@ abstract contract InitializableOwnable is IInitializableOwnable {
     /**
      * @dev Returns the address of the current owner.
      */
-    function owner() public view override returns (address) {
+    function owner() public view returns (address) {
         return _owner;
     }
 

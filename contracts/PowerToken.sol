@@ -7,9 +7,9 @@ import "./math/ExpMath.sol";
 import "./token/ERC20.sol";
 import "./interfaces/IPowerToken.sol";
 import "./Enterprise.sol";
-import "./InitializableOwnable.sol";
+import "./EnterpriseOwnable.sol";
 
-contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
+contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
     using SafeERC20 for IERC20;
 
     struct State {
@@ -19,18 +19,14 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
     }
 
     mapping(address => State) private _states;
-    Enterprise private _enterprise;
 
     function initialize(
         string memory name,
         string memory symbol,
         Enterprise enterprise
     ) external override {
-        require(address(_enterprise) == address(0), "Already initialized");
-        require(address(enterprise) != address(0), "Invalid enterprise");
-        InitializableOwnable.initialize(address(enterprise));
+        EnterpriseOwnable.initialize(enterprise);
         ERC20.initialize(name, symbol);
-        _enterprise = enterprise;
     }
 
     function availableBalanceOf(address account) external view returns (uint256) {
@@ -38,11 +34,11 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
         return balanceOf(account) - state.lockedBalance;
     }
 
-    function mint(address to, uint256 value) external override onlyOwner {
+    function mint(address to, uint256 value) external override onlyEnterprise {
         _mint(to, value, true);
     }
 
-    function burnFrom(address account, uint256 value) external override onlyOwner {
+    function burnFrom(address account, uint256 value) external override onlyEnterprise {
         _burn(account, value, true);
     }
 
@@ -51,7 +47,7 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
         address from,
         address to,
         uint256 amount
-    ) external override onlyOwner {
+    ) external override onlyEnterprise {
         liquidityToken.safeTransferFrom(from, address(this), amount);
         _mint(to, amount, false);
     }
@@ -60,7 +56,7 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
         IERC20 liquidityToken,
         address account,
         uint256 amount
-    ) external override onlyOwner {
+    ) external override onlyEnterprise {
         _burn(account, amount, false);
         liquidityToken.safeTransfer(account, amount);
     }
@@ -82,7 +78,7 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
                 ExpMath.halfLife(
                     state.timestamp,
                     balance - state.energy,
-                    _enterprise.getServiceHalfLife(this),
+                    getEnterprise().getServiceHalfLife(this),
                     timestamp
                 );
         } else {
@@ -91,7 +87,7 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
                 ExpMath.halfLife(
                     state.timestamp,
                     state.energy - balance,
-                    _enterprise.getServiceHalfLife(this),
+                    getEnterprise().getServiceHalfLife(this),
                     timestamp
                 );
         }
@@ -101,7 +97,7 @@ contract PowerToken is IPowerToken, ERC20, InitializableOwnable {
         address from,
         address to,
         uint256 amount
-    ) external override onlyOwner returns (bool) {
+    ) external override onlyEnterprise returns (bool) {
         _transfer(from, to, amount, true);
         return true;
     }

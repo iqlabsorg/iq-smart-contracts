@@ -5,12 +5,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./math/ExpMath.sol";
-import "./InitializableOwnable.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IPowerToken.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/IConverter.sol";
-import "./interfaces/ILoanCostEstimator.sol";
+import "./interfaces/IEstimator.sol";
 import "./EnterpriseStorage.sol";
 
 contract Enterprise is EnterpriseStorage {
@@ -75,7 +74,7 @@ contract Enterprise is EnterpriseStorage {
     ) external registeredPowerToken(powerToken) {
         require(isSupportedPaymentToken(paymentToken), "Interest payment token is disabled or not supported");
         require(isServiceAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
-        require(amount <= _availableReserve, "Insufficient reserves");
+        require(amount <= getAvailableReserve(), "Insufficient reserves");
 
         uint112 gcFee;
         {
@@ -89,17 +88,16 @@ contract Enterprise is EnterpriseStorage {
 
             paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
 
-            IERC20 liquidityToken = _liquidityToken;
-
-            uint256 convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, liquidityToken);
+            uint256 convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
 
             uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
-            liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
+            _liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
 
-            uint256 poolInterest = convertedLiquidityTokens - serviceLiquidity;
+            uint112 poolInterest = uint112(convertedLiquidityTokens - serviceLiquidity);
 
-            _availableReserve = _availableReserve - amount + poolInterest;
-            _reserve += poolInterest;
+            _usedReserve += amount;
+
+            increaseStreamingReserveTarget(poolInterest);
         }
         paymentToken.safeTransferFrom(msg.sender, address(_borrowToken), gcFee);
         uint32 borrowingTime = uint32(block.timestamp);
@@ -115,11 +113,12 @@ contract Enterprise is EnterpriseStorage {
             gcFee,
             uint16(supportedPaymentTokensIndex(paymentToken))
         );
-        emit Borrowed(address(powerToken), tokenId, borrowingTime, maturiryTime);
+
+        assert(_borrowToken.mint(msg.sender) == tokenId); // also mints PowerTokens
 
         _estimator.notifyNewLoan(tokenId);
 
-        _borrowToken.mint(msg.sender); // also mints PowerTokens
+        emit Borrowed(address(powerToken), tokenId, borrowingTime, maturiryTime);
     }
 
     function estimateLoan(
@@ -200,7 +199,14 @@ contract Enterprise is EnterpriseStorage {
         require(isServiceAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
         require(loan.maturityTime + duration >= block.timestamp, "Invalid duration");
 
+        // emulating here loan return
+        _usedReserve -= loan.amount;
+
         (uint112 interest, uint112 serviceFee, ) = _estimateLoan(powerToken, paymentToken, loan.amount, duration);
+
+        // emulating here borrow
+        _usedReserve += loan.amount;
+
         uint256 loanCost = interest + serviceFee;
         require(loanCost <= maximumPayment, "Slippage is too big");
 
@@ -210,10 +216,9 @@ contract Enterprise is EnterpriseStorage {
 
         uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
         _liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
-        uint256 poolInterest = convertedLiquidityTokens - serviceLiquidity;
+        uint112 poolInterest = uint112(convertedLiquidityTokens - serviceLiquidity);
 
-        _availableReserve += poolInterest;
-        _reserve += poolInterest;
+        increaseStreamingReserveTarget(poolInterest);
 
         uint32 borrowingTime = loan.maturityTime;
         loan.maturityTime = loan.maturityTime + duration;
@@ -242,7 +247,7 @@ contract Enterprise is EnterpriseStorage {
             "Only borrower or enterprise can return within enterprise grace period"
         );
 
-        _availableReserve += loan.amount;
+        _usedReserve -= loan.amount;
 
         _borrowToken.burn(tokenId, msg.sender); // burns PowerTokens, returns gc fee
 
@@ -263,8 +268,7 @@ contract Enterprise is EnterpriseStorage {
             newShares = sharesToLiquidity(liquidityAmount);
         }
 
-        _reserve += liquidityAmount;
-        _availableReserve += liquidityAmount;
+        _fixedReserve += liquidityAmount;
 
         uint256 tokenId = _interestToken.mint(msg.sender);
 
@@ -278,7 +282,7 @@ contract Enterprise is EnterpriseStorage {
         uint256 shares = liquidityInfo.shares;
 
         uint256 interest = sharesToLiquidity(shares) - liquidityInfo.amount;
-        require(interest <= _availableReserve, "Insufficient liquidity");
+        require(interest <= getAvailableReserve(), "Insufficient liquidity");
 
         _liquidityToken.safeTransfer(msg.sender, interest);
 
@@ -286,8 +290,7 @@ contract Enterprise is EnterpriseStorage {
         liquidityInfo.shares = newShares;
         _totalShares -= (shares - newShares);
 
-        _availableReserve -= interest;
-        _reserve -= interest;
+        decreaseReserve(interest);
     }
 
     function removeLiquidity(uint256 tokenId) external {
@@ -296,24 +299,33 @@ contract Enterprise is EnterpriseStorage {
         uint256 shares = liquidityInfo.shares;
 
         uint256 liquidityWithInterest = sharesToLiquidity(shares);
-        require(liquidityWithInterest <= _availableReserve, "Insufficient liquidity");
+        require(liquidityWithInterest <= getAvailableReserve(), "Insufficient liquidity");
 
         _interestToken.burn(tokenId);
         _liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
 
-        _reserve -= liquidityWithInterest;
-        _availableReserve -= liquidityWithInterest;
+        decreaseReserve(liquidityWithInterest);
 
         _totalShares -= shares;
         delete _liquidityInfo[tokenId];
     }
 
+    function decreaseReserve(uint256 delta) internal {
+        if (_fixedReserve >= delta) {
+            _fixedReserve -= delta;
+        } else {
+            uint256 streamingReserve = flushStreamingReserve();
+
+            _fixedReserve = _fixedReserve + streamingReserve - delta;
+        }
+    }
+
     function liquidityToShares(uint256 amount) internal view returns (uint256) {
-        return (_totalShares * amount) / _reserve;
+        return (_totalShares * amount) / getReserve();
     }
 
     function sharesToLiquidity(uint256 shares) internal view returns (uint256) {
-        return (_reserve * shares) / _totalShares;
+        return (getReserve() * shares) / _totalShares;
     }
 
     /**

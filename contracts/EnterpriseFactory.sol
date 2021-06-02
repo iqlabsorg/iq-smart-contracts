@@ -3,8 +3,8 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./Enterprise.sol";
-import "./DefaultLoanCostEstimator.sol";
-import "./DefaultConverter.sol";
+import "./interfaces/IEstimator.sol";
+import "./interfaces/IConverter.sol";
 import "./InterestToken.sol";
 import "./BorrowToken.sol";
 
@@ -48,10 +48,10 @@ contract EnterpriseFactory {
         IConverter converter
     ) external returns (Enterprise) {
         Enterprise enterprise = Enterprise(_enterpriseImpl.clone());
-        ILoanCostEstimator estimator = ILoanCostEstimator(estimatorImpl.clone());
+        IEstimator estimator = IEstimator(estimatorImpl.clone());
 
-        IInterestToken interestToken = deployInterestToken(liquidityToken.symbol(), enterprise);
-        IBorrowToken borrowToken = deployBorrowToken(liquidityToken.symbol(), enterprise);
+        InterestToken interestToken = deployInterestToken(liquidityToken.symbol(), enterprise);
+        BorrowToken borrowToken = deployBorrowToken(liquidityToken.symbol(), enterprise);
 
         enterprise.initialize(name, baseUri, estimator, converter, msg.sender);
         enterprise.initializeTokens(_powerTokenImpl, liquidityToken, interestToken, borrowToken);
@@ -63,7 +63,7 @@ contract EnterpriseFactory {
         return enterprise;
     }
 
-    function deployInterestToken(string memory symbol, Enterprise enterprise) internal returns (IInterestToken) {
+    function deployInterestToken(string memory symbol, Enterprise enterprise) internal returns (InterestToken) {
         string memory interestTokenName = string(abi.encodePacked("Interest Bearing ", symbol));
         string memory interestTokenSymbol = string(abi.encodePacked("i", symbol));
 
@@ -72,7 +72,7 @@ contract EnterpriseFactory {
         return interestToken;
     }
 
-    function deployBorrowToken(string memory symbol, Enterprise enterprise) internal returns (IBorrowToken) {
+    function deployBorrowToken(string memory symbol, Enterprise enterprise) internal returns (BorrowToken) {
         string memory borrowTokenName = string(abi.encodePacked("Borrow ", symbol));
         string memory borrowTokenSymbol = string(abi.encodePacked("b", symbol));
 

@@ -7,11 +7,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const {deployer} = await getNamedAccounts();
 
-  await deploy('DefaultLoanCostEstimator', {
+  await deploy('DefaultEstimator', {
     from: deployer,
     args: [],
     log: true,
   });
 };
 export default func;
-func.tags = ['DefaultLoanCostEstimator'];
+func.tags = ['DefaultEstimator'];

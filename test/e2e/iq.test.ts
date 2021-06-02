@@ -14,12 +14,12 @@ import {
   Enterprise,
   IConverter,
   IERC20Metadata,
-  ILoanCostEstimator,
+  IEstimator,
   InterestToken,
   PowerToken,
 } from '../../typechain';
 
-describe.only('IQ Protocol E2E', () => {
+describe('IQ Protocol E2E', () => {
   let deployer: Address;
   let user: Address;
   let token: IERC20Metadata;
@@ -35,7 +35,7 @@ describe.only('IQ Protocol E2E', () => {
     token = (await ethers.getContract('ERC20Mock')) as IERC20Metadata;
     const estimator = (await ethers.getContract(
       'DefaultLoanCostEstimator'
-    )) as ILoanCostEstimator;
+    )) as IEstimator;
     const converter = (await ethers.getContract(
       'DefaultConverter'
     )) as IConverter;
@@ -48,8 +48,6 @@ describe.only('IQ Protocol E2E', () => {
       estimator.address,
       converter.address
     );
-
-    console.log('Enterprise deploy: ', (await tx.wait()).gasUsed.toString());
 
     enterprise = await getEnterprise(factory, tx);
   });
@@ -183,7 +181,7 @@ describe.only('IQ Protocol E2E', () => {
       await userEnterprise.returnLoan(tokenId);
     });
 
-    it.only('should be possible to take 2 loans', async () => {
+    it('should be possible to take 2 loans', async () => {
       const BORROW1 = ONE_TOKEN.mul(300000);
       const BORROW2 = ONE_TOKEN.mul(200000);
 
@@ -211,6 +209,11 @@ describe.only('IQ Protocol E2E', () => {
         )
       );
 
+      console.log(
+        'Available Reserve --> ',
+        toTokens(await userEnterprise.getAvailableReserve(), 4)
+      );
+
       const borrow1Tx = await userEnterprise.borrow(
         powerToken.address,
         token.address,
@@ -219,6 +222,24 @@ describe.only('IQ Protocol E2E', () => {
         86400
       );
       const balanceAfter1 = await token.balanceOf(user);
+      await increaseTime(86400);
+      console.log(
+        'Available Reserve --> ',
+        toTokens(await userEnterprise.getAvailableReserve(), 4)
+      );
+
+      console.log(
+        'Loan 2 --> ',
+        toTokens(
+          await userEnterprise.estimateLoan(
+            powerToken.address,
+            token.address,
+            BORROW2,
+            86400
+          ),
+          4
+        )
+      );
       const borrow2Tx = await userEnterprise.borrow(
         powerToken.address,
         token.address,

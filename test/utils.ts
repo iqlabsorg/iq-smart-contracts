@@ -8,8 +8,10 @@ export const evmRevert = async (id: string) =>
   ethers.provider.send('evm_revert', [id]);
 export const nextBlock = async (timestamp = 0) =>
   ethers.provider.send('evm_mine', timestamp > 0 ? [timestamp] : []);
-export const increaseTime = async (seconds: number) =>
+export const increaseTime = async (seconds: number) => {
   ethers.provider.send('evm_increaseTime', [seconds]);
+  await nextBlock();
+};
 export const currentTime = async (): Promise<number> => {
   const block = await ethers.provider.getBlock('latest');
   return block.timestamp;

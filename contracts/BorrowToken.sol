@@ -4,12 +4,11 @@ pragma solidity 0.8.4;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./Enterprise.sol";
-import "./InitializableOwnable.sol";
+import "./EnterpriseOwnable.sol";
 import "./token/ERC721Enumerable.sol";
 
-contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721Enumerable {
+contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
     using SafeERC20 for IERC20;
-    Enterprise private _enterprise;
     uint256 private _counter = 1;
 
     function initialize(
@@ -17,9 +16,8 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721Enumerable {
         string memory symbol,
         Enterprise enterprise
     ) external {
-        InitializableOwnable.initialize(address(enterprise));
+        EnterpriseOwnable.initialize(enterprise);
         ERC721.initialize(name, symbol);
-        _enterprise = enterprise;
     }
 
     function getCounter() external view override returns (uint256) {
@@ -27,21 +25,22 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721Enumerable {
     }
 
     function _baseURI() internal view override returns (string memory) {
-        string memory baseURI = _enterprise.getBaseUri();
+        string memory baseURI = getEnterprise().getBaseUri();
         return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, "borrow/")) : "";
     }
 
-    function mint(address to) external override onlyOwner returns (uint256) {
+    function mint(address to) external override onlyEnterprise returns (uint256) {
         uint256 tokenId = _counter;
         _safeMint(to, tokenId);
         _counter++;
         return tokenId;
     }
 
-    function burn(uint256 tokenId, address burner) external override onlyOwner {
+    function burn(uint256 tokenId, address burner) external override onlyEnterprise {
         _burn(tokenId);
-        Enterprise.LoanInfo memory loan = _enterprise.getLoanInfo(tokenId);
-        IERC20 paymentToken = IERC20(_enterprise.supportedPaymentTokens(loan.gcFeeTokenIndex));
+        Enterprise enterprise = getEnterprise();
+        Enterprise.LoanInfo memory loan = enterprise.getLoanInfo(tokenId);
+        IERC20 paymentToken = IERC20(enterprise.supportedPaymentTokens(loan.gcFeeTokenIndex));
 
         paymentToken.safeTransfer(burner, loan.gcFee);
     }
@@ -52,6 +51,6 @@ contract BorrowToken is IBorrowToken, InitializableOwnable, ERC721Enumerable {
         uint256 tokenId
     ) internal override {
         super._beforeTokenTransfer(from, to, tokenId);
-        _enterprise.loanTransfer(from, to, tokenId);
+        getEnterprise().loanTransfer(from, to, tokenId);
     }
 }

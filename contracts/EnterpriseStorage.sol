@@ -5,14 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./interfaces/IPowerToken.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IBorrowToken.sol";
-import "./interfaces/ILoanCostEstimator.sol";
+import "./interfaces/IEstimator.sol";
 import "./interfaces/IConverter.sol";
 import "./InitializableOwnable.sol";
+import "./math/ExpMath.sol";
 
 /**
  * @dev Contract which stores Enterprise state
  * To prevent Enterprise from front-running it's users, it is supposed to be owned by some
- * Governance system. For example OpenZeppelin `TimelockController` contract can
+ * Governance system. For example: OpenZeppelin `TimelockController` contract can
  * be used as an `owner` of this contract
  */
 contract EnterpriseStorage is InitializableOwnable {
@@ -55,6 +56,9 @@ contract EnterpriseStorage is InitializableOwnable {
      */
     IERC20Metadata internal _liquidityToken;
 
+    /**
+     * @dev ERC721 token for liquidity providers
+     */
     IInterestToken internal _interestToken;
     /**
      * @dev ERC721 token to keep loan
@@ -62,13 +66,13 @@ contract EnterpriseStorage is InitializableOwnable {
     IBorrowToken internal _borrowToken;
     address internal _powerTokenImpl;
 
-    ILoanCostEstimator internal _estimator;
+    IEstimator internal _estimator;
     IConverter internal _converter;
     address internal _enterpriseCollector;
-
     address internal _enterpriseVault;
-    uint32 internal _borrowerLoanReturnGracePeriod = 1 days;
-    uint32 internal _enterpriseLoanCollectGracePeriod = 2 days;
+
+    uint32 internal _borrowerLoanReturnGracePeriod = 12 hours;
+    uint32 internal _enterpriseLoanCollectGracePeriod = 1 days;
     uint16 internal _gcFeePercent; // 100 is 1%, 10_000 is 100%
 
     mapping(address => int16) internal _paymentTokensIndex;
@@ -76,15 +80,25 @@ contract EnterpriseStorage is InitializableOwnable {
     string internal _baseUri;
 
     /**
-     * @dev Total amount of `_liquidityToken`
+     * @dev Amount of fixed `_liquidityToken`
      */
-    uint256 internal _reserve;
+    uint256 internal _fixedReserve;
 
     /**
-     * @dev Available to borrow reserves of `_liquidityToken`
+     * @dev Borrowed reserves of `_liquidityToken`
      */
-    uint256 internal _availableReserve;
+    uint256 internal _usedReserve;
 
+    /**
+     * @dev Reverves which are streamed from borrower
+     */
+    uint112 internal _streamingReserve;
+    uint112 internal _streamingReserveTarget;
+    uint32 internal _streamingReserveUpdated;
+
+    /**
+     * Total shares given to liquidity providers
+     */
     uint256 internal _totalShares;
 
     string internal _name;
@@ -101,7 +115,7 @@ contract EnterpriseStorage is InitializableOwnable {
     function initialize(
         string memory enterpriseName,
         string calldata baseUri,
-        ILoanCostEstimator estimator,
+        IEstimator estimator,
         IConverter converter,
         address owner
     ) external {
@@ -141,13 +155,13 @@ contract EnterpriseStorage is InitializableOwnable {
         return _borrowToken;
     }
 
-    function setLoanCostEstimator(ILoanCostEstimator newEstimator) external onlyOwner {
+    function setLoanCostEstimator(IEstimator newEstimator) external onlyOwner {
         require(address(newEstimator) != address(0), "Zero address");
         _estimator = newEstimator;
         //TODO: emit event
     }
 
-    function getLoanCostEstimator() public view returns (ILoanCostEstimator) {
+    function getLoanCostEstimator() public view returns (IEstimator) {
         return _estimator;
     }
 
@@ -204,12 +218,12 @@ contract EnterpriseStorage is InitializableOwnable {
         view
         returns (
             uint256 reserve,
-            uint256 availableReserve,
+            uint256 usedReserve,
             uint256 totalShares,
             string memory name
         )
     {
-        return (_reserve, _availableReserve, _totalShares, _name);
+        return (_fixedReserve, _usedReserve, _totalShares, _name);
     }
 
     function getPowerTokens() external view returns (IPowerToken[] memory) {
@@ -262,12 +276,16 @@ contract EnterpriseStorage is InitializableOwnable {
         return _serviceConfig[powerToken].index;
     }
 
-    function getReserve() external view returns (uint256) {
-        return _reserve;
+    function getReserve() public view returns (uint256) {
+        return _fixedReserve + getStreamingReserve();
     }
 
-    function getAvailableReserve() external view returns (uint256) {
-        return _availableReserve;
+    function getUsedReserve() public view returns (uint256) {
+        return _usedReserve;
+    }
+
+    function getAvailableReserve() public view returns (uint256) {
+        return getReserve() - _usedReserve;
     }
 
     function setEnterpriseCollector(address newCollector) public onlyOwner {
@@ -415,5 +433,31 @@ contract EnterpriseStorage is InitializableOwnable {
         if (_paymentTokensIndex[token] > 0) {
             _paymentTokensIndex[token] = -_paymentTokensIndex[token];
         }
+    }
+
+    function getStreamingReserve() internal view returns (uint112) {
+        return
+            _streamingReserveTarget -
+            ExpMath.halfLife(
+                _streamingReserveUpdated,
+                _streamingReserveTarget - _streamingReserve,
+                4 hours,
+                uint32(block.timestamp)
+            );
+    }
+
+    function increaseStreamingReserveTarget(uint112 delta) internal {
+        _streamingReserve = getStreamingReserve();
+
+        _streamingReserveUpdated = uint32(block.timestamp);
+        _streamingReserveTarget += delta;
+    }
+
+    function flushStreamingReserve() internal returns (uint112 streamingReserve) {
+        streamingReserve = getStreamingReserve();
+
+        _streamingReserve = 0;
+        _streamingReserveTarget -= streamingReserve;
+        _streamingReserveUpdated = uint32(block.timestamp);
     }
 }
