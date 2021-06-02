@@ -66,6 +66,7 @@ contract EnterpriseStorage is InitializableOwnable {
      */
     IBorrowToken internal _borrowToken;
     address internal _powerTokenImpl;
+    uint32 internal _interestHalfLife = 4 hours;
 
     IEstimator internal _estimator;
     IConverter internal _converter;
@@ -99,7 +100,7 @@ contract EnterpriseStorage is InitializableOwnable {
     uint256 internal _usedReserve;
 
     /**
-     * @dev Reverves which are streamed from borrower
+     * @dev Reserves which are streamed from borrower
      */
     uint112 internal _streamingReserve;
     uint112 internal _streamingReserveTarget;
@@ -203,6 +204,10 @@ contract EnterpriseStorage is InitializableOwnable {
 
     function getPowerTokenImpl() public view returns (address) {
         return _powerTokenImpl;
+    }
+
+    function getInterestHalfLife() public view returns (uint32) {
+        return _interestHalfLife;
     }
 
     function getServiceFeePercent(IPowerToken powerToken) public view returns (uint112) {
@@ -320,6 +325,10 @@ contract EnterpriseStorage is InitializableOwnable {
 
     function setBaseUri(string calldata baseUri) external onlyOwner {
         _baseUri = baseUri;
+    }
+
+    function setInterestHalfLife(uint32 interestHalfLife) external onlyOwner {
+        _interestHalfLife = interestHalfLife;
     }
 
     function setServiceFeePercent(IPowerToken powerToken, uint16 newServiceFeePercent)
@@ -443,7 +452,7 @@ contract EnterpriseStorage is InitializableOwnable {
             ExpMath.halfLife(
                 _streamingReserveUpdated,
                 _streamingReserveTarget - _streamingReserve,
-                4 hours,
+                _interestHalfLife,
                 uint32(block.timestamp)
             );
     }
