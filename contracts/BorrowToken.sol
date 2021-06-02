@@ -9,7 +9,7 @@ import "./token/ERC721Enumerable.sol";
 
 contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
     using SafeERC20 for IERC20;
-    uint256 private _counter = 1;
+    uint256 private _tokenIdTracker;
 
     function initialize(
         string memory name,
@@ -20,8 +20,8 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
         ERC721.initialize(name, symbol);
     }
 
-    function getCounter() external view override returns (uint256) {
-        return _counter;
+    function getNextTokenId() external view override returns (uint256) {
+        return _tokenIdTracker;
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -30,9 +30,9 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
     }
 
     function mint(address to) external override onlyEnterprise returns (uint256) {
-        uint256 tokenId = _counter;
+        uint256 tokenId = _tokenIdTracker;
         _safeMint(to, tokenId);
-        _counter++;
+        _tokenIdTracker++;
         return tokenId;
     }
 
@@ -40,7 +40,7 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
         _burn(tokenId);
         Enterprise enterprise = getEnterprise();
         Enterprise.LoanInfo memory loan = enterprise.getLoanInfo(tokenId);
-        IERC20 paymentToken = IERC20(enterprise.supportedPaymentTokens(loan.gcFeeTokenIndex));
+        IERC20 paymentToken = IERC20(enterprise.paymentToken(loan.gcFeeTokenIndex));
 
         paymentToken.safeTransfer(burner, loan.gcFee);
     }

@@ -13,7 +13,7 @@ contract DefaultConverter is IConverter {
         uint256 amount,
         IERC20 target
     ) external pure override returns (uint256) {
-        require(address(source) == address(target), "Not supported");
+        require(address(source) == address(target), "Convertion not supported");
 
         return amount;
     }
@@ -27,7 +27,7 @@ contract DefaultConverter is IConverter {
         uint256 amount,
         IERC20 target
     ) external pure override returns (uint256) {
-        require(address(source) == address(target), "Not supported");
+        require(address(source) == address(target), "Convertion not supported");
         return amount;
     }
 }

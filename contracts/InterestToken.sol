@@ -8,7 +8,7 @@ import "./EnterpriseOwnable.sol";
 import "./token/ERC721Enumerable.sol";
 
 contract InterestToken is IInterestToken, EnterpriseOwnable, ERC721Enumerable {
-    uint256 private _counter;
+    uint256 private _tokenIdTracker;
 
     function initialize(
         string memory name_,
@@ -19,8 +19,8 @@ contract InterestToken is IInterestToken, EnterpriseOwnable, ERC721Enumerable {
         ERC721.initialize(name_, symbol_);
     }
 
-    function getCounter() public view returns (uint256) {
-        return _counter;
+    function getNextTokenId() public view returns (uint256) {
+        return _tokenIdTracker;
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -29,9 +29,9 @@ contract InterestToken is IInterestToken, EnterpriseOwnable, ERC721Enumerable {
     }
 
     function mint(address to) external override onlyEnterprise returns (uint256) {
-        uint256 tokenId = _counter;
+        uint256 tokenId = _tokenIdTracker;
         _safeMint(to, tokenId);
-        _counter++;
+        _tokenIdTracker++;
         return tokenId;
     }
 

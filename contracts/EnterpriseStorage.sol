@@ -41,7 +41,7 @@ contract EnterpriseStorage is InitializableOwnable {
         uint32 enterpriseCollectGraceTime; // 4 bytes
         // slot 1, 0 bytes left
         uint112 gcFee; // 14 bytes, loan return reward
-        uint16 gcFeeTokenIndex; // 2 bytes, index in supportedPaymentTokens array
+        uint16 gcFeeTokenIndex; // 2 bytes, index in `_paymentTokens` array
         // slot 2, 16 bytes left
     }
 
@@ -60,15 +60,24 @@ contract EnterpriseStorage is InitializableOwnable {
      * @dev ERC721 token for liquidity providers
      */
     IInterestToken internal _interestToken;
+
     /**
-     * @dev ERC721 token to keep loan
+     * @dev ERC721 token for borrowers
      */
     IBorrowToken internal _borrowToken;
     address internal _powerTokenImpl;
 
     IEstimator internal _estimator;
     IConverter internal _converter;
+
+    /**
+     * @dev address which have rights to collect expired PowerTokens
+     */
     address internal _enterpriseCollector;
+
+    /**
+     * @dev address where collected service fee goes
+     */
     address internal _enterpriseVault;
 
     uint32 internal _borrowerLoanReturnGracePeriod = 12 hours;
@@ -119,7 +128,7 @@ contract EnterpriseStorage is InitializableOwnable {
         IConverter converter,
         address owner
     ) external {
-        require(address(_interestToken) == address(0), "Already initialized");
+        require(bytes(_name).length == 0, "Already initialized");
         InitializableOwnable.initialize(owner);
         _name = enterpriseName;
         _baseUri = baseUri;
@@ -155,21 +164,20 @@ contract EnterpriseStorage is InitializableOwnable {
         return _borrowToken;
     }
 
-    function setLoanCostEstimator(IEstimator newEstimator) external onlyOwner {
+    function setEstimator(IEstimator newEstimator) external onlyOwner {
         require(address(newEstimator) != address(0), "Zero address");
         _estimator = newEstimator;
-        //TODO: emit event
     }
 
-    function getLoanCostEstimator() public view returns (IEstimator) {
+    function getEstimator() public view returns (IEstimator) {
         return _estimator;
     }
 
-    function supportedPaymentTokensIndex(IERC20 token) public view returns (int16) {
+    function paymentTokenIndex(IERC20 token) public view returns (int16) {
         return _paymentTokensIndex[address(token)] - 1;
     }
 
-    function supportedPaymentTokens(uint256 index) public view returns (address) {
+    function paymentToken(uint256 index) public view returns (address) {
         return _paymentTokens[index];
     }
 
@@ -267,12 +275,7 @@ contract EnterpriseStorage is InitializableOwnable {
         return _powerTokens[index];
     }
 
-    function getPowerTokenIndex(IPowerToken powerToken)
-        external
-        view
-        registeredPowerToken(powerToken)
-        returns (uint16)
-    {
+    function getPowerTokenIndex(IPowerToken powerToken) external view returns (uint16) {
         return _serviceConfig[powerToken].index;
     }
 
@@ -319,15 +322,15 @@ contract EnterpriseStorage is InitializableOwnable {
         _baseUri = baseUri;
     }
 
-    function setServiceFeePercent(IPowerToken powerToken, uint16 newFeePercent)
+    function setServiceFeePercent(IPowerToken powerToken, uint16 newServiceFeePercent)
         public
         onlyOwner
         registeredPowerToken(powerToken)
     {
-        _setServiceFeePercent(powerToken, newFeePercent);
+        _setServiceFeePercent(powerToken, newServiceFeePercent);
     }
 
-    function scheduleServiceFeePercentBatch(IPowerToken[] calldata powerToken, uint16[] calldata newServiceFeePercent)
+    function setServiceFeePercentBatch(IPowerToken[] calldata powerToken, uint16[] calldata newServiceFeePercent)
         external
         onlyOwner
     {
@@ -343,7 +346,6 @@ contract EnterpriseStorage is InitializableOwnable {
         require(newServiceFeePercent <= MAX_SERVICE_FEE_PERCENT, "Maximum service fee percent threshold");
 
         _serviceConfig[powerToken].serviceFeePercent = newServiceFeePercent;
-        //TODO: emit event
     }
 
     function setServiceBaseRate(

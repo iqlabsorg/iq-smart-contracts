@@ -93,16 +93,15 @@ contract Enterprise is EnterpriseStorage {
             uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
             _liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
 
-            uint112 poolInterest = uint112(convertedLiquidityTokens - serviceLiquidity);
-
             _usedReserve += amount;
 
+            uint112 poolInterest = uint112(convertedLiquidityTokens - serviceLiquidity);
             increaseStreamingReserveTarget(poolInterest);
         }
         paymentToken.safeTransferFrom(msg.sender, address(_borrowToken), gcFee);
         uint32 borrowingTime = uint32(block.timestamp);
         uint32 maturiryTime = borrowingTime + duration;
-        uint256 tokenId = _borrowToken.getCounter();
+        uint256 tokenId = _borrowToken.getNextTokenId();
         _loanInfo[tokenId] = LoanInfo(
             amount,
             _serviceConfig[powerToken].index,
@@ -111,7 +110,7 @@ contract Enterprise is EnterpriseStorage {
             maturiryTime + _borrowerLoanReturnGracePeriod,
             maturiryTime + _enterpriseLoanCollectGracePeriod,
             gcFee,
-            uint16(supportedPaymentTokensIndex(paymentToken))
+            uint16(paymentTokenIndex(paymentToken))
         );
 
         assert(_borrowToken.mint(msg.sender) == tokenId); // also mints PowerTokens
@@ -128,6 +127,8 @@ contract Enterprise is EnterpriseStorage {
         uint32 duration
     ) external view registeredPowerToken(powerToken) returns (uint256) {
         require(isSupportedPaymentToken(paymentToken), "Interest payment token is disabled or not supported");
+        require(isServiceAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
+
         (uint112 interest, uint112 serviceFee, uint112 gcFee) =
             _estimateLoan(powerToken, paymentToken, amount, duration);
 
@@ -216,8 +217,8 @@ contract Enterprise is EnterpriseStorage {
 
         uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
         _liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
-        uint112 poolInterest = uint112(convertedLiquidityTokens - serviceLiquidity);
 
+        uint112 poolInterest = uint112(convertedLiquidityTokens - serviceLiquidity);
         increaseStreamingReserveTarget(poolInterest);
 
         uint32 borrowingTime = loan.maturityTime;
@@ -235,7 +236,6 @@ contract Enterprise is EnterpriseStorage {
         IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
         require(address(powerToken) != address(0), "Invalid tokenId");
         address borrower = _borrowToken.ownerOf(tokenId);
-        //TODO: implement grace periods for loan borrower and enterprise
         uint32 timestamp = uint32(block.timestamp);
 
         require(

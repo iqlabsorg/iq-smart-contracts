@@ -30,8 +30,7 @@ contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
     }
 
     function availableBalanceOf(address account) external view returns (uint256) {
-        State storage state = _states[account];
-        return balanceOf(account) - state.lockedBalance;
+        return balanceOf(account) - _states[account].lockedBalance;
     }
 
     function mint(address to, uint256 value) external override onlyEnterprise {

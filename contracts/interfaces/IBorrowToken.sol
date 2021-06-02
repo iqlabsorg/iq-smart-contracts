@@ -10,5 +10,5 @@ interface IBorrowToken is IERC721 {
 
     function burn(uint256 tokenId, address burner) external;
 
-    function getCounter() external returns (uint256);
+    function getNextTokenId() external returns (uint256);
 }

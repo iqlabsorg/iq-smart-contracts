@@ -34,7 +34,7 @@ describe('IQ Protocol E2E', () => {
 
     token = (await ethers.getContract('ERC20Mock')) as IERC20Metadata;
     const estimator = (await ethers.getContract(
-      'DefaultLoanCostEstimator'
+      'DefaultEstimator'
     )) as IEstimator;
     const converter = (await ethers.getContract(
       'DefaultConverter'
@@ -195,6 +195,10 @@ describe('IQ Protocol E2E', () => {
       )) as Enterprise;
 
       const balanceBefore = await token.balanceOf(user);
+      console.log(
+        'Available Reserve --> ',
+        toTokens(await userEnterprise.getAvailableReserve(), 4)
+      );
 
       console.log(
         'Loan --> ',
@@ -209,11 +213,6 @@ describe('IQ Protocol E2E', () => {
         )
       );
 
-      console.log(
-        'Available Reserve --> ',
-        toTokens(await userEnterprise.getAvailableReserve(), 4)
-      );
-
       const borrow1Tx = await userEnterprise.borrow(
         powerToken.address,
         token.address,
@@ -222,7 +221,7 @@ describe('IQ Protocol E2E', () => {
         86400
       );
       const balanceAfter1 = await token.balanceOf(user);
-      await increaseTime(86400);
+      await increaseTime(3600 * 4);
       console.log(
         'Available Reserve --> ',
         toTokens(await userEnterprise.getAvailableReserve(), 4)

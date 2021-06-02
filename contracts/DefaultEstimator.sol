@@ -59,16 +59,19 @@ contract DefaultEstimator is IEstimator {
         return ONE + ((lambda * uint128(log_2(int128(x)))) >> 64);
     }
 
-    function h(uint256 x, uint256 lambda) internal view returns (uint256) {
-        uint256 reserve = _enterprise.getReserve();
-
+    function h(
+        uint256 x,
+        uint256 lambda,
+        uint256 reserve
+    ) internal pure returns (uint256) {
         return (x * f(uint128((reserve << 64) / ((reserve - x))), lambda)) >> 64;
     }
 
     function g(uint256 x, uint256 lambda) internal view returns (uint256) {
         uint256 usedReserve = _enterprise.getUsedReserve();
+        uint256 reserve = _enterprise.getReserve();
 
-        return h(usedReserve + x, lambda) - h(usedReserve, lambda);
+        return h(usedReserve + x, lambda, reserve) - h(usedReserve, lambda, reserve);
     }
 
     function log_2(int128 x) internal pure returns (int128) {
