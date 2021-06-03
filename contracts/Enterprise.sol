@@ -78,7 +78,7 @@ contract Enterprise is EnterpriseStorage {
 
         uint112 gcFee;
         {
-            // scope to avaid stack too deep errors
+            // scope to avoid stack too deep errors
             (uint112 interest, uint112 serviceFee, uint112 gcFeeAmount) =
                 _estimateLoan(powerToken, paymentToken, amount, duration);
             gcFee = gcFeeAmount;
@@ -100,15 +100,15 @@ contract Enterprise is EnterpriseStorage {
         }
         paymentToken.safeTransferFrom(msg.sender, address(_borrowToken), gcFee);
         uint32 borrowingTime = uint32(block.timestamp);
-        uint32 maturiryTime = borrowingTime + duration;
+        uint32 maturityTime = borrowingTime + duration;
         uint256 tokenId = _borrowToken.getNextTokenId();
         _loanInfo[tokenId] = LoanInfo(
             amount,
             _serviceConfig[powerToken].index,
             borrowingTime,
-            maturiryTime,
-            maturiryTime + _borrowerLoanReturnGracePeriod,
-            maturiryTime + _enterpriseLoanCollectGracePeriod,
+            maturityTime,
+            maturityTime + _borrowerLoanReturnGracePeriod,
+            maturityTime + _enterpriseLoanCollectGracePeriod,
             gcFee,
             uint16(paymentTokenIndex(paymentToken))
         );
@@ -117,7 +117,7 @@ contract Enterprise is EnterpriseStorage {
 
         _estimator.notifyNewLoan(tokenId);
 
-        emit Borrowed(address(powerToken), tokenId, borrowingTime, maturiryTime);
+        emit Borrowed(address(powerToken), tokenId, borrowingTime, maturityTime);
     }
 
     function estimateLoan(

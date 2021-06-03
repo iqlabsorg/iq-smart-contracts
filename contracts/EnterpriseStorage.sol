@@ -221,22 +221,22 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function getInfo()
-    external
-    view
-    returns (
-        string memory name,
-        string memory baseUri,
-        uint256 totalShares,
-        uint32 interestHalfLife,
-        uint32 borrowerLoanReturnGracePeriod,
-        uint32 enterpriseLoanCollectGracePeriod,
-        uint16 gcFeePercent,
-        uint256 fixedReserve,
-        uint256 usedReserve,
-        uint112 streamingReserve,
-        uint112 streamingReserveTarget,
-        uint32 streamingReserveUpdated
-    )
+        external
+        view
+        returns (
+            string memory name,
+            string memory baseUri,
+            uint256 totalShares,
+            uint32 interestHalfLife,
+            uint32 borrowerLoanReturnGracePeriod,
+            uint32 enterpriseLoanCollectGracePeriod,
+            uint16 gcFeePercent,
+            uint256 fixedReserve,
+            uint256 usedReserve,
+            uint112 streamingReserve,
+            uint112 streamingReserveTarget,
+            uint32 streamingReserveUpdated
+        )
     {
         return (
             _name,
@@ -258,7 +258,7 @@ contract EnterpriseStorage is InitializableOwnable {
         return _powerTokens;
     }
 
-    function getServicesInfo()
+    function getServices()
         external
         view
         returns (
@@ -275,12 +275,25 @@ contract EnterpriseStorage is InitializableOwnable {
         configs = new ServiceConfig[](powerTokenCount);
 
         for (uint256 i = 0; i < powerTokenCount; i++) {
-            IPowerToken token = _powerTokens[i];
-            names[i] = token.name();
-            symbols[i] = token.symbol();
-            addresses[i] = address(token);
-            configs[i] = _getServiceConfig(token);
+            IPowerToken powerToken = _powerTokens[i];
+            (string memory name, string memory symbol, ServiceConfig memory config) = getService(powerToken);
+            addresses[i] = address(powerToken);
+            names[i] = name;
+            symbols[i] = symbol;
+            configs[i] = config;
         }
+    }
+
+    function getService(IPowerToken powerToken)
+        public
+        view
+        returns (
+            string memory name,
+            string memory symbol,
+            ServiceConfig memory config
+        )
+    {
+        return (powerToken.name(), powerToken.symbol(), _serviceConfig[powerToken]);
     }
 
     function getLoanInfo(uint256 tokenId) external view returns (LoanInfo memory) {
@@ -450,10 +463,6 @@ contract EnterpriseStorage is InitializableOwnable {
 
     function isRegisteredPowerToken(IPowerToken powerToken) public view returns (bool) {
         return _serviceConfig[powerToken].halfLife != 0;
-    }
-
-    function _getServiceConfig(IPowerToken powerToken) internal view returns (ServiceConfig memory) {
-        return _serviceConfig[powerToken];
     }
 
     function _enablePaymentToken(address token) internal {
