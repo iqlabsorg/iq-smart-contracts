@@ -22,14 +22,15 @@ contract EnterpriseStorage is InitializableOwnable {
     struct ServiceConfig {
         // 1 slot
         uint112 baseRate; // base rate for price calculations, nominated in baseToken
-        uint112 minGCFee; // fee for collecting expired PowerTokens
+        uint96 minGCFee; // fee for collecting expired PowerTokens
         uint32 halfLife; // fixed, not updatable
+        uint16 index; // 1 - based because empty value points to 0 index. Not updatable
         // 2 slot
         IERC20Metadata baseToken;
         uint32 minLoanDuration;
         uint32 maxLoanDuration;
         uint16 serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
-        uint16 index; // 1 - based because empty value points to 0 index. Not updatable
+        bool allowsPerpetual; // allows perpetual PowerTokens (wraping / unwraping)
     }
 
     struct LoanInfo {
@@ -66,7 +67,7 @@ contract EnterpriseStorage is InitializableOwnable {
      */
     IBorrowToken internal _borrowToken;
     address internal _powerTokenImpl;
-    uint32 internal _interestHalfLife = 4 hours;
+    uint32 internal _interestHalfLife;
 
     IEstimator internal _estimator;
     IConverter internal _converter;
@@ -81,8 +82,8 @@ contract EnterpriseStorage is InitializableOwnable {
      */
     address internal _enterpriseVault;
 
-    uint32 internal _borrowerLoanReturnGracePeriod = 12 hours;
-    uint32 internal _enterpriseLoanCollectGracePeriod = 1 days;
+    uint32 internal _borrowerLoanReturnGracePeriod;
+    uint32 internal _enterpriseLoanCollectGracePeriod;
     uint16 internal _gcFeePercent; // 100 is 1%, 10_000 is 100%
 
     mapping(address => int16) internal _paymentTokensIndex;
@@ -137,6 +138,9 @@ contract EnterpriseStorage is InitializableOwnable {
         _converter = converter;
         _enterpriseVault = owner;
         _enterpriseCollector = owner;
+        _interestHalfLife = 4 hours;
+        _borrowerLoanReturnGracePeriod = 12 hours;
+        _enterpriseLoanCollectGracePeriod = 1 days;
     }
 
     function initializeTokens(
@@ -209,8 +213,6 @@ contract EnterpriseStorage is InitializableOwnable {
     function getInterestHalfLife() external view returns (uint32) {
         return _interestHalfLife;
     }
-
-
 
     function getConverter() external view returns (IConverter) {
         return _converter;
@@ -356,6 +358,7 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function setInterestHalfLife(uint32 interestHalfLife) external onlyOwner {
+        require(interestHalfLife > 0, "Invalid half life");
         _interestHalfLife = interestHalfLife;
     }
 
@@ -389,8 +392,8 @@ contract EnterpriseStorage is InitializableOwnable {
         IPowerToken powerToken,
         uint112 baseRate,
         IERC20Metadata baseToken,
-        uint112 minGCFee
-    ) external onlyOwner registeredPowerToken(powerToken) {
+        uint96 minGCFee
+    ) public onlyOwner registeredPowerToken(powerToken) {
         require(address(baseToken) != address(0), "Invalid Base Token");
         ServiceConfig storage config = _serviceConfig[powerToken];
 
@@ -409,6 +412,16 @@ contract EnterpriseStorage is InitializableOwnable {
 
         config.minLoanDuration = minLoanDuration;
         config.maxLoanDuration = maxLoanDuration;
+    }
+
+    function allowPerpetualPowerTokenForever(IPowerToken powerToken)
+        external
+        onlyOwner
+        registeredPowerToken(powerToken)
+    {
+        require(_serviceConfig[powerToken].allowsPerpetual == false, "Perpetual Power Tokens already allowed");
+
+        _serviceConfig[powerToken].allowsPerpetual = true;
     }
 
     function setGcFeePercent(uint16 newGcFeePercent) external onlyOwner {

@@ -1,75 +1,69 @@
-import {ethers, getNamedAccounts} from 'hardhat';
+import {ethers, waffle} from 'hardhat';
 import {expect} from 'chai';
-import {Contract} from '@ethersproject/contracts';
-import {BigNumberish} from 'ethers';
-import {Address} from 'hardhat-deploy/types';
-import {PowerToken__factory} from '../typechain';
+import {BigNumberish, Wallet} from 'ethers';
+import {
+  Enterprise,
+  ERC20,
+  ERC20Mock,
+  IERC20Metadata,
+  PowerToken,
+  PowerToken__factory,
+} from '../typechain';
+import {baseRate, deployEnterprise, registerService} from './utils';
 
 type EnegryTestCase = [BigNumberish, number, BigNumberish];
 
-const ONE_ETHER = ethers.constants.WeiPerEther;
+const ONE_ETHER = 10n ** 18n;
+const ONE_TOKEN = 10n ** 18n;
 
 describe('PowerToken', function () {
-  let token: Contract;
-  let userToken: Contract;
-  let user: Address;
-  let stranger: Address;
+  let token: ERC20Mock;
+  let user: Wallet;
+  let enterprise: Enterprise;
+  let powerToken: PowerToken;
+  let stranger: Wallet;
+
   const HALF_LIFE = 100;
 
   beforeEach(async () => {
-    ({user, stranger} = await getNamedAccounts());
+    [user, stranger] = await waffle.provider.getWallets();
+    token = (await ethers.getContract('ERC20Mock')) as ERC20Mock;
+    enterprise = await deployEnterprise('Testing', token.address);
 
-    token = await ethers.getContract('PowerToken');
-    const factory = new PowerToken__factory(
-      await ethers.getNamedSigner('deployer')
-    );
-    token = await factory.deploy();
-    await token.initialize('Test', 'TST', 'https://test.io/', HALF_LIFE);
-
-    userToken = PowerToken__factory.connect(
+    powerToken = await registerService(
+      enterprise,
+      HALF_LIFE,
+      baseRate(100n, 86400n, 3n),
       token.address,
-      await ethers.getNamedSigner('user')
+      300,
+      0,
+      86400 * 365,
+      ONE_TOKEN,
+      true
     );
-  });
-
-  it('should mint', async () => {
-    await token.mint(user, 999, ONE_ETHER.mul(1000), '0x');
-  });
-
-  it('should return balance', async () => {
-    await token.mint(user, 999, ONE_ETHER.mul(1000), '0x');
-
-    expect(await token.balanceOf(user, 999)).to.equal(ONE_ETHER.mul(1000));
-  });
-
-  describe('transfer', () => {
-    it('should transfer tokens', async () => {
-      await token.mint(user, 999, ONE_ETHER.mul(1000), '0x');
-
-      await userToken.safeTransferFrom(
-        user,
-        stranger,
-        999,
-        ONE_ETHER.mul(1000),
-        '0x'
-      );
-
-      expect(await token.balanceOf(stranger, 999)).to.equal(
-        ONE_ETHER.mul(1000)
-      );
-    });
   });
 
   describe('energy', () => {
-    ([
-      [ONE_ETHER.mul(1000), HALF_LIFE, ONE_ETHER.mul(500)],
-      [ONE_ETHER.mul(9999), HALF_LIFE, ethers.utils.parseEther('4999.5')],
-    ] as EnegryTestCase[]).forEach(([amount, period, expected], idx) => {
+    (
+      [
+        [ONE_ETHER * 1000n, HALF_LIFE, ONE_ETHER * 500n],
+        [ONE_ETHER * 9999n, HALF_LIFE, ethers.utils.parseEther('4999.5')],
+      ] as EnegryTestCase[]
+    ).forEach(([amount, period, expected], idx) => {
       it(`should calculate energy: ${idx}`, async () => {
-        const tx = await token.mint(user, 999, amount, '0x');
-        const block = await ethers.provider.getBlock(tx.blockNumber);
+        await token.approve(powerToken.address, amount);
+        const tx = await enterprise.wrap(powerToken.address, amount);
 
-        const result = await token.energyAt(user, block.timestamp + period);
+        const block = await ethers.provider.getBlock(
+          (
+            await tx.wait()
+          ).blockNumber
+        );
+
+        const result = await powerToken.energyAt(
+          user.address,
+          block.timestamp + period
+        );
 
         expect(result).to.equal(expected);
       });

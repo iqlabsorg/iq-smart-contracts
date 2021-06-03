@@ -1,9 +1,13 @@
-import {expect} from '../chai-setup';
-
-import {config, ethers, getNamedAccounts} from 'hardhat';
+import {ethers, waffle} from 'hardhat';
+import chai from 'chai';
+chai.use(waffle.solidity);
+const {expect} = chai;
 
 import {
+  baseRate,
+  deployEnterprise,
   getEnterprise,
+  getInterestTokenId,
   getPowerToken,
   getTokenId,
   increaseTime,
@@ -12,44 +16,27 @@ import {
 import {Address} from 'hardhat-deploy/types';
 import {
   Enterprise,
+  EnterpriseFactory,
   IConverter,
   IERC20Metadata,
   IEstimator,
   InterestToken,
   PowerToken,
 } from '../../typechain';
+import {BigNumber, Wallet} from 'ethers';
 
 describe('IQ Protocol E2E', () => {
-  let deployer: Address;
-  let user: Address;
+  let deployer: Wallet;
+  let user: Wallet;
   let token: IERC20Metadata;
   let enterprise: Enterprise;
 
-  const ONE_TOKEN = ethers.utils.parseEther('1');
-  const BORROWER_LOAN_RETURN_GRACE_PERIOD = 3600; // 1 hour
-  const ENTERPRISE_LOAN_RETURN_GRACE_PERIOD = 7200; // 2 hours
+  const ONE_TOKEN = 10n ** 18n;
 
   beforeEach(async () => {
-    ({deployer, user} = await getNamedAccounts());
-
+    [deployer, user] = await waffle.provider.getWallets();
     token = (await ethers.getContract('ERC20Mock')) as IERC20Metadata;
-    const estimator = (await ethers.getContract(
-      'DefaultEstimator'
-    )) as IEstimator;
-    const converter = (await ethers.getContract(
-      'DefaultConverter'
-    )) as IConverter;
-
-    const factory = await ethers.getContract('EnterpriseFactory');
-    const tx = await factory.deploy(
-      'Testing',
-      token.address,
-      'https://test.iq.space',
-      estimator.address,
-      converter.address
-    );
-
-    enterprise = await getEnterprise(factory, tx);
+    enterprise = await deployEnterprise('Testing', token.address);
   });
 
   describe('Basic', () => {
@@ -85,7 +72,7 @@ describe('IQ Protocol E2E', () => {
   });
 
   const HALF_LIFE = 86400;
-  const BASE_RATE = (3n << 64n) / (100n * 86400n); // 100 tokens per day costs 3 tokens
+  const BASE_RATE = baseRate(100n, 86400n, 3n);
   describe('Service', () => {
     it('should register service', async () => {
       const txPromise = enterprise.registerService(
@@ -97,7 +84,8 @@ describe('IQ Protocol E2E', () => {
         300, // 3%
         43200, // 12 hours
         86400 * 60, // 2 months
-        ethers.utils.parseUnits('1', 18) // 1 token
+        ethers.utils.parseUnits('1', 18), // 1 token
+        true
       );
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
@@ -109,10 +97,11 @@ describe('IQ Protocol E2E', () => {
   });
 
   describe('Lend-Borrow-Return-Withdraw', () => {
-    const LEND_AMOUNT = ONE_TOKEN.mul(1000000);
-    const BORROW_AMOUNT = ONE_TOKEN.mul(50);
-    const MAX_PAYMENT_AMOUNT = ONE_TOKEN.mul(5000000);
+    const LEND_AMOUNT = ONE_TOKEN * 1000000n;
+    const BORROW_AMOUNT = ONE_TOKEN * 50n;
+    const MAX_PAYMENT_AMOUNT = ONE_TOKEN * 5000000n;
     let powerToken: PowerToken;
+    let liquidityTokenId: BigNumber;
 
     beforeEach(async () => {
       // 2.Create service
@@ -125,31 +114,21 @@ describe('IQ Protocol E2E', () => {
         300, // 3%
         43200, // 12 hours
         86400 * 60, // 2 months
-        0
+        0,
+        true
       );
       powerToken = await getPowerToken(enterprise, tx);
 
       // 2.1 Approve
       await token.approve(enterprise.address, LEND_AMOUNT);
       // 3. Lend
-      await enterprise.addLiquidity(LEND_AMOUNT);
-      await token.transfer(user, MAX_PAYMENT_AMOUNT);
-    });
-
-    afterEach(async () => {
-      // 6. withdraw
-      console.log(
-        'Balance Before withdraw: ',
-        (await token.balanceOf(deployer)).toString()
-      );
-      await enterprise.removeLiquidity(LEND_AMOUNT);
-
-      console.log('Balance: ', (await token.balanceOf(deployer)).toString());
+      const liquidityTx = await enterprise.addLiquidity(LEND_AMOUNT);
+      liquidityTokenId = await getInterestTokenId(enterprise, liquidityTx);
+      await token.transfer(user.address, MAX_PAYMENT_AMOUNT);
     });
 
     it('should perform actions', async () => {
-      const userToken = await ethers.getContract('ERC20Mock', user);
-      await userToken.approve(enterprise.address, MAX_PAYMENT_AMOUNT);
+      await token.connect(user).approve(enterprise.address, MAX_PAYMENT_AMOUNT);
 
       const userEnterprise = (await ethers.getContractAt(
         'Enterprise',
@@ -179,11 +158,13 @@ describe('IQ Protocol E2E', () => {
       // 5. Burn
       const tokenId = await getTokenId(userEnterprise, borrowTx);
       await userEnterprise.returnLoan(tokenId);
+
+      await enterprise.removeLiquidity(liquidityTokenId);
     });
 
     it('should be possible to take 2 loans', async () => {
-      const BORROW1 = ONE_TOKEN.mul(300000);
-      const BORROW2 = ONE_TOKEN.mul(200000);
+      const BORROW1 = ONE_TOKEN * 300000n;
+      const BORROW2 = ONE_TOKEN * 200000n;
 
       const userToken = await ethers.getContract('ERC20Mock', user);
       await userToken.approve(enterprise.address, MAX_PAYMENT_AMOUNT);
@@ -194,7 +175,7 @@ describe('IQ Protocol E2E', () => {
         user
       )) as Enterprise;
 
-      const balanceBefore = await token.balanceOf(user);
+      const balanceBefore = await token.balanceOf(user.address);
       console.log(
         'Available Reserve --> ',
         toTokens(await userEnterprise.getAvailableReserve(), 4)
@@ -220,7 +201,7 @@ describe('IQ Protocol E2E', () => {
         MAX_PAYMENT_AMOUNT,
         86400
       );
-      const balanceAfter1 = await token.balanceOf(user);
+      const balanceAfter1 = await token.balanceOf(user.address);
       await increaseTime(3600 * 4);
       console.log(
         'Available Reserve --> ',
@@ -246,7 +227,7 @@ describe('IQ Protocol E2E', () => {
         MAX_PAYMENT_AMOUNT,
         86400
       );
-      const balanceAfter2 = await token.balanceOf(user);
+      const balanceAfter2 = await token.balanceOf(user.address);
 
       console.log(
         toTokens(balanceBefore.sub(balanceAfter1), 15),

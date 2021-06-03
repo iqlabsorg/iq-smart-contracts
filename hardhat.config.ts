@@ -3,6 +3,7 @@ import {HardhatUserConfig} from 'hardhat/types';
 import 'hardhat-deploy';
 import '@nomiclabs/hardhat-ethers';
 import 'hardhat-gas-reporter';
+import '@nomiclabs/hardhat-waffle';
 import '@typechain/hardhat';
 import 'solidity-coverage';
 import 'hardhat-contract-sizer';

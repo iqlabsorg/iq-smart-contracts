@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
@@ -18,7 +17,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * the Metadata extension, but not including the Enumerable extension, which is available separately as
  * {ERC721Enumerable}.
  */
-contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
+contract ERC721 is ERC165, IERC721, IERC721Metadata {
     using Address for address;
     using Strings for uint256;
 
@@ -116,7 +115,7 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
         require(to != owner, "ERC721: approval to current owner");
 
         require(
-            _msgSender() == owner || isApprovedForAll(owner, _msgSender()),
+            msg.sender == owner || isApprovedForAll(owner, msg.sender),
             "ERC721: approve caller is not owner nor approved for all"
         );
 
@@ -136,10 +135,10 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
      * @dev See {IERC721-setApprovalForAll}.
      */
     function setApprovalForAll(address operator, bool approved) public virtual override {
-        require(operator != _msgSender(), "ERC721: approve to caller");
+        require(operator != msg.sender, "ERC721: approve to caller");
 
-        _operatorApprovals[_msgSender()][operator] = approved;
-        emit ApprovalForAll(_msgSender(), operator, approved);
+        _operatorApprovals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
     }
 
     /**
@@ -158,7 +157,7 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
         uint256 tokenId
     ) public virtual override {
         //solhint-disable-next-line max-line-length
-        require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721: transfer caller is not owner nor approved");
+        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: transfer caller is not owner nor approved");
 
         _transfer(from, to, tokenId);
     }
@@ -183,7 +182,7 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
         uint256 tokenId,
         bytes memory _data
     ) public virtual override {
-        require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721: transfer caller is not owner nor approved");
+        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: transfer caller is not owner nor approved");
         _safeTransfer(from, to, tokenId, _data);
     }
 
@@ -376,7 +375,7 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
         bytes memory _data
     ) private returns (bool) {
         if (to.isContract()) {
-            try IERC721Receiver(to).onERC721Received(_msgSender(), from, tokenId, _data) returns (bytes4 retval) {
+            try IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, _data) returns (bytes4 retval) {
                 return retval == IERC721Receiver(to).onERC721Received.selector;
             } catch (bytes memory reason) {
                 if (reason.length == 0) {
