@@ -24,7 +24,7 @@ contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
         string memory name,
         string memory symbol,
         Enterprise enterprise
-    ) external override {
+    ) external {
         EnterpriseOwnable.initialize(enterprise);
         ERC20.initialize(name, symbol);
     }
@@ -114,7 +114,7 @@ contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
             fromState.energy = _getEnergy(fromState, from, timestamp);
             fromState.timestamp = timestamp;
             if (!updateLockedBalance) {
-                require(balanceOf(from) - value >= fromState.lockedBalance, "Insuffucient available balance");
+                require(balanceOf(from) - value >= fromState.lockedBalance, "Insufficient available balance");
             } else {
                 fromState.lockedBalance -= uint112(value);
             }

@@ -6,12 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../Enterprise.sol";
 
 interface IPowerToken is IERC20Metadata {
-    function initialize(
-        string memory name,
-        string memory symbol,
-        Enterprise enterprise
-    ) external;
-
     function forceTransfer(
         address from,
         address to,

@@ -50,8 +50,8 @@ contract EnterpriseFactory {
         Enterprise enterprise = Enterprise(_enterpriseImpl.clone());
         IEstimator estimator = IEstimator(estimatorImpl.clone());
 
-        InterestToken interestToken = deployInterestToken(liquidityToken.symbol(), enterprise);
-        BorrowToken borrowToken = deployBorrowToken(liquidityToken.symbol(), enterprise);
+        InterestToken interestToken = _deployInterestToken(liquidityToken.symbol(), enterprise);
+        BorrowToken borrowToken = _deployBorrowToken(liquidityToken.symbol(), enterprise);
 
         enterprise.initialize(name, baseUri, estimator, converter, msg.sender);
         enterprise.initializeTokens(_powerTokenImpl, liquidityToken, interestToken, borrowToken);
@@ -63,7 +63,7 @@ contract EnterpriseFactory {
         return enterprise;
     }
 
-    function deployInterestToken(string memory symbol, Enterprise enterprise) internal returns (InterestToken) {
+    function _deployInterestToken(string memory symbol, Enterprise enterprise) internal returns (InterestToken) {
         string memory interestTokenName = string(abi.encodePacked("Interest Bearing ", symbol));
         string memory interestTokenSymbol = string(abi.encodePacked("i", symbol));
 
@@ -72,7 +72,7 @@ contract EnterpriseFactory {
         return interestToken;
     }
 
-    function deployBorrowToken(string memory symbol, Enterprise enterprise) internal returns (BorrowToken) {
+    function _deployBorrowToken(string memory symbol, Enterprise enterprise) internal returns (BorrowToken) {
         string memory borrowTokenName = string(abi.encodePacked("Borrow ", symbol));
         string memory borrowTokenSymbol = string(abi.encodePacked("b", symbol));
 
