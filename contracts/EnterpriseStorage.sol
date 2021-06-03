@@ -144,7 +144,7 @@ contract EnterpriseStorage is InitializableOwnable {
         IERC20Metadata liquidityToken,
         IInterestToken interestToken,
         IBorrowToken borrowToken
-    ) public {
+    ) external {
         require(_powerTokenImpl == address(0), "Already initialized");
         _powerTokenImpl = powerTokenImpl;
         _liquidityToken = liquidityToken;
@@ -153,15 +153,15 @@ contract EnterpriseStorage is InitializableOwnable {
         _enablePaymentToken(address(liquidityToken));
     }
 
-    function getLiquidityToken() public view returns (IERC20Metadata) {
+    function getLiquidityToken() external view returns (IERC20Metadata) {
         return _liquidityToken;
     }
 
-    function getInterestToken() public view returns (IInterestToken) {
+    function getInterestToken() external view returns (IInterestToken) {
         return _interestToken;
     }
 
-    function getBorrowToken() public view returns (IBorrowToken) {
+    function getBorrowToken() external view returns (IBorrowToken) {
         return _borrowToken;
     }
 
@@ -170,7 +170,7 @@ contract EnterpriseStorage is InitializableOwnable {
         _estimator = newEstimator;
     }
 
-    function getEstimator() public view returns (IEstimator) {
+    function getEstimator() external view returns (IEstimator) {
         return _estimator;
     }
 
@@ -178,7 +178,7 @@ contract EnterpriseStorage is InitializableOwnable {
         return _paymentTokensIndex[address(token)] - 1;
     }
 
-    function paymentToken(uint256 index) public view returns (address) {
+    function paymentToken(uint256 index) external view returns (address) {
         return _paymentTokens[index];
     }
 
@@ -186,43 +186,37 @@ contract EnterpriseStorage is InitializableOwnable {
         return _paymentTokensIndex[address(token)] > 0;
     }
 
-    function getEnterpriseCollector() public view returns (address) {
+    function getEnterpriseCollector() external view returns (address) {
         return _enterpriseCollector;
     }
 
-    function getEnterpriseVault() public view returns (address) {
+    function getEnterpriseVault() external view returns (address) {
         return _enterpriseVault;
     }
 
-    function getBorrowerLoanReturnGracePeriod() public view returns (uint32) {
+    function getBorrowerLoanReturnGracePeriod() external view returns (uint32) {
         return _borrowerLoanReturnGracePeriod;
     }
 
-    function getEnterpriseLoanCollectGracePeriod() public view returns (uint32) {
+    function getEnterpriseLoanCollectGracePeriod() external view returns (uint32) {
         return _enterpriseLoanCollectGracePeriod;
     }
 
-    function getPowerTokenImpl() public view returns (address) {
+    function getPowerTokenImpl() external view returns (address) {
         return _powerTokenImpl;
     }
 
-    function getInterestHalfLife() public view returns (uint32) {
+    function getInterestHalfLife() external view returns (uint32) {
         return _interestHalfLife;
     }
 
-    function getServiceFeePercent(IPowerToken powerToken) public view returns (uint112) {
-        return _serviceConfig[powerToken].serviceFeePercent;
-    }
 
-    function getServiceHalfLife(IPowerToken powerToken) public view returns (uint32) {
-        return _serviceConfig[powerToken].halfLife;
-    }
 
-    function getConverter() public view returns (IConverter) {
+    function getConverter() external view returns (IConverter) {
         return _converter;
     }
 
-    function getBaseUri() public view returns (string memory) {
+    function getBaseUri() external view returns (string memory) {
         return _baseUri;
     }
 
@@ -264,28 +258,28 @@ contract EnterpriseStorage is InitializableOwnable {
         return _powerTokens;
     }
 
-    function getPowerTokensInfo()
+    function getServicesInfo()
         external
         view
         returns (
             address[] memory addresses,
             string[] memory names,
             string[] memory symbols,
-            uint32[] memory halfLifes
+            ServiceConfig[] memory configs
         )
     {
         uint256 powerTokenCount = _powerTokens.length;
         addresses = new address[](powerTokenCount);
         names = new string[](powerTokenCount);
         symbols = new string[](powerTokenCount);
-        halfLifes = new uint32[](powerTokenCount);
+        configs = new ServiceConfig[](powerTokenCount);
 
         for (uint256 i = 0; i < powerTokenCount; i++) {
             IPowerToken token = _powerTokens[i];
-            addresses[i] = address(token);
             names[i] = token.name();
             symbols[i] = token.symbol();
-            halfLifes[i] = getServiceHalfLife(token);
+            addresses[i] = address(token);
+            configs[i] = _getServiceConfig(token);
         }
     }
 
@@ -306,10 +300,10 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function getReserve() public view returns (uint256) {
-        return _fixedReserve + getStreamingReserve();
+        return _fixedReserve + _getStreamingReserve();
     }
 
-    function getUsedReserve() public view returns (uint256) {
+    function getUsedReserve() external view returns (uint256) {
         return _usedReserve;
     }
 
@@ -317,12 +311,12 @@ contract EnterpriseStorage is InitializableOwnable {
         return getReserve() - _usedReserve;
     }
 
-    function setEnterpriseCollector(address newCollector) public onlyOwner {
+    function setEnterpriseCollector(address newCollector) external onlyOwner {
         require(newCollector != address(0), "Zero address");
         _enterpriseCollector = newCollector;
     }
 
-    function setEnterpriseVault(address newVault) public onlyOwner {
+    function setEnterpriseVault(address newVault) external onlyOwner {
         require(newVault != address(0), "Zero address");
         _enterpriseVault = newVault;
     }
@@ -333,13 +327,13 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function setBorrowerLoanReturnGracePeriod(uint32 newPeriod) external onlyOwner {
-        require(newPeriod <= _enterpriseLoanCollectGracePeriod, "Invalid grace periods");
+        require(newPeriod <= _enterpriseLoanCollectGracePeriod, "Invalid grace period");
 
         _borrowerLoanReturnGracePeriod = newPeriod;
     }
 
     function setEnterpriseLoanCollectGracePeriod(uint32 newPeriod) external onlyOwner {
-        require(_borrowerLoanReturnGracePeriod <= newPeriod, "Invalid grace periods");
+        require(_borrowerLoanReturnGracePeriod <= newPeriod, "Invalid grace period");
 
         _enterpriseLoanCollectGracePeriod = newPeriod;
     }
@@ -353,7 +347,7 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function setServiceFeePercent(IPowerToken powerToken, uint16 newServiceFeePercent)
-        public
+        external
         onlyOwner
         registeredPowerToken(powerToken)
     {
@@ -383,7 +377,7 @@ contract EnterpriseStorage is InitializableOwnable {
         uint112 baseRate,
         IERC20Metadata baseToken,
         uint112 minGCFee
-    ) public onlyOwner registeredPowerToken(powerToken) {
+    ) external onlyOwner registeredPowerToken(powerToken) {
         require(address(baseToken) != address(0), "Invalid Base Token");
         ServiceConfig storage config = _serviceConfig[powerToken];
 
@@ -408,27 +402,35 @@ contract EnterpriseStorage is InitializableOwnable {
         _gcFeePercent = newGcFeePercent;
     }
 
-    function getGCFeePercent() public view returns (uint16) {
+    function getGCFeePercent() external view returns (uint16) {
         return _gcFeePercent;
     }
 
-    function getServiceBaseRate(IPowerToken powerToken) public view returns (uint112) {
+    function getServiceFeePercent(IPowerToken powerToken) external view returns (uint112) {
+        return _serviceConfig[powerToken].serviceFeePercent;
+    }
+
+    function getServiceHalfLife(IPowerToken powerToken) external view returns (uint32) {
+        return _serviceConfig[powerToken].halfLife;
+    }
+
+    function getServiceBaseRate(IPowerToken powerToken) external view returns (uint112) {
         return _serviceConfig[powerToken].baseRate;
     }
 
-    function getServiceMinGCFee(IPowerToken powerToken) public view returns (uint112) {
+    function getServiceMinGCFee(IPowerToken powerToken) external view returns (uint112) {
         return _serviceConfig[powerToken].minGCFee;
     }
 
-    function getServiceBaseToken(IPowerToken powerToken) public view returns (IERC20Metadata) {
+    function getServiceBaseToken(IPowerToken powerToken) external view returns (IERC20Metadata) {
         return _serviceConfig[powerToken].baseToken;
     }
 
-    function getServiceMinLoanDuration(IPowerToken powerToken) public view returns (uint32) {
+    function getServiceMinLoanDuration(IPowerToken powerToken) external view returns (uint32) {
         return _serviceConfig[powerToken].minLoanDuration;
     }
 
-    function getServiceMaxLoanDuration(IPowerToken powerToken) public view returns (uint32) {
+    function getServiceMaxLoanDuration(IPowerToken powerToken) external view returns (uint32) {
         return _serviceConfig[powerToken].maxLoanDuration;
     }
 
@@ -437,17 +439,21 @@ contract EnterpriseStorage is InitializableOwnable {
         return config.minLoanDuration <= duration && duration <= config.maxLoanDuration;
     }
 
-    function enablePaymentToken(address token) public onlyOwner {
+    function enablePaymentToken(address token) external onlyOwner {
         require(token != address(0), "Zero address");
         _enablePaymentToken(token);
     }
 
-    function disablePaymentToken(address token) public onlyOwner {
+    function disablePaymentToken(address token) external onlyOwner {
         _disablePaymentToken(token);
     }
 
     function isRegisteredPowerToken(IPowerToken powerToken) public view returns (bool) {
         return _serviceConfig[powerToken].halfLife != 0;
+    }
+
+    function _getServiceConfig(IPowerToken powerToken) internal view returns (ServiceConfig memory) {
+        return _serviceConfig[powerToken];
     }
 
     function _enablePaymentToken(address token) internal {
@@ -467,7 +473,7 @@ contract EnterpriseStorage is InitializableOwnable {
         }
     }
 
-    function getStreamingReserve() internal view returns (uint112) {
+    function _getStreamingReserve() internal view returns (uint112) {
         return
             _streamingReserveTarget -
             ExpMath.halfLife(
@@ -478,15 +484,15 @@ contract EnterpriseStorage is InitializableOwnable {
             );
     }
 
-    function increaseStreamingReserveTarget(uint112 delta) internal {
-        _streamingReserve = getStreamingReserve();
+    function _increaseStreamingReserveTarget(uint112 delta) internal {
+        _streamingReserve = _getStreamingReserve();
 
         _streamingReserveUpdated = uint32(block.timestamp);
         _streamingReserveTarget += delta;
     }
 
-    function flushStreamingReserve() internal returns (uint112 streamingReserve) {
-        streamingReserve = getStreamingReserve();
+    function _flushStreamingReserve() internal returns (uint112 streamingReserve) {
+        streamingReserve = _getStreamingReserve();
 
         _streamingReserve = 0;
         _streamingReserveTarget -= streamingReserve;

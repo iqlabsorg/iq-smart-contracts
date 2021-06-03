@@ -9,11 +9,11 @@ interface IEstimator {
 
     function initializeService(IPowerToken powerToken) external;
 
+    function notifyNewLoan(uint256 tokenId) external;
+
     function estimateCost(
         IPowerToken powerToken,
         uint112 amount,
         uint32 duration
     ) external view returns (uint112);
-
-    function notifyNewLoan(uint256 tokenId) external;
 }
