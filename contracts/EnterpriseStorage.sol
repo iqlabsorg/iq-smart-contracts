@@ -227,16 +227,37 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function getInfo()
-        external
-        view
-        returns (
-            uint256 reserve,
-            uint256 usedReserve,
-            uint256 totalShares,
-            string memory name
-        )
+    external
+    view
+    returns (
+        string memory name,
+        string memory baseUri,
+        uint256 totalShares,
+        uint32 interestHalfLife,
+        uint32 borrowerLoanReturnGracePeriod,
+        uint32 enterpriseLoanCollectGracePeriod,
+        uint16 gcFeePercent,
+        uint256 fixedReserve,
+        uint256 usedReserve,
+        uint112 streamingReserve,
+        uint112 streamingReserveTarget,
+        uint32 streamingReserveUpdated
+    )
     {
-        return (_fixedReserve, _usedReserve, _totalShares, _name);
+        return (
+            _name,
+            _baseUri,
+            _totalShares,
+            _interestHalfLife,
+            _borrowerLoanReturnGracePeriod,
+            _enterpriseLoanCollectGracePeriod,
+            _gcFeePercent,
+            _fixedReserve,
+            _usedReserve,
+            _streamingReserve,
+            _streamingReserveTarget,
+            _streamingReserveUpdated
+        );
     }
 
     function getPowerTokens() external view returns (IPowerToken[] memory) {
