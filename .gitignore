@@ -5,6 +5,7 @@ coverage*
 *.dbg.json
 typechain/
 
+.idea
 .vscode/*
 !.vscode/settings.json.default
 !.vscode/launch.json.default
@@ -19,3 +20,5 @@ yalc.lock
 contractsInfo.json
 deployments/hardhat
 deployments/localhost
+
+artifacts/build-info
