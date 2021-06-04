@@ -4,29 +4,25 @@ chai.use(waffle.solidity);
 const {expect} = chai;
 
 import {
+  basePrice,
   baseRate,
   deployEnterprise,
-  getEnterprise,
+  estimateLoan,
   getInterestTokenId,
   getPowerToken,
   getTokenId,
   increaseTime,
   toTokens,
 } from '../utils';
-import {Address} from 'hardhat-deploy/types';
 import {
   Enterprise,
-  EnterpriseFactory,
-  IConverter,
   IERC20Metadata,
-  IEstimator,
   InterestToken,
   PowerToken,
 } from '../../typechain';
 import {BigNumber, Wallet} from 'ethers';
 
 describe('IQ Protocol E2E', () => {
-  let deployer: Wallet;
   let user: Wallet;
   let token: IERC20Metadata;
   let enterprise: Enterprise;
@@ -34,7 +30,7 @@ describe('IQ Protocol E2E', () => {
   const ONE_TOKEN = 10n ** 18n;
 
   beforeEach(async () => {
-    [deployer, user] = await waffle.provider.getWallets();
+    [, user] = await waffle.provider.getWallets();
     token = (await ethers.getContract('ERC20Mock')) as IERC20Metadata;
     enterprise = await deployEnterprise('Testing', token.address);
   });
@@ -84,7 +80,7 @@ describe('IQ Protocol E2E', () => {
         300, // 3%
         43200, // 12 hours
         86400 * 60, // 2 months
-        ethers.utils.parseUnits('1', 18), // 1 token
+        ONE_TOKEN,
         true
       );
 
@@ -127,114 +123,66 @@ describe('IQ Protocol E2E', () => {
       await token.transfer(user.address, MAX_PAYMENT_AMOUNT);
     });
 
-    it('should perform actions', async () => {
+    it('should borrow-return-remove liquidity', async () => {
       await token.connect(user).approve(enterprise.address, MAX_PAYMENT_AMOUNT);
 
-      const userEnterprise = (await ethers.getContractAt(
-        'Enterprise',
-        enterprise.address,
-        user
-      )) as Enterprise;
-
-      const loanCost = await userEnterprise.estimateLoan(
-        powerToken.address,
-        token.address,
-        BORROW_AMOUNT,
-        86400
-      );
-      console.log('Estimated', toTokens(loanCost));
-
       // 4. Borrow
-      const borrowTx = await userEnterprise.borrow(
-        powerToken.address,
-        token.address,
-        BORROW_AMOUNT,
-        MAX_PAYMENT_AMOUNT,
-        86400
-      );
+      const borrowTx = await enterprise
+        .connect(user)
+        .borrow(
+          powerToken.address,
+          token.address,
+          BORROW_AMOUNT,
+          MAX_PAYMENT_AMOUNT,
+          86400
+        );
 
       await increaseTime(86400);
 
       // 5. Burn
-      const tokenId = await getTokenId(userEnterprise, borrowTx);
-      await userEnterprise.returnLoan(tokenId);
+      const tokenId = await getTokenId(enterprise, borrowTx);
+      await enterprise.connect(user).returnLoan(tokenId);
 
       await enterprise.removeLiquidity(liquidityTokenId);
     });
 
-    it('should be possible to take 2 loans', async () => {
+    it('2 sequential borrow approximately costs the same as 1 for accumulated amount for the same period (additivity)', async () => {
+      const ONE_SHOT_BORROW_COST = estimateLoan(
+        basePrice(100.0, 86400.0, 3.0),
+        1000000.0,
+        0.0,
+        500000.0,
+        86400.0
+      );
       const BORROW1 = ONE_TOKEN * 300000n;
       const BORROW2 = ONE_TOKEN * 200000n;
 
-      const userToken = await ethers.getContract('ERC20Mock', user);
-      await userToken.approve(enterprise.address, MAX_PAYMENT_AMOUNT);
-
-      const userEnterprise = (await ethers.getContractAt(
-        'Enterprise',
-        enterprise.address,
-        user
-      )) as Enterprise;
+      await token.connect(user).approve(enterprise.address, MAX_PAYMENT_AMOUNT);
 
       const balanceBefore = await token.balanceOf(user.address);
-      console.log(
-        'Available Reserve --> ',
-        toTokens(await userEnterprise.getAvailableReserve(), 4)
-      );
+      await enterprise
+        .connect(user)
+        .borrow(
+          powerToken.address,
+          token.address,
+          BORROW1,
+          MAX_PAYMENT_AMOUNT,
+          86400
+        );
+      await enterprise
+        .connect(user)
+        .borrow(
+          powerToken.address,
+          token.address,
+          BORROW2,
+          MAX_PAYMENT_AMOUNT,
+          86400
+        );
+      const balanceAfter = await token.balanceOf(user.address);
 
-      console.log(
-        'Loan --> ',
-        toTokens(
-          await userEnterprise.estimateLoan(
-            powerToken.address,
-            token.address,
-            BORROW1,
-            86400
-          ),
-          4
-        )
-      );
+      const diff = balanceBefore.toBigInt() - balanceAfter.toBigInt();
 
-      const borrow1Tx = await userEnterprise.borrow(
-        powerToken.address,
-        token.address,
-        BORROW1,
-        MAX_PAYMENT_AMOUNT,
-        86400
-      );
-      const balanceAfter1 = await token.balanceOf(user.address);
-      await increaseTime(3600 * 4);
-      console.log(
-        'Available Reserve --> ',
-        toTokens(await userEnterprise.getAvailableReserve(), 4)
-      );
-
-      console.log(
-        'Loan 2 --> ',
-        toTokens(
-          await userEnterprise.estimateLoan(
-            powerToken.address,
-            token.address,
-            BORROW2,
-            86400
-          ),
-          4
-        )
-      );
-      const borrow2Tx = await userEnterprise.borrow(
-        powerToken.address,
-        token.address,
-        BORROW2,
-        MAX_PAYMENT_AMOUNT,
-        86400
-      );
-      const balanceAfter2 = await token.balanceOf(user.address);
-
-      console.log(
-        toTokens(balanceBefore.sub(balanceAfter1), 15),
-        toTokens(balanceAfter1.sub(balanceAfter2), 15),
-        'Total',
-        toTokens(balanceBefore.sub(balanceAfter2), 15)
-      );
+      expect(toTokens(diff, 8)).to.be.approximately(ONE_SHOT_BORROW_COST, 0.1);
     });
   });
 });

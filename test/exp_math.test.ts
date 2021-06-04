@@ -1,5 +1,4 @@
 import {expect} from 'chai';
-import {Contract} from '@ethersproject/contracts';
 import {f2b, b2f} from '../scripts/utils';
 import {ethers} from 'hardhat';
 import {ExpMathMock} from '../typechain';

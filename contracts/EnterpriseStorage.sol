@@ -2,12 +2,16 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/utils/StorageSlot.sol";
 import "./interfaces/IPowerToken.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/IEstimator.sol";
 import "./interfaces/IConverter.sol";
 import "./InitializableOwnable.sol";
+import "./EnterpriseFactory.sol";
 import "./math/ExpMath.sol";
 
 /**
@@ -18,14 +22,16 @@ import "./math/ExpMath.sol";
  */
 contract EnterpriseStorage is InitializableOwnable {
     uint16 internal constant MAX_SERVICE_FEE_PERCENT = 5000; // 50%
+    // This is the keccak-256 hash of "iq.protocol.proxy.admin" subtracted by 1
+    bytes32 private constant _PROXY_ADMIN_SLOT = 0xd1248cccb5fef9131c731321e43e9a924840ffee7dc68c7d1d3e5cb7dedcae03;
 
     struct ServiceConfig {
-        // 1 slot
+        // slot 1, 0 bytes left
         uint112 baseRate; // base rate for price calculations, nominated in baseToken
         uint96 minGCFee; // fee for collecting expired PowerTokens
         uint32 halfLife; // fixed, not updatable
-        uint16 index; // 1 - based because empty value points to 0 index. Not updatable
-        // 2 slot
+        uint16 index; // index in _powerTokens array. Not updatable
+        // slot 2, 1 byte left
         IERC20Metadata baseToken;
         uint32 minLoanDuration;
         uint32 maxLoanDuration;
@@ -34,16 +40,16 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     struct LoanInfo {
+        // slot 1, 0 bytes left
         uint112 amount; // 14 bytes
         uint16 powerTokenIndex; // 2 bytes, index in powerToken array
         uint32 borrowingTime; // 4 bytes
         uint32 maturityTime; // 4 bytes
         uint32 borrowerReturnGraceTime; // 4 bytes
         uint32 enterpriseCollectGraceTime; // 4 bytes
-        // slot 1, 0 bytes left
+        // slot 2, 16 bytes left
         uint112 gcFee; // 14 bytes, loan return reward
         uint16 gcFeeTokenIndex; // 2 bytes, index in `_paymentTokens` array
-        // slot 2, 16 bytes left
     }
 
     struct LiquidityInfo {
@@ -66,8 +72,9 @@ contract EnterpriseStorage is InitializableOwnable {
      * @dev ERC721 token for borrowers
      */
     IBorrowToken internal _borrowToken;
-    address internal _powerTokenImpl;
+    EnterpriseFactory internal _factory;
     uint32 internal _interestHalfLife;
+    bool internal _enterpriseShutdown;
 
     IEstimator internal _estimator;
     IConverter internal _converter;
@@ -101,7 +108,7 @@ contract EnterpriseStorage is InitializableOwnable {
     uint256 internal _usedReserve;
 
     /**
-     * @dev Reserves which are streamed from borrower
+     * @dev Reserves which are streamed from borrower to the pool
      */
     uint112 internal _streamingReserve;
     uint112 internal _streamingReserveTarget;
@@ -119,7 +126,7 @@ contract EnterpriseStorage is InitializableOwnable {
     IPowerToken[] internal _powerTokens;
 
     modifier registeredPowerToken(IPowerToken powerToken) {
-        require(isRegisteredPowerToken(powerToken), "Unknown PowerToken");
+        require(_isRegisteredPowerToken(powerToken), "Unknown PowerToken");
         _;
     }
 
@@ -128,10 +135,13 @@ contract EnterpriseStorage is InitializableOwnable {
         string calldata baseUri,
         IEstimator estimator,
         IConverter converter,
+        ProxyAdmin proxyAdmin,
         address owner
     ) external {
         require(bytes(_name).length == 0, "Already initialized");
         InitializableOwnable.initialize(owner);
+        StorageSlot.getAddressSlot(_PROXY_ADMIN_SLOT).value = address(proxyAdmin);
+        _factory = EnterpriseFactory(msg.sender);
         _name = enterpriseName;
         _baseUri = baseUri;
         _estimator = estimator;
@@ -144,13 +154,11 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function initializeTokens(
-        address powerTokenImpl,
         IERC20Metadata liquidityToken,
         IInterestToken interestToken,
         IBorrowToken borrowToken
     ) external {
-        require(_powerTokenImpl == address(0), "Already initialized");
-        _powerTokenImpl = powerTokenImpl;
+        require(address(_liquidityToken) == address(0), "Already initialized");
         _liquidityToken = liquidityToken;
         _interestToken = interestToken;
         _borrowToken = borrowToken;
@@ -190,6 +198,10 @@ contract EnterpriseStorage is InitializableOwnable {
         return _paymentTokensIndex[address(token)] > 0;
     }
 
+    function getProxyAdmin() public view returns (ProxyAdmin) {
+        return ProxyAdmin(StorageSlot.getAddressSlot(_PROXY_ADMIN_SLOT).value);
+    }
+
     function getEnterpriseCollector() external view returns (address) {
         return _enterpriseCollector;
     }
@@ -204,10 +216,6 @@ contract EnterpriseStorage is InitializableOwnable {
 
     function getEnterpriseLoanCollectGracePeriod() external view returns (uint32) {
         return _enterpriseLoanCollectGracePeriod;
-    }
-
-    function getPowerTokenImpl() external view returns (address) {
-        return _powerTokenImpl;
     }
 
     function getInterestHalfLife() external view returns (uint32) {
@@ -362,6 +370,30 @@ contract EnterpriseStorage is InitializableOwnable {
         _interestHalfLife = interestHalfLife;
     }
 
+    function upgradePowerToken(IPowerToken powerToken, address implementation)
+        external
+        onlyOwner
+        registeredPowerToken(powerToken)
+    {
+        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(powerToken))), implementation);
+    }
+
+    function upgradeBorrowToken(address implementation) external onlyOwner {
+        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(_borrowToken))), implementation);
+    }
+
+    function upgradeInterestToken(address implementation) external onlyOwner {
+        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(_interestToken))), implementation);
+    }
+
+    function upgradeEstimator(address implementation) external onlyOwner {
+        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(_estimator))), implementation);
+    }
+
+    function upgradeEnterprise(address implementation) external onlyOwner {
+        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(this))), implementation);
+    }
+
     function setServiceFeePercent(IPowerToken powerToken, uint16 newServiceFeePercent)
         external
         onlyOwner
@@ -377,7 +409,7 @@ contract EnterpriseStorage is InitializableOwnable {
         require(powerToken.length == newServiceFeePercent.length, "Invalid array length");
 
         for (uint256 i = 0; i < powerToken.length; i++) {
-            require(isRegisteredPowerToken(powerToken[i]), "Unknown PowerToken");
+            require(_isRegisteredPowerToken(powerToken[i]), "Unknown PowerToken");
             _setServiceFeePercent(powerToken[i], newServiceFeePercent[i]);
         }
     }
@@ -475,6 +507,10 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function isRegisteredPowerToken(IPowerToken powerToken) public view returns (bool) {
+        return _isRegisteredPowerToken(powerToken);
+    }
+
+    function _isRegisteredPowerToken(IPowerToken powerToken) internal view returns (bool) {
         return _serviceConfig[powerToken].halfLife != 0;
     }
 

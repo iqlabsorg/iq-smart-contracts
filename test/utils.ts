@@ -11,13 +11,16 @@ import {
   PowerToken,
 } from '../typechain';
 
-export const evmSnapshot = async (): Promise<any> =>
+export const ONE_DAY = 86400;
+export const ONE_HOUR = 3600;
+
+export const evmSnapshot = async (): Promise<unknown> =>
   ethers.provider.send('evm_snapshot', []);
-export const evmRevert = async (id: string): Promise<any> =>
+export const evmRevert = async (id: string): Promise<unknown> =>
   ethers.provider.send('evm_revert', [id]);
-export const nextBlock = async (timestamp = 0) =>
+export const nextBlock = async (timestamp = 0): Promise<unknown> =>
   ethers.provider.send('evm_mine', timestamp > 0 ? [timestamp] : []);
-export const increaseTime = async (seconds: number) => {
+export const increaseTime = async (seconds: number): Promise<void> => {
   ethers.provider.send('evm_increaseTime', [seconds]);
   await nextBlock();
 };
@@ -28,7 +31,9 @@ export const currentTime = async (): Promise<number> => {
 
 export const deployEnterprise = async (
   name: string,
-  token: string
+  token: string,
+  converterAddress?: string,
+  estimatorImpl?: string
 ): Promise<Enterprise> => {
   const estimator = (await ethers.getContract(
     'DefaultEstimator'
@@ -44,8 +49,8 @@ export const deployEnterprise = async (
     'Testing',
     token,
     'https://test.iq.space',
-    estimator.address,
-    converter.address
+    estimatorImpl || estimator.address,
+    converterAddress || converter.address
   );
 
   return getEnterprise(factory, tx);
@@ -139,10 +144,14 @@ export const getInterestToken = async (
   return iToken.attach(iTokenAddress) as InterestToken;
 };
 
-export const toTokens = (amount: BigNumberish, decimals = 2): string => {
+export const toTokens = (
+  amount: BigNumberish,
+  decimals = 2,
+  tokenDecimals = 18
+): number => {
   const a = BigInt(amount.toString());
-  const dec = 10n ** BigInt(18 - decimals);
-  return (Number(a / dec) / 10 ** decimals).toFixed(decimals);
+  const dec = 10n ** BigInt(tokenDecimals - decimals);
+  return Number(a / dec) / 10 ** decimals;
 };
 
 export const baseRate = (
@@ -151,6 +160,37 @@ export const baseRate = (
   price: bigint
 ): bigint => {
   return (price << 64n) / (tokens * period);
+};
+
+export const basePrice = (
+  tokens: number,
+  period: number,
+  price: number
+): number => {
+  return price / (tokens * period);
+};
+
+export const estimateLoan = (
+  basePrice: number,
+  reserves: number,
+  usedReserves: number,
+  amount: number,
+  duration: number,
+  lambda = 1.0
+): number => {
+  return g(amount) * basePrice * duration;
+
+  function f(x: number) {
+    return 1.0 - lambda * Math.log2(x);
+  }
+
+  function h(x: number) {
+    return x * f((reserves - x) / reserves);
+  }
+
+  function g(x: number) {
+    return h(usedReserves + x) - h(usedReserves);
+  }
 };
 
 export const registerService = async (

@@ -2,20 +2,17 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "./math/ExpMath.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/IConverter.sol";
 import "./interfaces/IEstimator.sol";
-import "./PowerToken.sol";
+import "./interfaces/IPowerToken.sol";
 import "./EnterpriseStorage.sol";
 
 contract Enterprise is EnterpriseStorage {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Metadata;
-    using Clones for address;
 
     event ServiceRegistered(address indexed powerToken, uint32 halfLife, uint112 factor);
     event Borrowed(address indexed powerToken, uint256 tokenId, uint32 from, uint32 to);
@@ -42,7 +39,7 @@ contract Enterprise is EnterpriseStorage {
         require(minLoanDuration <= maxLoanDuration, "Invalid min and max periods");
         require(halfLife > 0, "Invalid half life");
 
-        PowerToken powerToken = PowerToken(_powerTokenImpl.clone());
+        PowerToken powerToken = _factory.deployService(getProxyAdmin());
         string memory tokenSymbol = _liquidityToken.symbol();
         string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", symbol));
         powerToken.initialize(serviceName, powerTokenSymbol, this);
@@ -90,7 +87,12 @@ contract Enterprise is EnterpriseStorage {
 
             paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
 
-            uint256 convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
+            uint256 convertedLiquidityTokens = loanCost;
+
+            if (address(paymentToken) != address(_serviceConfig[powerToken].baseToken)) {
+                paymentToken.approve(address(_converter), loanCost);
+                convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
+            }
 
             uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
             _liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
@@ -208,14 +210,17 @@ contract Enterprise is EnterpriseStorage {
         (uint112 interest, uint112 serviceFee, ) = _estimateLoan(powerToken, paymentToken, loan.amount, duration);
 
         // emulating here borrow
-        _usedReserve += loan.amount;
-
+        unchecked {_usedReserve += loan.amount;} // safe, because previously we successfully decreased it
         uint256 loanCost = interest + serviceFee;
+
         require(loanCost <= maximumPayment, "Slippage is too big");
 
         paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
-
-        uint256 convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
+        uint256 convertedLiquidityTokens = loanCost;
+        if (address(paymentToken) != address(_serviceConfig[powerToken].baseToken)) {
+            paymentToken.approve(address(_converter), loanCost);
+            convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
+        }
 
         uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
         _liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
@@ -278,7 +283,7 @@ contract Enterprise is EnterpriseStorage {
 
     function removeLiquidity(uint256 tokenId) external {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
-        require(liquidityInfo.block < block.number, "Cannot add and remove liquidity in same block");
+        require(liquidityInfo.block < block.number, "Failed to remove liquidity");
         uint256 shares = liquidityInfo.shares;
 
         uint256 liquidityWithInterest = _sharesToLiquidity(shares);
@@ -294,7 +299,7 @@ contract Enterprise is EnterpriseStorage {
 
     function _decreaseReserve(uint256 delta) internal {
         if (_fixedReserve >= delta) {
-            _fixedReserve -= delta;
+            unchecked {_fixedReserve -= delta;}
         } else {
             uint256 streamingReserve = _flushStreamingReserve();
 

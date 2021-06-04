@@ -10,7 +10,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   await deploy('ERC20Mock', {
     from: deployer,
-    args: ['Testing', 'TST', parseEther('1000000000')],
+    args: ['Testing', 'TST', 18, parseEther('1000000000')],
     log: true,
   });
 

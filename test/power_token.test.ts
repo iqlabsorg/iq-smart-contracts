@@ -1,14 +1,7 @@
 import {ethers, waffle} from 'hardhat';
 import {expect} from 'chai';
 import {BigNumberish, Wallet} from 'ethers';
-import {
-  Enterprise,
-  ERC20,
-  ERC20Mock,
-  IERC20Metadata,
-  PowerToken,
-  PowerToken__factory,
-} from '../typechain';
+import {Enterprise, ERC20Mock, PowerToken} from '../typechain';
 import {baseRate, deployEnterprise, registerService} from './utils';
 
 type EnegryTestCase = [BigNumberish, number, BigNumberish];
@@ -21,12 +14,11 @@ describe('PowerToken', function () {
   let user: Wallet;
   let enterprise: Enterprise;
   let powerToken: PowerToken;
-  let stranger: Wallet;
 
   const HALF_LIFE = 100;
 
   beforeEach(async () => {
-    [user, stranger] = await waffle.provider.getWallets();
+    [user] = await waffle.provider.getWallets();
     token = (await ethers.getContract('ERC20Mock')) as ERC20Mock;
     enterprise = await deployEnterprise('Testing', token.address);
 
