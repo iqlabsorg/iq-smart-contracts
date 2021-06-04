@@ -10,6 +10,7 @@ import "./interfaces/IConverter.sol";
 import "./InterestToken.sol";
 import "./BorrowToken.sol";
 import "./PowerToken.sol";
+import "./libs/Errors.sol";
 
 contract EnterpriseFactory {
     using Clones for address;
@@ -33,10 +34,10 @@ contract EnterpriseFactory {
         address interestTokenImpl,
         address borrowTokenImpl
     ) {
-        require(enterpriseImpl != address(0), "Invalid Enterprise address");
-        require(powerTokenImpl != address(0), "Invalid PowerToken address");
-        require(interestTokenImpl != address(0), "Invalid InterestToken address");
-        require(borrowTokenImpl != address(0), "Invalid BorrowToken address");
+        require(enterpriseImpl != address(0), Errors.EF_INVALID_ENTERPRISE_IMPLEMENTATION_ADDRESS);
+        require(powerTokenImpl != address(0), Errors.EF_INVALID_POWER_TOKEN_IMPLEMENTATION_ADDRESS);
+        require(interestTokenImpl != address(0), Errors.EF_INVALID_INTEREST_TOKEN_IMPLEMENTATION_ADDRESS);
+        require(borrowTokenImpl != address(0), Errors.EF_INVALID_BORROW_TOKEN_IMPLEMENTATION_ADDRESS);
         _enterpriseImpl = enterpriseImpl;
         _powerTokenImpl = powerTokenImpl;
         _interestTokenImpl = interestTokenImpl;

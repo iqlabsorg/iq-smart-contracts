@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.4;
+import "../libs/Errors.sol";
 
 library ExpMath {
     uint256 private constant ONE = 1 << 144;
@@ -12,7 +13,7 @@ library ExpMath {
         uint32 t
     ) internal pure returns (uint112) {
         unchecked {
-            require(t >= t0, "Invalid period");
+            require(t >= t0, Errors.EXP_INVALID_PERIOD);
 
             t -= t0;
             c0 >>= t / t12;
