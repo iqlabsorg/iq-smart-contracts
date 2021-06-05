@@ -18,7 +18,7 @@ contract Enterprise is EnterpriseStorage {
     event Borrowed(address indexed powerToken, uint256 tokenId, uint32 from, uint32 to);
 
     modifier onlyBorrowToken() {
-        require(msg.sender == address(_borrowToken), "Not BorrowToken");
+        require(msg.sender == address(_borrowToken), Errors.E_CALLER_NOT_BORROW_TOKEN);
         _;
     }
 
@@ -34,10 +34,10 @@ contract Enterprise is EnterpriseStorage {
         uint96 minGCFee,
         bool allowsPerpetualTokensForever
     ) external onlyOwner {
-        require(address(baseToken) != address(0), "Invalid Base Token");
-        require(_powerTokens.length < type(uint16).max, "Cannot register more services");
-        require(minLoanDuration <= maxLoanDuration, "Invalid min and max periods");
-        require(halfLife > 0, "Invalid half life");
+        require(address(baseToken) != address(0), Errors.E_INVALID_BASE_TOKEN_ADDRESS);
+        require(_powerTokens.length < type(uint16).max, Errors.E_SERVICE_LIMIT_REACHED);
+        require(minLoanDuration <= maxLoanDuration, Errors.E_INVALID_LOAN_DURATION_RANGE);
+        require(halfLife > 0, Errors.E_SERVICE_HALF_LIFE_NOT_GT_0);
 
         PowerToken powerToken = _factory.deployService(getProxyAdmin());
         string memory tokenSymbol = _liquidityToken.symbol();
@@ -68,12 +68,12 @@ contract Enterprise is EnterpriseStorage {
         IPowerToken powerToken,
         IERC20 paymentToken,
         uint112 amount,
-        uint256 maximumPayment,
+        uint256 maxPayment,
         uint32 duration
     ) external registeredPowerToken(powerToken) {
-        require(isSupportedPaymentToken(paymentToken), "Interest payment token is disabled or not supported");
-        require(isServiceAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
-        require(amount <= getAvailableReserve(), "Insufficient reserves");
+        require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
+        require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
+        require(amount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         uint112 gcFee;
         {
@@ -83,7 +83,7 @@ contract Enterprise is EnterpriseStorage {
             gcFee = gcFeeAmount;
 
             uint256 loanCost = interest + serviceFee;
-            require(loanCost + gcFee <= maximumPayment, "Slippage is too big");
+            require(loanCost + gcFee <= maxPayment, Errors.E_LOAN_COST_SLIPPAGE);
 
             paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
 
@@ -130,8 +130,8 @@ contract Enterprise is EnterpriseStorage {
         uint112 amount,
         uint32 duration
     ) external view registeredPowerToken(powerToken) returns (uint256) {
-        require(isSupportedPaymentToken(paymentToken), "Interest payment token is disabled or not supported");
-        require(isServiceAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
+        require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
+        require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
 
         (uint112 interest, uint112 serviceFee, uint112 gcFee) =
             _estimateLoan(powerToken, paymentToken, amount, duration);
@@ -194,15 +194,15 @@ contract Enterprise is EnterpriseStorage {
     function reborrow(
         uint256 tokenId,
         IERC20 paymentToken,
-        uint256 maximumPayment,
+        uint256 maxPayment,
         uint32 duration
     ) external {
-        require(isSupportedPaymentToken(paymentToken), "Interest payment token is disabled or not supported");
+        require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
         LoanInfo storage loan = _loanInfo[tokenId];
         IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
-        require(address(powerToken) != address(0), "Invalid tokenId");
-        require(isServiceAllowedLoanDuration(powerToken, duration), "Duration is not allowed");
-        require(loan.maturityTime + duration >= block.timestamp, "Invalid duration");
+        require(address(powerToken) != address(0), Errors.E_INVALID_LOAN_TOKEN_ID);
+        require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
+        require(loan.maturityTime + duration >= block.timestamp, Errors.E_INVALID_LOAN_DURATION);
 
         // emulating here loan return
         _usedReserve -= loan.amount;
@@ -213,7 +213,7 @@ contract Enterprise is EnterpriseStorage {
         unchecked {_usedReserve += loan.amount;} // safe, because previously we successfully decreased it
         uint256 loanCost = interest + serviceFee;
 
-        require(loanCost <= maximumPayment, "Slippage is too big");
+        require(loanCost <= maxPayment, Errors.E_LOAN_COST_SLIPPAGE);
 
         paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
         uint256 convertedLiquidityTokens = loanCost;
@@ -270,7 +270,7 @@ contract Enterprise is EnterpriseStorage {
         uint256 shares = liquidityInfo.shares;
 
         uint256 interest = _sharesToLiquidity(shares) - liquidityInfo.amount;
-        require(interest <= getAvailableReserve(), "Insufficient liquidity");
+        require(interest <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         _liquidityToken.safeTransfer(msg.sender, interest);
 
@@ -283,11 +283,11 @@ contract Enterprise is EnterpriseStorage {
 
     function removeLiquidity(uint256 tokenId) external {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
-        require(liquidityInfo.block < block.number, "Failed to remove liquidity");
+        require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
         uint256 shares = liquidityInfo.shares;
 
         uint256 liquidityWithInterest = _sharesToLiquidity(shares);
-        require(liquidityWithInterest <= getAvailableReserve(), "Insufficient liquidity");
+        require(liquidityWithInterest <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         _interestToken.burn(tokenId);
         _liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
@@ -344,7 +344,7 @@ contract Enterprise is EnterpriseStorage {
         address to,
         uint256 amount
     ) internal returns (bool) {
-        require(_serviceConfig[powerToken].allowsPerpetual == true, "Wrapping is not allowed");
+        require(_serviceConfig[powerToken].allowsPerpetual == true, Errors.E_WRAPPING_NOT_ALLOWED);
 
         powerToken.wrap(_liquidityToken, msg.sender, to, amount);
         return true;
@@ -362,7 +362,7 @@ contract Enterprise is EnterpriseStorage {
     ) external onlyBorrowToken {
         LoanInfo memory loan = _loanInfo[tokenId];
         IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
-        require(address(powerToken) != address(0), "Invalid tokenId");
+        require(address(powerToken) != address(0), Errors.E_INVALID_LOAN_TOKEN_ID);
 
         bool isExpiredBorrow = (block.timestamp > loan.maturityTime);
         bool isMinting = (from == address(0));
@@ -375,7 +375,7 @@ contract Enterprise is EnterpriseStorage {
         } else if (!isExpiredBorrow) {
             powerToken.forceTransfer(from, to, loan.amount);
         } else {
-            revert("Not allowed transfer");
+            revert(Errors.E_LOAN_TRANSFER_NOT_ALLOWED);
         }
     }
 
@@ -388,17 +388,17 @@ contract Enterprise is EnterpriseStorage {
     function _returnLoan(uint256 tokenId, address account) internal {
         LoanInfo storage loan = _loanInfo[tokenId];
         IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
-        require(address(powerToken) != address(0), "Invalid tokenId");
+        require(address(powerToken) != address(0), Errors.E_INVALID_LOAN_TOKEN_ID);
         address borrower = _borrowToken.ownerOf(tokenId);
         uint32 timestamp = uint32(block.timestamp);
 
         require(
             loan.borrowerReturnGraceTime < timestamp || account == borrower,
-            "Only borrower can return within borrower grace period"
+            Errors.E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD
         );
         require(
             loan.enterpriseCollectGraceTime < timestamp || account == borrower || account == _enterpriseCollector,
-            "Only borrower or enterprise can return within enterprise grace period"
+            Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD
         );
 
         _usedReserve -= loan.amount;

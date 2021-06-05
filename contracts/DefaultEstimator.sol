@@ -4,6 +4,7 @@ pragma solidity 0.8.4;
 import "./interfaces/IEstimator.sol";
 import "./math/ExpMath.sol";
 import "./Enterprise.sol";
+import "./libs/Errors.sol";
 
 contract DefaultEstimator is IEstimator {
     uint256 internal constant ONE = 1 << 64;
@@ -12,25 +13,25 @@ contract DefaultEstimator is IEstimator {
     mapping(IPowerToken => uint256) private _serviceLambda;
 
     modifier onlyOwner() {
-        require(msg.sender == _enterprise.owner(), "Not an owner");
+        require(msg.sender == _enterprise.owner(), Errors.CALLER_NOT_OWNER);
         _;
     }
 
     function initialize(Enterprise enterprise) external override {
-        require(address(enterprise) != address(0), "Zero address");
-        require(address(_enterprise) == address(0), "Already initialized");
+        require(address(enterprise) != address(0), Errors.DE_INVALID_ENTERPRISE_ADDRESS);
+        require(address(_enterprise) == address(0), Errors.ALREADY_INITIALIZED);
 
         _enterprise = enterprise;
     }
 
     function initializeService(IPowerToken powerToken) external override {
-        require(address(_enterprise) != address(0), "Not initialized");
-        require(_enterprise.isRegisteredPowerToken(powerToken), "Unknown Power Token");
+        require(address(_enterprise) != address(0), Errors.NOT_INITIALIZED);
+        require(_enterprise.isRegisteredPowerToken(powerToken), Errors.UNREGISTERED_POWER_TOKEN);
         _serviceLambda[powerToken] = ONE;
     }
 
     function setLambda(IPowerToken powerToken, uint256 lambda) external onlyOwner {
-        require(lambda > 0, "Cannot be zero");
+        require(lambda > 0, Errors.DE_LABMDA_NOT_GT_0);
         _serviceLambda[powerToken] = lambda;
     }
 

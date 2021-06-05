@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "../libs/Errors.sol";
 
 /**
  * @dev Implementation of https://eips.ethereum.org/EIPS/eip-721[ERC721] Non-Fungible Token Standard, including
@@ -43,7 +44,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      * @dev Initializes the contract by setting a `name` and a `symbol` to the token collection.
      */
     function initialize(string memory name_, string memory symbol_) public {
-        require(bytes(_name).length == 0, "Already initialized");
+        require(bytes(_name).length == 0, Errors.ALREADY_INITIALIZED);
         _name = name_;
         _symbol = symbol_;
     }
@@ -62,7 +63,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      * @dev See {IERC721-balanceOf}.
      */
     function balanceOf(address owner) public view virtual override returns (uint256) {
-        require(owner != address(0), "ERC721: balance query for the zero address");
+        require(owner != address(0), Errors.ERC721_BALANCE_QUERY_FOR_THE_ZERO_ADDRESS);
         return _balances[owner];
     }
 
@@ -71,7 +72,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      */
     function ownerOf(uint256 tokenId) public view virtual override returns (address) {
         address owner = _owners[tokenId];
-        require(owner != address(0), "ERC721: owner query for nonexistent token");
+        require(owner != address(0), Errors.ERC721_OWNER_QUERY_FOR_NONEXISTENT_TOKEN);
         return owner;
     }
 
@@ -93,14 +94,14 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      * @dev See {IERC721Metadata-tokenURI}.
      */
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
+        require(_exists(tokenId), Errors.ERC721META_URI_QUERY_FOR_NONEXISTENT_TOKEN);
 
         string memory baseURI = _baseURI();
         return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, tokenId.toString())) : "";
     }
 
     /**
-     * @dev Base URI for computing {tokenURI}. Empty by default, can be overriden
+     * @dev Base URI for computing {tokenURI}. Empty by default, can be overridden
      * in child contracts.
      */
     function _baseURI() internal view virtual returns (string memory) {
@@ -112,11 +113,11 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      */
     function approve(address to, uint256 tokenId) public virtual override {
         address owner = ERC721.ownerOf(tokenId);
-        require(to != owner, "ERC721: approval to current owner");
+        require(to != owner, Errors.ERC721_APPROVAL_TO_CURRENT_OWNER);
 
         require(
             msg.sender == owner || isApprovedForAll(owner, msg.sender),
-            "ERC721: approve caller is not owner nor approved for all"
+            Errors.ERC721_APPROVE_CALLER_IS_NOT_OWNER_NOR_APPROVED_FOR_ALL
         );
 
         _approve(to, tokenId);
@@ -126,7 +127,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      * @dev See {IERC721-getApproved}.
      */
     function getApproved(uint256 tokenId) public view virtual override returns (address) {
-        require(_exists(tokenId), "ERC721: approved query for nonexistent token");
+        require(_exists(tokenId), Errors.ERC721_APPROVED_QUERY_FOR_NONEXISTENT_TOKEN);
 
         return _tokenApprovals[tokenId];
     }
@@ -135,7 +136,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      * @dev See {IERC721-setApprovalForAll}.
      */
     function setApprovalForAll(address operator, bool approved) public virtual override {
-        require(operator != msg.sender, "ERC721: approve to caller");
+        require(operator != msg.sender, Errors.ERC721_APPROVE_TO_CALLER);
 
         _operatorApprovals[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
@@ -157,7 +158,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
         uint256 tokenId
     ) public virtual override {
         //solhint-disable-next-line max-line-length
-        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: transfer caller is not owner nor approved");
+        require(_isApprovedOrOwner(msg.sender, tokenId), Errors.ERC721_TRANSFER_CALLER_IS_NOT_OWNER_NOR_APPROVED);
 
         _transfer(from, to, tokenId);
     }
@@ -182,7 +183,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
         uint256 tokenId,
         bytes memory _data
     ) public virtual override {
-        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: transfer caller is not owner nor approved");
+        require(_isApprovedOrOwner(msg.sender, tokenId), Errors.ERC721_TRANSFER_CALLER_IS_NOT_OWNER_NOR_APPROVED);
         _safeTransfer(from, to, tokenId, _data);
     }
 
@@ -211,7 +212,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
         bytes memory _data
     ) internal virtual {
         _transfer(from, to, tokenId);
-        require(_checkOnERC721Received(from, to, tokenId, _data), "ERC721: transfer to non ERC721Receiver implementer");
+        require(_checkOnERC721Received(from, to, tokenId, _data), Errors.ERC721_TRANSFER_TO_NON_ERC721RECEIVER_IMPLEMENTER);
     }
 
     /**
@@ -234,7 +235,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      * - `tokenId` must exist.
      */
     function _isApprovedOrOwner(address spender, uint256 tokenId) internal view virtual returns (bool) {
-        require(_exists(tokenId), "ERC721: operator query for nonexistent token");
+        require(_exists(tokenId), Errors.ERC721_OPERATOR_QUERY_FOR_NONEXISTENT_TOKEN);
         address owner = ERC721.ownerOf(tokenId);
         return (spender == owner || getApproved(tokenId) == spender || isApprovedForAll(owner, spender));
     }
@@ -265,7 +266,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
         _mint(to, tokenId);
         require(
             _checkOnERC721Received(address(0), to, tokenId, _data),
-            "ERC721: transfer to non ERC721Receiver implementer"
+            Errors.ERC721_TRANSFER_TO_NON_ERC721RECEIVER_IMPLEMENTER
         );
     }
 
@@ -282,8 +283,8 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
      * Emits a {Transfer} event.
      */
     function _mint(address to, uint256 tokenId) internal virtual {
-        require(to != address(0), "ERC721: mint to the zero address");
-        require(!_exists(tokenId), "ERC721: token already minted");
+        require(to != address(0), Errors.ERC721_MINT_TO_THE_ZERO_ADDRESS);
+        require(!_exists(tokenId), Errors.ERC721_TOKEN_ALREADY_MINTED);
 
         _beforeTokenTransfer(address(0), to, tokenId);
 
@@ -333,8 +334,8 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
         address to,
         uint256 tokenId
     ) internal virtual {
-        require(ERC721.ownerOf(tokenId) == from, "ERC721: transfer of token that is not own");
-        require(to != address(0), "ERC721: transfer to the zero address");
+        require(ERC721.ownerOf(tokenId) == from, Errors.ERC721_TRANSFER_OF_TOKEN_THAT_IS_NOT_OWN);
+        require(to != address(0), Errors.ERC721_TRANSFER_TO_THE_ZERO_ADDRESS);
 
         _beforeTokenTransfer(from, to, tokenId);
 
@@ -379,7 +380,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
                 return retval == IERC721Receiver(to).onERC721Received.selector;
             } catch (bytes memory reason) {
                 if (reason.length == 0) {
-                    revert("ERC721: transfer to non ERC721Receiver implementer");
+                    revert(Errors.ERC721_TRANSFER_TO_NON_ERC721RECEIVER_IMPLEMENTER);
                 } else {
                     // solhint-disable-next-line no-inline-assembly
                     assembly {

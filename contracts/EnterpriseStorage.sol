@@ -13,6 +13,7 @@ import "./interfaces/IConverter.sol";
 import "./InitializableOwnable.sol";
 import "./EnterpriseFactory.sol";
 import "./math/ExpMath.sol";
+import "./libs/Errors.sol";
 
 /**
  * @dev Contract which stores Enterprise state
@@ -126,7 +127,7 @@ contract EnterpriseStorage is InitializableOwnable {
     IPowerToken[] internal _powerTokens;
 
     modifier registeredPowerToken(IPowerToken powerToken) {
-        require(_isRegisteredPowerToken(powerToken), "Unknown PowerToken");
+        require(_isRegisteredPowerToken(powerToken), Errors.UNREGISTERED_POWER_TOKEN);
         _;
     }
 
@@ -138,7 +139,7 @@ contract EnterpriseStorage is InitializableOwnable {
         ProxyAdmin proxyAdmin,
         address owner
     ) external {
-        require(bytes(_name).length == 0, "Already initialized");
+        require(bytes(_name).length == 0, Errors.ALREADY_INITIALIZED);
         InitializableOwnable.initialize(owner);
         StorageSlot.getAddressSlot(_PROXY_ADMIN_SLOT).value = address(proxyAdmin);
         _factory = EnterpriseFactory(msg.sender);
@@ -158,7 +159,7 @@ contract EnterpriseStorage is InitializableOwnable {
         IInterestToken interestToken,
         IBorrowToken borrowToken
     ) external {
-        require(address(_liquidityToken) == address(0), "Already initialized");
+        require(address(_liquidityToken) == address(0), Errors.ALREADY_INITIALIZED);
         _liquidityToken = liquidityToken;
         _interestToken = interestToken;
         _borrowToken = borrowToken;
@@ -178,7 +179,7 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function setEstimator(IEstimator newEstimator) external onlyOwner {
-        require(address(newEstimator) != address(0), "Zero address");
+        require(address(newEstimator) != address(0), Errors.ES_INVALID_ESTIMATOR_ADDRESS);
         _estimator = newEstimator;
     }
 
@@ -335,28 +336,28 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function setEnterpriseCollector(address newCollector) external onlyOwner {
-        require(newCollector != address(0), "Zero address");
+        require(newCollector != address(0), Errors.ES_INVALID_COLLECTOR_ADDRESS);
         _enterpriseCollector = newCollector;
     }
 
     function setEnterpriseVault(address newVault) external onlyOwner {
-        require(newVault != address(0), "Zero address");
+        require(newVault != address(0), Errors.ES_INVALID_VAULT_ADDRESS);
         _enterpriseVault = newVault;
     }
 
     function setConverter(IConverter newConverter) external onlyOwner {
-        require(address(newConverter) != address(0), "Zero address");
+        require(address(newConverter) != address(0), Errors.ES_INVALID_CONVERTER_ADDRESS);
         _converter = newConverter;
     }
 
     function setBorrowerLoanReturnGracePeriod(uint32 newPeriod) external onlyOwner {
-        require(newPeriod <= _enterpriseLoanCollectGracePeriod, "Invalid grace period");
+        require(newPeriod <= _enterpriseLoanCollectGracePeriod, Errors.ES_INVALID_BORROWER_LOAN_RETURN_GRACE_PERIOD);
 
         _borrowerLoanReturnGracePeriod = newPeriod;
     }
 
     function setEnterpriseLoanCollectGracePeriod(uint32 newPeriod) external onlyOwner {
-        require(_borrowerLoanReturnGracePeriod <= newPeriod, "Invalid grace period");
+        require(_borrowerLoanReturnGracePeriod <= newPeriod, Errors.ES_INVALID_ENTERPRISE_LOAN_COLLECT_GRACE_PERIOD);
 
         _enterpriseLoanCollectGracePeriod = newPeriod;
     }
@@ -366,7 +367,7 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function setInterestHalfLife(uint32 interestHalfLife) external onlyOwner {
-        require(interestHalfLife > 0, "Invalid half life");
+        require(interestHalfLife > 0, Errors.ES_INTEREST_HALF_LIFE_NOT_GT_0);
         _interestHalfLife = interestHalfLife;
     }
 
@@ -406,16 +407,16 @@ contract EnterpriseStorage is InitializableOwnable {
         external
         onlyOwner
     {
-        require(powerToken.length == newServiceFeePercent.length, "Invalid array length");
+        require(powerToken.length == newServiceFeePercent.length, Errors.INVALID_ARRAY_LENGTH);
 
         for (uint256 i = 0; i < powerToken.length; i++) {
-            require(_isRegisteredPowerToken(powerToken[i]), "Unknown PowerToken");
+            require(_isRegisteredPowerToken(powerToken[i]), Errors.UNREGISTERED_POWER_TOKEN);
             _setServiceFeePercent(powerToken[i], newServiceFeePercent[i]);
         }
     }
 
     function _setServiceFeePercent(IPowerToken powerToken, uint16 newServiceFeePercent) internal {
-        require(newServiceFeePercent <= MAX_SERVICE_FEE_PERCENT, "Maximum service fee percent threshold");
+        require(newServiceFeePercent <= MAX_SERVICE_FEE_PERCENT, Errors.ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED);
 
         _serviceConfig[powerToken].serviceFeePercent = newServiceFeePercent;
     }
@@ -426,7 +427,7 @@ contract EnterpriseStorage is InitializableOwnable {
         IERC20Metadata baseToken,
         uint96 minGCFee
     ) public onlyOwner registeredPowerToken(powerToken) {
-        require(address(baseToken) != address(0), "Invalid Base Token");
+        require(address(baseToken) != address(0), Errors.ES_INVALID_BASE_TOKEN_ADDRESS);
         ServiceConfig storage config = _serviceConfig[powerToken];
 
         config.baseRate = baseRate;
@@ -439,7 +440,7 @@ contract EnterpriseStorage is InitializableOwnable {
         uint32 minLoanDuration,
         uint32 maxLoanDuration
     ) external onlyOwner registeredPowerToken(powerToken) {
-        require(minLoanDuration <= maxLoanDuration, "Invalid durations");
+        require(minLoanDuration <= maxLoanDuration, Errors.ES_INVALID_LOAN_DURATION_RANGE);
         ServiceConfig storage config = _serviceConfig[powerToken];
 
         config.minLoanDuration = minLoanDuration;
@@ -451,7 +452,7 @@ contract EnterpriseStorage is InitializableOwnable {
         onlyOwner
         registeredPowerToken(powerToken)
     {
-        require(_serviceConfig[powerToken].allowsPerpetual == false, "Perpetual Power Tokens already allowed");
+        require(_serviceConfig[powerToken].allowsPerpetual == false, Errors.ES_PERPETUAL_TOKENS_ALREADY_ALLOWED);
 
         _serviceConfig[powerToken].allowsPerpetual = true;
     }
@@ -498,7 +499,7 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function enablePaymentToken(address token) external onlyOwner {
-        require(token != address(0), "Zero address");
+        require(token != address(0), Errors.ES_INVALID_PAYMENT_TOKEN_ADDRESS);
         _enablePaymentToken(token);
     }
 
@@ -524,7 +525,7 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function _disablePaymentToken(address token) internal {
-        require(_paymentTokensIndex[token] != 0, "Invalid token");
+        require(_paymentTokensIndex[token] != 0, Errors.ES_UNREGISTERED_PAYMENT_TOKEN);
 
         if (_paymentTokensIndex[token] > 0) {
             _paymentTokensIndex[token] = -_paymentTokensIndex[token];

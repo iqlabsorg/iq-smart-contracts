@@ -3,6 +3,7 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "../libs/Errors.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -48,7 +49,7 @@ contract ERC20 is IERC20Metadata {
      * construction.
      */
     function initialize(string memory name_, string memory symbol_) public {
-        require(bytes(_name).length == 0, "Already initialized");
+        require(bytes(_name).length == 0, Errors.ALREADY_INITIALIZED);
         _name = name_;
         _symbol = symbol_;
     }
@@ -152,7 +153,7 @@ contract ERC20 is IERC20Metadata {
         _transfer(sender, recipient, amount, false);
 
         uint256 currentAllowance = _allowances[sender][msg.sender];
-        require(currentAllowance >= amount, "ERC20: transfer amount exceeds allowance");
+        require(currentAllowance >= amount, Errors.ERC20_TRANSFER_AMOUNT_EXCEEDS_ALLOWANCE);
         _approve(sender, msg.sender, currentAllowance - amount);
 
         return true;
@@ -191,7 +192,7 @@ contract ERC20 is IERC20Metadata {
      */
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
         uint256 currentAllowance = _allowances[msg.sender][spender];
-        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        require(currentAllowance >= subtractedValue, Errors.ERC20_DECREASED_ALLOWANCE_BELOW_ZERO);
         _approve(msg.sender, spender, currentAllowance - subtractedValue);
 
         return true;
@@ -217,13 +218,13 @@ contract ERC20 is IERC20Metadata {
         uint256 amount,
         bool updateLockedBalance
     ) internal virtual {
-        require(sender != address(0), "ERC20: transfer from the zero address");
-        require(recipient != address(0), "ERC20: transfer to the zero address");
+        require(sender != address(0), Errors.ERC20_TRANSFER_FROM_THE_ZERO_ADDRESS);
+        require(recipient != address(0), Errors.ERC20_TRANSFER_TO_THE_ZERO_ADDRESS);
 
         _beforeTokenTransfer(sender, recipient, amount, updateLockedBalance);
 
         uint256 senderBalance = _balances[sender];
-        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        require(senderBalance >= amount, Errors.ERC20_TRANSFER_AMOUNT_EXCEEDS_BALANCE);
         _balances[sender] = senderBalance - amount;
         _balances[recipient] += amount;
 
@@ -244,7 +245,7 @@ contract ERC20 is IERC20Metadata {
         uint256 amount,
         bool updateLockedBalance
     ) internal virtual {
-        require(account != address(0), "ERC20: mint to the zero address");
+        require(account != address(0), Errors.ERC20_MINT_TO_THE_ZERO_ADDRESS);
 
         _beforeTokenTransfer(address(0), account, amount, updateLockedBalance);
 
@@ -269,12 +270,12 @@ contract ERC20 is IERC20Metadata {
         uint256 amount,
         bool updateLockedBalance
     ) internal virtual {
-        require(account != address(0), "ERC20: burn from the zero address");
+        require(account != address(0), Errors.ERC20_BURN_FROM_THE_ZERO_ADDRESS);
 
         _beforeTokenTransfer(account, address(0), amount, updateLockedBalance);
 
         uint256 accountBalance = _balances[account];
-        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        require(accountBalance >= amount, Errors.ERC20_BURN_AMOUNT_EXCEEDS_BALANCE);
         _balances[account] = accountBalance - amount;
         _totalSupply -= amount;
 
@@ -299,8 +300,8 @@ contract ERC20 is IERC20Metadata {
         address spender,
         uint256 amount
     ) internal virtual {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
+        require(owner != address(0), Errors.ERC20_APPROVE_FROM_THE_ZERO_ADDRESS);
+        require(spender != address(0), Errors.ERC20_APPROVE_TO_THE_ZERO_ADDRESS);
 
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);

@@ -8,6 +8,7 @@ import "./token/ERC20.sol";
 import "./interfaces/IPowerToken.sol";
 import "./Enterprise.sol";
 import "./EnterpriseOwnable.sol";
+import "./libs/Errors.sol";
 
 contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
     using SafeERC20 for IERC20;
@@ -114,7 +115,7 @@ contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
             fromState.energy = _getEnergy(fromState, from, timestamp);
             fromState.timestamp = timestamp;
             if (!updateLockedBalance) {
-                require(balanceOf(from) - value >= fromState.lockedBalance, "Insufficient available balance");
+                require(balanceOf(from) - value >= fromState.lockedBalance, Errors.PT_INSUFFICIENT_AVAILABLE_BALANCE);
             } else {
                 fromState.lockedBalance -= uint112(value);
             }

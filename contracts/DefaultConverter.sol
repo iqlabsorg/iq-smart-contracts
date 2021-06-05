@@ -3,7 +3,7 @@
 pragma solidity 0.8.4;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IConverter.sol";
-
+import "./libs/Errors.sol";
 /**
  * Noop converter
  */
@@ -13,7 +13,7 @@ contract DefaultConverter is IConverter {
         uint256 amount,
         IERC20 target
     ) external pure override returns (uint256) {
-        require(address(source) == address(target), "Conversion not supported");
+        require(address(source) == address(target), Errors.DC_UNSUPPORTED_PAIR);
 
         return amount;
     }
@@ -27,7 +27,7 @@ contract DefaultConverter is IConverter {
         uint256 amount,
         IERC20 target
     ) external pure override returns (uint256) {
-        require(address(source) == address(target), "Conversion not supported");
+        require(address(source) == address(target), Errors.DC_UNSUPPORTED_PAIR);
         return amount;
     }
 }
