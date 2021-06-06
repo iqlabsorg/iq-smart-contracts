@@ -48,11 +48,11 @@ contract DefaultEstimator is IEstimator {
     ) external view override returns (uint112) {
         uint256 availableReserve = _enterprise.getAvailableReserve();
         if (availableReserve <= amount) return type(uint112).max;
+        (, , EnterpriseStorage.ServiceConfig memory config) = _enterprise.getService(powerToken);
 
-        uint256 basePrice = _enterprise.getServiceBaseRate(powerToken);
         uint256 lambda = _serviceLambda[powerToken];
 
-        uint256 price = (g(amount, lambda) * basePrice * duration) >> 64;
+        uint256 price = (g(amount, lambda) * config.baseRate * duration) >> 64;
 
         return uint112(price);
     }

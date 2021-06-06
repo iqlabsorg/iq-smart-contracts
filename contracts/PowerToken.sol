@@ -7,6 +7,7 @@ import "./math/ExpMath.sol";
 import "./token/ERC20.sol";
 import "./interfaces/IPowerToken.sol";
 import "./Enterprise.sol";
+import "./EnterpriseStorage.sol";
 import "./EnterpriseOwnable.sol";
 import "./libs/Errors.sol";
 
@@ -28,10 +29,6 @@ contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
     ) external {
         EnterpriseOwnable.initialize(enterprise);
         ERC20.initialize(name, symbol);
-    }
-
-    function availableBalanceOf(address account) external view returns (uint256) {
-        return balanceOf(account) - _states[account].lockedBalance;
     }
 
     function mint(address to, uint256 value) external override onlyEnterprise {
@@ -61,6 +58,10 @@ contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
         liquidityToken.safeTransfer(account, amount);
     }
 
+    function availableBalanceOf(address account) external view returns (uint256) {
+        return balanceOf(account) - _states[account].lockedBalance;
+    }
+
     function energyAt(address who, uint32 timestamp) public view returns (uint112) {
         State memory state = _states[who];
         return _getEnergy(state, who, timestamp);
@@ -72,24 +73,11 @@ contract PowerToken is IPowerToken, ERC20, EnterpriseOwnable {
         uint32 timestamp
     ) internal view returns (uint112) {
         uint112 balance = uint112(balanceOf(who));
+        (, , EnterpriseStorage.ServiceConfig memory config) = getEnterprise().getService(this);
         if (balance > state.energy) {
-            return
-                balance -
-                ExpMath.halfLife(
-                    state.timestamp,
-                    balance - state.energy,
-                    getEnterprise().getServiceHalfLife(this),
-                    timestamp
-                );
+            return balance - ExpMath.halfLife(state.timestamp, balance - state.energy, config.halfLife, timestamp);
         } else {
-            return
-                balance +
-                ExpMath.halfLife(
-                    state.timestamp,
-                    state.energy - balance,
-                    getEnterprise().getServiceHalfLife(this),
-                    timestamp
-                );
+            return balance + ExpMath.halfLife(state.timestamp, state.energy - balance, config.halfLife, timestamp);
         }
     }
 

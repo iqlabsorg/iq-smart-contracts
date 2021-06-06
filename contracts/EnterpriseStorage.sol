@@ -22,10 +22,6 @@ import "./libs/Errors.sol";
  * be used as an `owner` of this contract
  */
 contract EnterpriseStorage is InitializableOwnable {
-    uint16 internal constant MAX_SERVICE_FEE_PERCENT = 5000; // 50%
-    // This is the keccak-256 hash of "iq.protocol.proxy.admin" subtracted by 1
-    bytes32 private constant _PROXY_ADMIN_SLOT = 0xd1248cccb5fef9131c731321e43e9a924840ffee7dc68c7d1d3e5cb7dedcae03;
-
     struct ServiceConfig {
         // slot 1, 0 bytes left
         uint112 baseRate; // base rate for price calculations, nominated in baseToken
@@ -37,7 +33,7 @@ contract EnterpriseStorage is InitializableOwnable {
         uint32 minLoanDuration;
         uint32 maxLoanDuration;
         uint16 serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
-        bool allowsPerpetual; // allows perpetual PowerTokens (wraping / unwraping)
+        bool allowsPerpetual; // allows wrapping tokens into perpetual PowerTokens
     }
 
     struct LoanInfo {
@@ -58,6 +54,10 @@ contract EnterpriseStorage is InitializableOwnable {
         uint256 shares;
         uint256 block;
     }
+
+    uint16 internal constant MAX_SERVICE_FEE_PERCENT = 5000; // 50%
+    // This is the keccak-256 hash of "iq.protocol.proxy.admin" subtracted by 1
+    bytes32 private constant _PROXY_ADMIN_SLOT = 0xd1248cccb5fef9131c731321e43e9a924840ffee7dc68c7d1d3e5cb7dedcae03;
 
     /**
      * @dev ERC20 token backed by enterprise services
@@ -96,7 +96,6 @@ contract EnterpriseStorage is InitializableOwnable {
 
     mapping(address => int16) internal _paymentTokensIndex;
     address[] internal _paymentTokens;
-    string internal _baseUri;
 
     /**
      * @dev Amount of fixed `_liquidityToken`
@@ -121,13 +120,24 @@ contract EnterpriseStorage is InitializableOwnable {
     uint256 internal _totalShares;
 
     string internal _name;
+    string internal _baseUri;
     mapping(uint256 => LoanInfo) internal _loanInfo;
     mapping(uint256 => LiquidityInfo) internal _liquidityInfo;
     mapping(IPowerToken => ServiceConfig) internal _serviceConfig;
     IPowerToken[] internal _powerTokens;
 
     modifier registeredPowerToken(IPowerToken powerToken) {
-        require(_isRegisteredPowerToken(powerToken), Errors.UNREGISTERED_POWER_TOKEN);
+        require(isRegisteredPowerToken(powerToken), Errors.UNREGISTERED_POWER_TOKEN);
+        _;
+    }
+
+    modifier notShutdown() {
+        require(!_enterpriseShutdown, Errors.E_ENTERPRISE_SHUTDOWN);
+        _;
+    }
+
+    modifier onlyBorrowToken() {
+        require(msg.sender == address(_borrowToken), Errors.E_CALLER_NOT_BORROW_TOKEN);
         _;
     }
 
@@ -269,32 +279,6 @@ contract EnterpriseStorage is InitializableOwnable {
         return _powerTokens;
     }
 
-    function getServices()
-        external
-        view
-        returns (
-            address[] memory addresses,
-            string[] memory names,
-            string[] memory symbols,
-            ServiceConfig[] memory configs
-        )
-    {
-        uint256 powerTokenCount = _powerTokens.length;
-        addresses = new address[](powerTokenCount);
-        names = new string[](powerTokenCount);
-        symbols = new string[](powerTokenCount);
-        configs = new ServiceConfig[](powerTokenCount);
-
-        for (uint256 i = 0; i < powerTokenCount; i++) {
-            IPowerToken powerToken = _powerTokens[i];
-            (string memory name, string memory symbol, ServiceConfig memory config) = getService(powerToken);
-            addresses[i] = address(powerToken);
-            names[i] = name;
-            symbols[i] = symbol;
-            configs[i] = config;
-        }
-    }
-
     function getService(IPowerToken powerToken)
         public
         view
@@ -313,14 +297,6 @@ contract EnterpriseStorage is InitializableOwnable {
 
     function getLiquidityInfo(uint256 tokenId) external view returns (LiquidityInfo memory) {
         return _liquidityInfo[tokenId];
-    }
-
-    function getPowerToken(uint256 index) external view returns (IPowerToken) {
-        return _powerTokens[index];
-    }
-
-    function getPowerTokenIndex(IPowerToken powerToken) external view returns (uint16) {
-        return _serviceConfig[powerToken].index;
     }
 
     function getReserve() public view returns (uint256) {
@@ -400,22 +376,6 @@ contract EnterpriseStorage is InitializableOwnable {
         onlyOwner
         registeredPowerToken(powerToken)
     {
-        _setServiceFeePercent(powerToken, newServiceFeePercent);
-    }
-
-    function setServiceFeePercentBatch(IPowerToken[] calldata powerToken, uint16[] calldata newServiceFeePercent)
-        external
-        onlyOwner
-    {
-        require(powerToken.length == newServiceFeePercent.length, Errors.INVALID_ARRAY_LENGTH);
-
-        for (uint256 i = 0; i < powerToken.length; i++) {
-            require(_isRegisteredPowerToken(powerToken[i]), Errors.UNREGISTERED_POWER_TOKEN);
-            _setServiceFeePercent(powerToken[i], newServiceFeePercent[i]);
-        }
-    }
-
-    function _setServiceFeePercent(IPowerToken powerToken, uint16 newServiceFeePercent) internal {
         require(newServiceFeePercent <= MAX_SERVICE_FEE_PERCENT, Errors.ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED);
 
         _serviceConfig[powerToken].serviceFeePercent = newServiceFeePercent;
@@ -465,34 +425,6 @@ contract EnterpriseStorage is InitializableOwnable {
         return _gcFeePercent;
     }
 
-    function getServiceFeePercent(IPowerToken powerToken) external view returns (uint112) {
-        return _serviceConfig[powerToken].serviceFeePercent;
-    }
-
-    function getServiceHalfLife(IPowerToken powerToken) external view returns (uint32) {
-        return _serviceConfig[powerToken].halfLife;
-    }
-
-    function getServiceBaseRate(IPowerToken powerToken) external view returns (uint112) {
-        return _serviceConfig[powerToken].baseRate;
-    }
-
-    function getServiceMinGCFee(IPowerToken powerToken) external view returns (uint112) {
-        return _serviceConfig[powerToken].minGCFee;
-    }
-
-    function getServiceBaseToken(IPowerToken powerToken) external view returns (IERC20Metadata) {
-        return _serviceConfig[powerToken].baseToken;
-    }
-
-    function getServiceMinLoanDuration(IPowerToken powerToken) external view returns (uint32) {
-        return _serviceConfig[powerToken].minLoanDuration;
-    }
-
-    function getServiceMaxLoanDuration(IPowerToken powerToken) external view returns (uint32) {
-        return _serviceConfig[powerToken].maxLoanDuration;
-    }
-
     function isServiceAllowedLoanDuration(IPowerToken powerToken, uint32 duration) public view returns (bool) {
         ServiceConfig storage config = _serviceConfig[powerToken];
         return config.minLoanDuration <= duration && duration <= config.maxLoanDuration;
@@ -504,14 +436,14 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function disablePaymentToken(address token) external onlyOwner {
-        _disablePaymentToken(token);
+        require(_paymentTokensIndex[token] != 0, Errors.ES_UNREGISTERED_PAYMENT_TOKEN);
+
+        if (_paymentTokensIndex[token] > 0) {
+            _paymentTokensIndex[token] = -_paymentTokensIndex[token];
+        }
     }
 
     function isRegisteredPowerToken(IPowerToken powerToken) public view returns (bool) {
-        return _isRegisteredPowerToken(powerToken);
-    }
-
-    function _isRegisteredPowerToken(IPowerToken powerToken) internal view returns (bool) {
         return _serviceConfig[powerToken].halfLife != 0;
     }
 
@@ -520,14 +452,6 @@ contract EnterpriseStorage is InitializableOwnable {
             _paymentTokens.push(token);
             _paymentTokensIndex[token] = int16(uint16(_paymentTokens.length));
         } else if (_paymentTokensIndex[token] < 0) {
-            _paymentTokensIndex[token] = -_paymentTokensIndex[token];
-        }
-    }
-
-    function _disablePaymentToken(address token) internal {
-        require(_paymentTokensIndex[token] != 0, Errors.ES_UNREGISTERED_PAYMENT_TOKEN);
-
-        if (_paymentTokensIndex[token] > 0) {
             _paymentTokensIndex[token] = -_paymentTokensIndex[token];
         }
     }
@@ -545,9 +469,8 @@ contract EnterpriseStorage is InitializableOwnable {
 
     function _increaseStreamingReserveTarget(uint112 delta) internal {
         _streamingReserve = _getStreamingReserve();
-
-        _streamingReserveUpdated = uint32(block.timestamp);
         _streamingReserveTarget += delta;
+        _streamingReserveUpdated = uint32(block.timestamp);
     }
 
     function _flushStreamingReserve() internal returns (uint112 streamingReserve) {

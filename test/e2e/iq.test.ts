@@ -86,9 +86,8 @@ describe('IQ Protocol E2E', () => {
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
       const powerToken = await getPowerToken(enterprise, await txPromise);
-      expect(await enterprise.getServiceHalfLife(powerToken.address)).to.equal(
-        HALF_LIFE
-      );
+      const service = await enterprise.getService(powerToken.address);
+      expect(service[2].halfLife).to.equal(HALF_LIFE);
     });
   });
 

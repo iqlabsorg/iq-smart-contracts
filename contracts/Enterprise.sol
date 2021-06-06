@@ -17,11 +17,6 @@ contract Enterprise is EnterpriseStorage {
     event ServiceRegistered(address indexed powerToken, uint32 halfLife, uint112 factor);
     event Borrowed(address indexed powerToken, uint256 tokenId, uint32 from, uint32 to);
 
-    modifier onlyBorrowToken() {
-        require(msg.sender == address(_borrowToken), Errors.E_CALLER_NOT_BORROW_TOKEN);
-        _;
-    }
-
     function registerService(
         string memory serviceName,
         string memory symbol,
@@ -33,31 +28,29 @@ contract Enterprise is EnterpriseStorage {
         uint32 maxLoanDuration,
         uint96 minGCFee,
         bool allowsPerpetualTokensForever
-    ) external onlyOwner {
+    ) external onlyOwner notShutdown {
         require(address(baseToken) != address(0), Errors.E_INVALID_BASE_TOKEN_ADDRESS);
         require(_powerTokens.length < type(uint16).max, Errors.E_SERVICE_LIMIT_REACHED);
         require(minLoanDuration <= maxLoanDuration, Errors.E_INVALID_LOAN_DURATION_RANGE);
         require(halfLife > 0, Errors.E_SERVICE_HALF_LIFE_NOT_GT_0);
+        require(serviceFeePercent <= MAX_SERVICE_FEE_PERCENT, Errors.ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED);
 
         PowerToken powerToken = _factory.deployService(getProxyAdmin());
         string memory tokenSymbol = _liquidityToken.symbol();
         string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", symbol));
         powerToken.initialize(serviceName, powerTokenSymbol, this);
 
-        ServiceConfig memory config =
-            ServiceConfig(
-                baseRate,
-                minGCFee,
-                halfLife,
-                uint16(_powerTokens.length),
-                baseToken,
-                minLoanDuration,
-                maxLoanDuration,
-                serviceFeePercent,
-                allowsPerpetualTokensForever
-            );
-
-        _serviceConfig[powerToken] = config;
+        _serviceConfig[powerToken] = ServiceConfig(
+            baseRate,
+            minGCFee,
+            halfLife,
+            uint16(_powerTokens.length),
+            baseToken,
+            minLoanDuration,
+            maxLoanDuration,
+            serviceFeePercent,
+            allowsPerpetualTokensForever
+        );
         _powerTokens.push(powerToken);
 
         _estimator.initializeService(powerToken);
@@ -70,9 +63,10 @@ contract Enterprise is EnterpriseStorage {
         uint112 amount,
         uint256 maxPayment,
         uint32 duration
-    ) external registeredPowerToken(powerToken) {
+    ) external notShutdown registeredPowerToken(powerToken) {
         require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
         require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
+        require(amount > 0, Errors.E_INVALID_LOAN_AMOUNT);
         require(amount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         uint112 gcFee;
@@ -129,7 +123,7 @@ contract Enterprise is EnterpriseStorage {
         IERC20 paymentToken,
         uint112 amount,
         uint32 duration
-    ) external view registeredPowerToken(powerToken) returns (uint256) {
+    ) external view notShutdown registeredPowerToken(powerToken) returns (uint256) {
         require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
         require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
 
@@ -170,37 +164,16 @@ contract Enterprise is EnterpriseStorage {
         gcFee = _estimateGCFee(powerToken, paymentToken, amount);
     }
 
-    function _estimateServiceFee(IPowerToken powerToken, uint112 loanCost) internal view returns (uint112) {
-        return uint112((uint256(loanCost) * _serviceConfig[powerToken].serviceFeePercent) / 10_000);
-    }
-
-    function _estimateGCFee(
-        IPowerToken powerToken,
-        IERC20 paymentToken,
-        uint112 amount
-    ) internal view returns (uint112) {
-        uint112 gcFeeAmount = uint112((uint256(amount) * _gcFeePercent) / 10_000);
-        uint112 minGcFee =
-            uint112(
-                _converter.estimateConvert(
-                    _serviceConfig[powerToken].baseToken,
-                    _serviceConfig[powerToken].minGCFee,
-                    paymentToken
-                )
-            );
-        return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
-    }
-
     function reborrow(
         uint256 tokenId,
         IERC20 paymentToken,
         uint256 maxPayment,
         uint32 duration
-    ) external {
+    ) external notShutdown {
         require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
         LoanInfo storage loan = _loanInfo[tokenId];
+        require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
         IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
-        require(address(powerToken) != address(0), Errors.E_INVALID_LOAN_TOKEN_ID);
         require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
         require(loan.maturityTime + duration >= block.timestamp, Errors.E_INVALID_LOAN_DURATION);
 
@@ -239,14 +212,33 @@ contract Enterprise is EnterpriseStorage {
     }
 
     function returnLoan(uint256 tokenId) public {
-        _returnLoan(tokenId, msg.sender);
+        LoanInfo storage loan = _loanInfo[tokenId];
+        require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
+        address borrower = _borrowToken.ownerOf(tokenId);
+        uint32 timestamp = uint32(block.timestamp);
+
+        require(
+            loan.borrowerReturnGraceTime < timestamp || msg.sender == borrower,
+            Errors.E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD
+        );
+        require(
+            loan.enterpriseCollectGraceTime < timestamp || msg.sender == borrower || msg.sender == _enterpriseCollector,
+            Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD
+        );
+        if (!_enterpriseShutdown) {
+            _usedReserve -= loan.amount;
+        }
+
+        _borrowToken.burn(tokenId, msg.sender); // burns PowerTokens, returns gc fee
+
+        delete _loanInfo[tokenId];
     }
 
     /**
      * One must approve sufficient amount of liquidity tokens to
      * Enterprise address before calling this function
      */
-    function addLiquidity(uint256 liquidityAmount) external {
+    function addLiquidity(uint256 liquidityAmount) external notShutdown {
         _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
 
         uint256 newShares = 0;
@@ -265,7 +257,7 @@ contract Enterprise is EnterpriseStorage {
         _totalShares += newShares;
     }
 
-    function withdrawInterest(uint256 tokenId) external {
+    function withdrawInterest(uint256 tokenId) external notShutdown {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
         uint256 shares = liquidityInfo.shares;
 
@@ -321,7 +313,7 @@ contract Enterprise is EnterpriseStorage {
      * One must approve sufficient amount of liquidity tokens to
      * corresponding PowerToken address before calling this function
      */
-    function wrap(IPowerToken powerToken, uint256 amount) public registeredPowerToken(powerToken) returns (bool) {
+    function wrap(IPowerToken powerToken, uint256 amount) public returns (bool) {
         return _wrapTo(powerToken, msg.sender, amount);
     }
 
@@ -335,7 +327,7 @@ contract Enterprise is EnterpriseStorage {
         IPowerToken powerToken,
         address to,
         uint256 amount
-    ) public registeredPowerToken(powerToken) returns (bool) {
+    ) public returns (bool) {
         return _wrapTo(powerToken, to, amount);
     }
 
@@ -343,7 +335,7 @@ contract Enterprise is EnterpriseStorage {
         IPowerToken powerToken,
         address to,
         uint256 amount
-    ) internal returns (bool) {
+    ) internal notShutdown returns (bool) {
         require(_serviceConfig[powerToken].allowsPerpetual == true, Errors.E_WRAPPING_NOT_ALLOWED);
 
         powerToken.wrap(_liquidityToken, msg.sender, to, amount);
@@ -360,20 +352,20 @@ contract Enterprise is EnterpriseStorage {
         address to,
         uint256 tokenId
     ) external onlyBorrowToken {
-        LoanInfo memory loan = _loanInfo[tokenId];
-        IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
-        require(address(powerToken) != address(0), Errors.E_INVALID_LOAN_TOKEN_ID);
+        uint112 amount = _loanInfo[tokenId].amount;
+        require(amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
 
-        bool isExpiredBorrow = (block.timestamp > loan.maturityTime);
+        bool isExpiredBorrow = (block.timestamp > _loanInfo[tokenId].maturityTime);
         bool isMinting = (from == address(0));
         bool isBurning = (to == address(0));
+        IPowerToken powerToken = _powerTokens[_loanInfo[tokenId].powerTokenIndex];
 
         if (isBurning) {
-            powerToken.burnFrom(from, loan.amount);
+            powerToken.burnFrom(from, amount);
         } else if (isMinting) {
-            powerToken.mint(to, loan.amount);
+            powerToken.mint(to, amount);
         } else if (!isExpiredBorrow) {
-            powerToken.forceTransfer(from, to, loan.amount);
+            powerToken.forceTransfer(from, to, amount);
         } else {
             revert(Errors.E_LOAN_TRANSFER_NOT_ALLOWED);
         }
@@ -385,26 +377,39 @@ contract Enterprise is EnterpriseStorage {
         return _sharesToLiquidity(liquidityInfo.shares) - liquidityInfo.amount;
     }
 
-    function _returnLoan(uint256 tokenId, address account) internal {
-        LoanInfo storage loan = _loanInfo[tokenId];
-        IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
-        require(address(powerToken) != address(0), Errors.E_INVALID_LOAN_TOKEN_ID);
-        address borrower = _borrowToken.ownerOf(tokenId);
-        uint32 timestamp = uint32(block.timestamp);
+    /**
+     * @dev Shuts down Enterprise.
+     *  * Unlocks all reverves, LPs can withdraw their tokens
+     *  * Disables adding liquidity
+     *  * Disables borrowing
+     *  * Disables wrapping
+     *
+     * !!! Cannot be undone !!!
+     */
+    function shutdownEnterpriseForever() external notShutdown onlyOwner {
+        _enterpriseShutdown = true;
+        _usedReserve = 0;
+        _streamingReserve = _streamingReserveTarget;
+    }
 
-        require(
-            loan.borrowerReturnGraceTime < timestamp || account == borrower,
-            Errors.E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD
-        );
-        require(
-            loan.enterpriseCollectGraceTime < timestamp || account == borrower || account == _enterpriseCollector,
-            Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD
-        );
+    function _estimateServiceFee(IPowerToken powerToken, uint112 loanCost) internal view returns (uint112) {
+        return uint112((uint256(loanCost) * _serviceConfig[powerToken].serviceFeePercent) / 10_000);
+    }
 
-        _usedReserve -= loan.amount;
-
-        _borrowToken.burn(tokenId, account); // burns PowerTokens, returns gc fee
-
-        delete _loanInfo[tokenId];
+    function _estimateGCFee(
+        IPowerToken powerToken,
+        IERC20 paymentToken,
+        uint112 amount
+    ) internal view returns (uint112) {
+        uint112 gcFeeAmount = uint112((uint256(amount) * _gcFeePercent) / 10_000);
+        uint112 minGcFee =
+            uint112(
+                _converter.estimateConvert(
+                    _serviceConfig[powerToken].baseToken,
+                    _serviceConfig[powerToken].minGCFee,
+                    paymentToken
+                )
+            );
+        return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
     }
 }
