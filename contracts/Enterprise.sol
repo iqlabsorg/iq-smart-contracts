@@ -61,8 +61,8 @@ contract Enterprise is EnterpriseStorage {
         IPowerToken powerToken,
         IERC20 paymentToken,
         uint112 amount,
-        uint256 maxPayment,
-        uint32 duration
+        uint32 duration,
+        uint256 maxPayment
     ) external notShutdown registeredPowerToken(powerToken) {
         require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
         require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
@@ -118,57 +118,11 @@ contract Enterprise is EnterpriseStorage {
         emit Borrowed(address(powerToken), tokenId, borrowingTime, maturityTime);
     }
 
-    function estimateLoan(
-        IPowerToken powerToken,
-        IERC20 paymentToken,
-        uint112 amount,
-        uint32 duration
-    ) external view notShutdown registeredPowerToken(powerToken) returns (uint256) {
-        require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
-        require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
-
-        (uint112 interest, uint112 serviceFee, uint112 gcFee) =
-            _estimateLoan(powerToken, paymentToken, amount, duration);
-
-        return interest + serviceFee + gcFee;
-    }
-
-    /**
-     * @dev Estimates loan cost divided into 3 parts:
-     *  1) Pool interest
-     *  2) Service operational fee
-     *  3) Loan return lien
-     */
-    function _estimateLoan(
-        IPowerToken powerToken,
-        IERC20 paymentToken,
-        uint112 amount,
-        uint32 duration
-    )
-        internal
-        view
-        returns (
-            uint112 interest,
-            uint112 serviceFee,
-            uint112 gcFee
-        )
-    {
-        uint112 loanBaseCost = _estimator.estimateCost(powerToken, amount, duration);
-
-        uint112 serviceBaseFee = _estimateServiceFee(powerToken, loanBaseCost);
-
-        uint256 loanCost = _converter.estimateConvert(_serviceConfig[powerToken].baseToken, loanBaseCost, paymentToken);
-
-        serviceFee = uint112((uint256(serviceBaseFee) * loanCost) / loanBaseCost);
-        interest = uint112(loanCost - serviceFee);
-        gcFee = _estimateGCFee(powerToken, paymentToken, amount);
-    }
-
     function reborrow(
         uint256 tokenId,
         IERC20 paymentToken,
-        uint256 maxPayment,
-        uint32 duration
+        uint32 duration,
+        uint256 maxPayment
     ) external notShutdown {
         require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
         LoanInfo storage loan = _loanInfo[tokenId];
@@ -211,6 +165,21 @@ contract Enterprise is EnterpriseStorage {
         emit Borrowed(address(powerToken), tokenId, borrowingTime, loan.maturityTime);
     }
 
+    function estimateLoan(
+        IPowerToken powerToken,
+        IERC20 paymentToken,
+        uint112 amount,
+        uint32 duration
+    ) external view notShutdown registeredPowerToken(powerToken) returns (uint256) {
+        require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
+        require(isServiceAllowedLoanDuration(powerToken, duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
+
+        (uint112 interest, uint112 serviceFee, uint112 gcFee) =
+            _estimateLoan(powerToken, paymentToken, amount, duration);
+
+        return interest + serviceFee + gcFee;
+    }
+
     function returnLoan(uint256 tokenId) public {
         LoanInfo storage loan = _loanInfo[tokenId];
         require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
@@ -241,12 +210,7 @@ contract Enterprise is EnterpriseStorage {
     function addLiquidity(uint256 liquidityAmount) external notShutdown {
         _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
 
-        uint256 newShares = 0;
-        if (_totalShares == 0) {
-            newShares = liquidityAmount;
-        } else {
-            newShares = _sharesToLiquidity(liquidityAmount);
-        }
+        uint256 newShares = (_totalShares == 0 ? liquidityAmount : _liquidityToShares(liquidityAmount));
 
         _fixedReserve += liquidityAmount;
 
@@ -257,11 +221,11 @@ contract Enterprise is EnterpriseStorage {
         _totalShares += newShares;
     }
 
-    function withdrawInterest(uint256 tokenId) external notShutdown {
+    function withdrawInterest(uint256 tokenId) external notShutdown onlyInterestTokenOwner(tokenId) {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
         uint256 shares = liquidityInfo.shares;
 
-        uint256 interest = _sharesToLiquidity(shares) - liquidityInfo.amount;
+        uint256 interest = getOwedInterest(tokenId);
         require(interest <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         _liquidityToken.safeTransfer(msg.sender, interest);
@@ -273,7 +237,7 @@ contract Enterprise is EnterpriseStorage {
         _decreaseReserve(interest);
     }
 
-    function removeLiquidity(uint256 tokenId) external {
+    function removeLiquidity(uint256 tokenId) external onlyInterestTokenOwner(tokenId) {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
         require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
         uint256 shares = liquidityInfo.shares;
@@ -288,6 +252,38 @@ contract Enterprise is EnterpriseStorage {
         _decreaseReserve(liquidityWithInterest);
         delete _liquidityInfo[tokenId];
     }
+
+    // function decreaseLiquidity(uint256 tokenId, uint256 amount) external onlyInterestTokenOwner(tokenId) {
+    //     LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+    //     require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
+    //     require(liquidityInfo.amount >= amount, Errors.E_INSUFFICIENT_LIQUIDITY);
+    //     require(amount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
+    //     _liquidityToken.safeTransfer(msg.sender, amount);
+
+    //     uint256 shares = _liquidityToShares(amount);
+    //     if (shares > liquidityInfo.shares) {
+    //         shares = liquidityInfo.shares;
+    //     }
+    //     unchecked {
+    //         liquidityInfo.shares -= shares;
+    //         liquidityInfo.amount -= amount;
+    //         _totalShares -= shares;
+    //     }
+    //     _decreaseReserve(amount);
+    // }
+
+    // function increaseLiquidity(uint256 tokenId, uint256 amount) external notShutdown onlyInterestTokenOwner(tokenId) {
+    //     _liquidityToken.safeTransferFrom(msg.sender, address(this), amount);
+
+    //     uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount));
+
+    //     _fixedReserve += amount;
+    //     LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+    //     liquidityInfo.amount += amount;
+    //     liquidityInfo.shares += newShares;
+    //     liquidityInfo.block = block.number;
+    //     _totalShares += newShares;
+    // }
 
     function _decreaseReserve(uint256 delta) internal {
         if (_fixedReserve >= delta) {
@@ -371,10 +367,13 @@ contract Enterprise is EnterpriseStorage {
         }
     }
 
-    function getOwedInterest(uint256 tokenId) external view returns (uint256) {
+    function getOwedInterest(uint256 tokenId) public view returns (uint256) {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
 
-        return _sharesToLiquidity(liquidityInfo.shares) - liquidityInfo.amount;
+        uint256 liquidity = _sharesToLiquidity(liquidityInfo.shares);
+        // Due to rounding errors calculated liquidity could insignificantly
+        // less than provided liquidity
+        return liquidity <= liquidityInfo.amount ? 0 : liquidity - liquidityInfo.amount;
     }
 
     /**
@@ -392,10 +391,6 @@ contract Enterprise is EnterpriseStorage {
         _streamingReserve = _streamingReserveTarget;
     }
 
-    function _estimateServiceFee(IPowerToken powerToken, uint112 loanCost) internal view returns (uint112) {
-        return uint112((uint256(loanCost) * _serviceConfig[powerToken].serviceFeePercent) / 10_000);
-    }
-
     function _estimateGCFee(
         IPowerToken powerToken,
         IERC20 paymentToken,
@@ -411,5 +406,35 @@ contract Enterprise is EnterpriseStorage {
                 )
             );
         return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
+    }
+
+    /**
+     * @dev Estimates loan cost divided into 3 parts:
+     *  1) Pool interest
+     *  2) Service operational fee
+     *  3) Loan return lien
+     */
+    function _estimateLoan(
+        IPowerToken powerToken,
+        IERC20 paymentToken,
+        uint112 amount,
+        uint32 duration
+    )
+        internal
+        view
+        returns (
+            uint112 interest,
+            uint112 serviceFee,
+            uint112 gcFee
+        )
+    {
+        uint112 loanBaseCost = _estimator.estimateCost(powerToken, amount, duration);
+        uint112 serviceBaseFee =
+            uint112((uint256(loanBaseCost) * _serviceConfig[powerToken].serviceFeePercent) / 10_000);
+        uint256 loanCost = _converter.estimateConvert(_serviceConfig[powerToken].baseToken, loanBaseCost, paymentToken);
+
+        serviceFee = uint112((uint256(serviceBaseFee) * loanCost) / loanBaseCost);
+        interest = uint112(loanCost - serviceFee);
+        gcFee = _estimateGCFee(powerToken, paymentToken, amount);
     }
 }

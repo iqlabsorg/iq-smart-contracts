@@ -9,14 +9,19 @@ import {
   ERC20Mock__factory,
   IERC20Metadata,
   InterestToken,
+  IPowerToken,
+  MockConverter,
   MockConverter__factory,
   PowerToken,
 } from '../typechain';
 import {
+  addLiquidity,
   basePrice,
   baseRate,
+  borrow,
   deployEnterprise,
   estimateLoan,
+  fromTokens,
   getInterestTokenId,
   getTokenId,
   increaseTime,
@@ -28,7 +33,7 @@ import {
 import {Wallet} from '@ethersproject/wallet';
 import {BigNumber} from 'ethers';
 
-describe('Enterprise', () => {
+describe.only('Enterprise', () => {
   let deployer: Wallet;
   let lender: Wallet;
   let borrower: Wallet;
@@ -38,7 +43,13 @@ describe('Enterprise', () => {
   let token: IERC20Metadata;
   const ONE_TOKEN = 10n ** 18n;
   const HALF_LIFE = ONE_DAY;
-  const BASE_RATE = baseRate(100n, 86400n, 3n);
+  const BASE_RATE = baseRate(
+    100n * ONE_TOKEN,
+    BigInt(ONE_DAY),
+    3n * ONE_TOKEN,
+    18n,
+    18n
+  );
 
   beforeEach(async () => {
     [deployer, lender, borrower, user, stranger] =
@@ -177,20 +188,19 @@ describe('Enterprise', () => {
       beforeEach(async () => {
         await token.transfer(borrower.address, ONE_TOKEN * 5n);
         await token.transfer(lender.address, LIQIDITY);
-        await token.connect(lender).approve(enterprise.address, LIQIDITY);
-        await enterprise.connect(lender).addLiquidity(LIQIDITY);
-        await token
-          .connect(borrower)
-          .approve(enterprise.address, ONE_TOKEN * 5n);
-        const borrowTx = await enterprise
-          .connect(borrower)
-          .borrow(
-            powerToken.address,
-            token.address,
-            BORROW_AMOUNT,
-            ONE_TOKEN * 5n,
-            ONE_DAY
-          );
+
+        await addLiquidity(enterprise, LIQIDITY, lender);
+
+        const borrowTx = await borrow(
+          enterprise,
+          powerToken,
+          token,
+          BORROW_AMOUNT,
+          ONE_DAY,
+          ONE_TOKEN * 5n,
+          borrower
+        );
+
         tokenId = await getTokenId(enterprise, borrowTx);
       });
 
@@ -214,7 +224,7 @@ describe('Enterprise', () => {
 
         await enterprise
           .connect(borrower)
-          .reborrow(tokenId, token.address, ONE_TOKEN * 5n, ONE_DAY);
+          .reborrow(tokenId, token.address, ONE_DAY, ONE_TOKEN * 5n);
 
         expect(await token.balanceOf(borrower.address)).to.be.below(
           ONE_TOKEN * 5n
@@ -244,14 +254,15 @@ describe('Enterprise', () => {
     const ONE_USDC = 10n ** BigInt(USDC_DECIMALS);
     let usdc: ERC20Mock;
     let powerToken: PowerToken;
+    let converter: MockConverter;
     beforeEach(async () => {
       usdc = await new ERC20Mock__factory(deployer).deploy(
         'USDC',
         'USDC',
         USDC_DECIMALS,
-        ONE_TOKEN * 1_000_000n
+        ONE_USDC * 1_000_000n
       );
-      const converter = await new MockConverter__factory(deployer).deploy();
+      converter = await new MockConverter__factory(deployer).deploy();
       enterprise = await deployEnterprise(
         'Test',
         token.address,
@@ -262,8 +273,7 @@ describe('Enterprise', () => {
       await token.transfer(converter.address, ONE_TOKEN * 10000n);
       await usdc.transfer(converter.address, ONE_USDC * 10000n);
 
-      await token.approve(enterprise.address, ONE_TOKEN * 100000n);
-      await enterprise.addLiquidity(ONE_TOKEN * 100000n);
+      await addLiquidity(enterprise, ONE_TOKEN * 100000n);
 
       await converter.setRate(usdc.address, token.address, 350_000n); // 0.35 cents
     });
@@ -285,17 +295,6 @@ describe('Enterprise', () => {
       it('should be possible to borrow paying with USDC', async () => {
         const usdcBalance = ONE_USDC * 1000n;
         await usdc.transfer(user.address, usdcBalance);
-        await usdc.connect(user).approve(enterprise.address, usdcBalance);
-
-        await enterprise
-          .connect(user)
-          .borrow(
-            powerToken.address,
-            usdc.address,
-            ONE_TOKEN * 10000n,
-            usdcBalance,
-            ONE_DAY
-          );
 
         const loan = estimateLoan(
           basePrice(100, ONE_DAY, 3),
@@ -303,6 +302,16 @@ describe('Enterprise', () => {
           0,
           10000,
           ONE_DAY
+        );
+
+        await borrow(
+          enterprise,
+          powerToken,
+          usdc,
+          ONE_TOKEN * 10000n,
+          ONE_DAY,
+          usdcBalance,
+          user
         );
 
         expect(await powerToken.balanceOf(user.address)).to.eq(
@@ -320,7 +329,13 @@ describe('Enterprise', () => {
         powerToken = await registerService(
           enterprise,
           HALF_LIFE,
-          baseRate(100n * ONE_TOKEN, BigInt(ONE_DAY), (ONE_USDC * 3n) / 2n), // 1.5 USDC for 100 tokens per day
+          baseRate(
+            100n * ONE_TOKEN,
+            BigInt(ONE_DAY),
+            (ONE_USDC * 3n) / 2n,
+            18n,
+            BigInt(USDC_DECIMALS)
+          ), // 1.5 USDC for 100 tokens per day
           usdc.address,
           300, // 3%
           ONE_HOUR * 12,
@@ -329,20 +344,9 @@ describe('Enterprise', () => {
           true
         );
       });
-      it.skip('should be possible to borrow paying with USDC', async () => {
+      it('should be possible to borrow paying with USDC', async () => {
         const usdcBalance = ONE_USDC * 1000n;
         await usdc.transfer(user.address, usdcBalance);
-        await usdc.connect(user).approve(enterprise.address, usdcBalance);
-
-        await enterprise
-          .connect(user)
-          .borrow(
-            powerToken.address,
-            usdc.address,
-            ONE_TOKEN * 10000n,
-            usdcBalance,
-            ONE_DAY
-          );
 
         const loan = estimateLoan(
           basePrice(100, ONE_DAY, 1.5),
@@ -352,14 +356,164 @@ describe('Enterprise', () => {
           ONE_DAY
         );
 
+        await borrow(
+          enterprise,
+          powerToken,
+          usdc,
+          ONE_TOKEN * 10000n,
+          ONE_DAY,
+          usdcBalance,
+          user
+        );
+
         expect(await powerToken.balanceOf(user.address)).to.eq(
           ONE_TOKEN * 10000n
         );
         const balanceAfter = await usdc.balanceOf(user.address);
         expect(
           toTokens(usdcBalance - balanceAfter.toBigInt(), 3, USDC_DECIMALS)
-        ).to.closeTo(loan, 0.1);
+        ).to.closeTo(loan, 0.001);
       });
+
+      it('should be possible to borrow paying with liquidity tokens', async () => {
+        const tokenBalance = ONE_TOKEN * 1000n;
+        await token.transfer(user.address, tokenBalance);
+        const loan = estimateLoan(
+          basePrice(100, ONE_DAY, 1.5),
+          100000,
+          0,
+          10000,
+          ONE_DAY
+        );
+        const convertedLoan = await converter.estimateConvert(
+          usdc.address,
+          fromTokens(loan, 6, USDC_DECIMALS),
+          token.address
+        );
+
+        await borrow(
+          enterprise,
+          powerToken,
+          token,
+          ONE_TOKEN * 10000n,
+          ONE_DAY,
+          tokenBalance,
+          user
+        );
+
+        expect(await powerToken.balanceOf(user.address)).to.eq(
+          ONE_TOKEN * 10000n
+        );
+        const balanceAfter = await token.balanceOf(user.address);
+        expect(
+          toTokens(tokenBalance - balanceAfter.toBigInt(), 3, 18)
+        ).to.closeTo(toTokens(convertedLoan, 3), 0.001);
+      });
+    });
+  });
+
+  describe('multi borrow scenario', () => {
+    let powerToken: IPowerToken;
+    beforeEach(async () => {
+      enterprise = await deployEnterprise('Test', token.address);
+      powerToken = await registerService(
+        enterprise,
+        HALF_LIFE,
+        baseRate(100n * ONE_TOKEN, BigInt(ONE_DAY), ONE_TOKEN * 3n),
+        token.address,
+        0, // 0%
+        ONE_HOUR * 12,
+        ONE_DAY * 60,
+        0,
+        true
+      );
+      await token.transfer(borrower.address, ONE_TOKEN * 1000n);
+    });
+
+    it.only('add-borrow-add-borrow-return-return-remove', async () => {
+      const liquidityTx1 = await addLiquidity(enterprise, ONE_TOKEN * 10_000n);
+      const tokenId1 = await getInterestTokenId(enterprise, liquidityTx1);
+
+      expect(await enterprise.getOwedInterest(tokenId1)).to.eq(0);
+
+      await increaseTime(ONE_DAY / 2);
+
+      expect(await enterprise.getOwedInterest(tokenId1)).to.eq(0);
+
+      const borrowerBalance1 = await token.balanceOf(borrower.address);
+      await expect(
+        borrow(
+          enterprise,
+          powerToken,
+          token,
+          ONE_TOKEN * 1_000n,
+          ONE_DAY * 10,
+          ONE_TOKEN * 300n,
+          borrower
+        )
+      ).to.be.revertedWith('47'); // 300 tokens is not enough
+
+      const borrowTx1 = await borrow(
+        enterprise,
+        powerToken,
+        token,
+        ONE_TOKEN * 1_000n,
+        ONE_DAY * 10,
+        ONE_TOKEN * 400n,
+        borrower
+      );
+
+      const borrower1Paid = borrowerBalance1.sub(
+        await token.balanceOf(borrower.address)
+      );
+
+      const borrowTokenId1 = await getTokenId(enterprise, borrowTx1);
+
+      await increaseTime(ONE_HOUR * 4);
+
+      expect(
+        toTokens(await enterprise.getOwedInterest(tokenId1), 3)
+      ).to.approximately(toTokens(borrower1Paid.div(2), 3), 0.001);
+
+      await increaseTime(ONE_HOUR * 4);
+
+      expect(
+        toTokens(await enterprise.getOwedInterest(tokenId1), 3)
+      ).to.approximately(toTokens(borrower1Paid.mul(3).div(4), 3), 0.001);
+
+      await expect(enterprise.removeLiquidity(tokenId1)).to.be.revertedWith(
+        '46'
+      );
+
+      const liquidityTx2 = await addLiquidity(enterprise, ONE_TOKEN * 1_000n);
+
+      const tokenId2 = await getInterestTokenId(enterprise, liquidityTx2);
+
+      expect(await enterprise.getOwedInterest(tokenId2)).to.eq(0);
+
+      await increaseTime(ONE_HOUR * 4);
+
+      const [L1, L2] = await Promise.all([
+        enterprise.getLiquidityInfo(tokenId1),
+        enterprise.getLiquidityInfo(tokenId2),
+      ]);
+
+      const LP2interest = borrower1Paid
+        .div(8)
+        .mul(L2.shares)
+        .div(L1.shares.add(L2.shares));
+
+      expect(
+        toTokens(await enterprise.getOwedInterest(tokenId2), 3)
+      ).to.approximately(toTokens(LP2interest, 3), 0.001);
+
+      await enterprise.removeLiquidity(tokenId1);
+    });
+  });
+
+  describe('Enterprise upgradabilitiy', () => {
+    beforeEach(async () => {
+      enterprise = await deployEnterprise('Test', token.address);
     });
   });
 });

@@ -141,9 +141,15 @@ contract EnterpriseStorage is InitializableOwnable {
         _;
     }
 
+    modifier onlyInterestTokenOwner(uint256 tokenId) {
+        require(_interestToken.ownerOf(tokenId) == msg.sender, Errors.CALLER_NOT_OWNER);
+        _;
+    }
+
     function initialize(
         string memory enterpriseName,
         string calldata baseUri,
+        uint16 gcFeePercent,
         IEstimator estimator,
         IConverter converter,
         ProxyAdmin proxyAdmin,
@@ -155,6 +161,7 @@ contract EnterpriseStorage is InitializableOwnable {
         _factory = EnterpriseFactory(msg.sender);
         _name = enterpriseName;
         _baseUri = baseUri;
+        _gcFeePercent = gcFeePercent;
         _estimator = estimator;
         _converter = converter;
         _enterpriseVault = owner;

@@ -48,6 +48,7 @@ contract EnterpriseFactory {
         string calldata name,
         IERC20Metadata liquidityToken,
         string calldata baseUri,
+        uint16 gcFeePercent,
         address estimatorImpl,
         IConverter converter
     ) external returns (Enterprise) {
@@ -55,13 +56,15 @@ contract EnterpriseFactory {
 
         Enterprise enterprise = Enterprise(deployProxy(_enterpriseImpl, proxyAdmin));
         proxyAdmin.transferOwnership(address(enterprise));
-
         IEstimator estimator = IEstimator(deployProxy(estimatorImpl, proxyAdmin));
-        InterestToken interestToken = _deployInterestToken(liquidityToken.symbol(), enterprise, proxyAdmin);
-        BorrowToken borrowToken = _deployBorrowToken(liquidityToken.symbol(), enterprise, proxyAdmin);
-
-        enterprise.initialize(name, baseUri, estimator, converter, proxyAdmin, msg.sender);
-        enterprise.initializeTokens(liquidityToken, interestToken, borrowToken);
+        {
+            enterprise.initialize(name, baseUri, gcFeePercent, estimator, converter, proxyAdmin, msg.sender);
+        }
+        {
+            InterestToken interestToken = _deployInterestToken(liquidityToken.symbol(), enterprise, proxyAdmin);
+            BorrowToken borrowToken = _deployBorrowToken(liquidityToken.symbol(), enterprise, proxyAdmin);
+            enterprise.initializeTokens(liquidityToken, interestToken, borrowToken);
+        }
 
         estimator.initialize(enterprise);
 

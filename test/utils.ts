@@ -6,10 +6,13 @@ import {
   Enterprise,
   EnterpriseFactory,
   IConverter,
+  IERC20,
   IEstimator,
   InterestToken,
+  IPowerToken,
   PowerToken,
 } from '../typechain';
+import {Wallet} from '@ethersproject/wallet';
 
 export const ONE_DAY = 86400;
 export const ONE_HOUR = 3600;
@@ -21,8 +24,8 @@ export const evmRevert = async (id: string): Promise<unknown> =>
 export const nextBlock = async (timestamp = 0): Promise<unknown> =>
   ethers.provider.send('evm_mine', timestamp > 0 ? [timestamp] : []);
 export const increaseTime = async (seconds: number): Promise<void> => {
-  ethers.provider.send('evm_increaseTime', [seconds]);
-  await nextBlock();
+  const time = await currentTime();
+  await nextBlock(time + seconds);
 };
 export const currentTime = async (): Promise<number> => {
   const block = await ethers.provider.getBlock('latest');
@@ -49,6 +52,7 @@ export const deployEnterprise = async (
     'Testing',
     token,
     'https://test.iq.space',
+    0, // 0% gc fee
     estimatorImpl || estimator.address,
     converterAddress || converter.address
   );
@@ -154,11 +158,38 @@ export const toTokens = (
   return Number(a / dec) / 10 ** decimals;
 };
 
+export const fromTokens = (
+  amount: number,
+  decimals = 6,
+  tokenDecimals = 18
+): BigNumber => {
+  const a = BigInt(Math.trunc(amount));
+  const f = amount - Math.trunc(amount);
+
+  return BigNumber.from(
+    (a * 10n ** BigInt(decimals) + BigInt(Math.trunc(f * 10 ** decimals))) *
+      10n ** BigInt(tokenDecimals - decimals)
+  );
+};
+
 export const baseRate = (
   tokens: bigint,
   period: bigint,
-  price: bigint
+  price: bigint,
+  tokenDecimals = 18n,
+  priceDecimals = 18n
 ): bigint => {
+  if (tokenDecimals > priceDecimals) {
+    return (
+      ((price * 10n ** (tokenDecimals - priceDecimals)) << 64n) /
+      (tokens * period)
+    );
+  } else if (tokenDecimals < priceDecimals) {
+    return (
+      (price << 64n) /
+      (tokens * 10n ** (priceDecimals - tokenDecimals) * period)
+    );
+  }
   return (price << 64n) / (tokens * period);
 };
 
@@ -190,6 +221,55 @@ export const estimateLoan = (
 
   function g(x: number) {
     return h(usedReserves + x) - h(usedReserves);
+  }
+};
+
+export const addLiquidity = async (
+  enterprise: Enterprise,
+  amount: BigNumberish,
+  user?: Wallet
+): Promise<ContractTransaction> => {
+  const ERC20 = await ethers.getContractFactory('ERC20Mock');
+  const token = ERC20.attach(await enterprise.getLiquidityToken());
+
+  if (user) {
+    await token.connect(user).approve(enterprise.address, amount);
+    return enterprise.connect(user).addLiquidity(amount);
+  } else {
+    await token.approve(enterprise.address, amount);
+    return enterprise.addLiquidity(amount);
+  }
+};
+
+export const borrow = async (
+  enterprise: Enterprise,
+  powerToken: IPowerToken,
+  paymentToken: IERC20,
+  amount: BigNumberish,
+  duration: number,
+  maxPayment: BigNumberish,
+  user?: Wallet
+): Promise<ContractTransaction> => {
+  if (user) {
+    await paymentToken.connect(user).approve(enterprise.address, maxPayment);
+    return enterprise
+      .connect(user)
+      .borrow(
+        powerToken.address,
+        paymentToken.address,
+        amount,
+        duration,
+        maxPayment
+      );
+  } else {
+    await paymentToken.approve(enterprise.address, maxPayment);
+    return enterprise.borrow(
+      powerToken.address,
+      paymentToken.address,
+      amount,
+      duration,
+      maxPayment
+    );
   }
 };
 

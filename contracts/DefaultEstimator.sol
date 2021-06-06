@@ -35,6 +35,8 @@ contract DefaultEstimator is IEstimator {
         _serviceLambda[powerToken] = lambda;
     }
 
+    function notifyNewLoan(uint256 tokenId) external override {}
+
     /**
      * @dev
      * f(x) = 1 - λln(x)
@@ -50,11 +52,25 @@ contract DefaultEstimator is IEstimator {
         if (availableReserve <= amount) return type(uint112).max;
         (, , EnterpriseStorage.ServiceConfig memory config) = _enterprise.getService(powerToken);
 
-        uint256 lambda = _serviceLambda[powerToken];
+        int8 decimalsDiff = int8(_enterprise.getLiquidityToken().decimals()) - int8(config.baseToken.decimals());
 
-        uint256 price = (g(amount, lambda) * config.baseRate * duration) >> 64;
+        uint256 basePrice = g(amount, _serviceLambda[powerToken]) * duration;
 
-        return uint112(price);
+        if (decimalsDiff > 0) {
+            basePrice = ((basePrice * config.baseRate) / 10**uint8(decimalsDiff)) >> 64;
+        } else if (decimalsDiff < 0) {
+            basePrice = ((basePrice * config.baseRate) * 10**(uint8(-decimalsDiff))) >> 64;
+        } else {
+            basePrice = (basePrice * config.baseRate) >> 64;
+        }
+        return uint112(basePrice);
+    }
+
+    function g(uint256 x, uint256 lambda) internal view returns (uint256) {
+        uint256 usedReserve = _enterprise.getUsedReserve();
+        uint256 reserve = _enterprise.getReserve();
+
+        return h(usedReserve + x, lambda, reserve) - h(usedReserve, lambda, reserve);
     }
 
     function f(uint128 x, uint256 lambda) internal pure returns (uint256) {
@@ -68,13 +84,4 @@ contract DefaultEstimator is IEstimator {
     ) internal pure returns (uint256) {
         return (x * f(uint128((reserve << 64) / ((reserve - x))), lambda)) >> 64;
     }
-
-    function g(uint256 x, uint256 lambda) internal view returns (uint256) {
-        uint256 usedReserve = _enterprise.getUsedReserve();
-        uint256 reserve = _enterprise.getReserve();
-
-        return h(usedReserve + x, lambda, reserve) - h(usedReserve, lambda, reserve);
-    }
-
-    function notifyNewLoan(uint256 tokenId) external override {}
 }

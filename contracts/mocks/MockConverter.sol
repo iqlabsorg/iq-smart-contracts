@@ -74,7 +74,7 @@ contract MockConverter is IConverter {
     ) internal view returns (uint256) {
         if (source.decimals() > target.decimals()) {
             return rate / 10**(source.decimals() - target.decimals());
-        } else if (target.decimals() > source.decimals()) {
+        } else if (source.decimals() < target.decimals()) {
             return rate * 10**(target.decimals() - source.decimals());
         }
         return rate;

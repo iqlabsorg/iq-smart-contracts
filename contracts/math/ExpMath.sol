@@ -38,6 +38,9 @@ library ExpMath {
         }
     }
 
+    /**
+     * @dev Credit to ABDK Consulting under BSD-4 license https://medium.com/coinmonks/math-in-solidity-part-5-exponent-and-logarithm-9aef8515136e
+     */
     function log_2(int128 x) internal pure returns (int128) {
         unchecked {
             require(x > 0);
