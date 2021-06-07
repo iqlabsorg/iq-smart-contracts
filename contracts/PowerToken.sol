@@ -26,11 +26,11 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     }
 
     function availableBalanceOf(address account) external view returns (uint256) {
-        return balanceOf(account) - states[account].lockedBalance;
+        return balanceOf(account) - _states[account].lockedBalance;
     }
 
     function energyAt(address who, uint32 timestamp) public view returns (uint112) {
-        State memory state = states[who];
+        State memory state = _states[who];
         return _getEnergy(state, who, timestamp);
     }
 
@@ -41,9 +41,9 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     ) internal view returns (uint112) {
         uint112 balance = uint112(balanceOf(who));
         if (balance > state.energy) {
-            return balance - ExpMath.halfLife(state.timestamp, balance - state.energy, gapHalvingPeriod, timestamp);
+            return balance - ExpMath.halfLife(state.timestamp, balance - state.energy, _gapHalvingPeriod, timestamp);
         } else {
-            return balance + ExpMath.halfLife(state.timestamp, state.energy - balance, gapHalvingPeriod, timestamp);
+            return balance + ExpMath.halfLife(state.timestamp, state.energy - balance, _gapHalvingPeriod, timestamp);
         }
     }
 
@@ -65,7 +65,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         uint32 timestamp = uint32(block.timestamp);
 
         if (from != address(0)) {
-            State memory fromState = states[from];
+            State memory fromState = _states[from];
             fromState.energy = _getEnergy(fromState, from, timestamp);
             fromState.timestamp = timestamp;
             if (!updateLockedBalance) {
@@ -73,17 +73,17 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             } else {
                 fromState.lockedBalance -= uint112(value);
             }
-            states[from] = fromState;
+            _states[from] = fromState;
         }
 
         if (to != address(0)) {
-            State memory toState = states[to];
+            State memory toState = _states[to];
             toState.energy = _getEnergy(toState, to, timestamp);
             toState.timestamp = timestamp;
             if (updateLockedBalance) {
                 toState.lockedBalance += uint112(value);
             }
-            states[to] = toState;
+            _states[to] = toState;
         }
     }
 
@@ -107,15 +107,15 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         return (
             this.name(),
             this.symbol(),
-            this.baseRate(),
-            this.minGCFee(),
-            this.gapHalvingPeriod(),
-            this.index(),
-            this.baseToken(),
-            this.minLoanDuration(),
-            this.maxLoanDuration(),
-            this.serviceFeePercent(),
-            this.allowsPerpetual()
+            _baseRate,
+            _minGCFee,
+            _gapHalvingPeriod,
+            _index,
+            _baseToken,
+            _minLoanDuration,
+            _maxLoanDuration,
+            _serviceFeePercent,
+            _allowsPerpetual
         );
     }
 
@@ -140,7 +140,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     }
 
     function _wrapTo(address to, uint256 amount) internal returns (bool) {
-        require(allowsPerpetual == true, Errors.E_WRAPPING_NOT_ALLOWED);
+        require(_allowsPerpetual == true, Errors.E_WRAPPING_NOT_ALLOWED);
 
         getEnterprise().getLiquidityToken().safeTransferFrom(msg.sender, address(this), amount);
         _mint(to, amount, false);
@@ -202,8 +202,8 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         require(isAllowedLoanDuration(duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
 
         uint112 loanBaseCost = estimateCost(amount, duration);
-        uint112 serviceBaseFee = uint112((uint256(loanBaseCost) * serviceFeePercent) / 10_000);
-        uint256 loanCost = getEnterprise().getConverter().estimateConvert(baseToken, loanBaseCost, paymentToken);
+        uint112 serviceBaseFee = uint112((uint256(loanBaseCost) * _serviceFeePercent) / 10_000);
+        uint256 loanCost = getEnterprise().getConverter().estimateConvert(_baseToken, loanBaseCost, paymentToken);
 
         serviceFee = uint112((uint256(serviceBaseFee) * loanCost) / loanBaseCost);
         interest = uint112(loanCost - serviceFee);
@@ -212,7 +212,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
 
     function _estimateGCFee(IERC20 paymentToken, uint112 amount) internal view returns (uint112) {
         uint112 gcFeeAmount = uint112((uint256(amount) * getEnterprise().getGCFeePercent()) / 10_000);
-        uint112 minGcFee = uint112(getEnterprise().getConverter().estimateConvert(baseToken, minGCFee, paymentToken));
+        uint112 minGcFee = uint112(getEnterprise().getConverter().estimateConvert(_baseToken, _minGCFee, paymentToken));
         return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
     }
 
@@ -228,16 +228,16 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         uint256 availableReserve = getEnterprise().getAvailableReserve();
         if (availableReserve <= amount) return type(uint112).max;
 
-        int8 decimalsDiff = int8(getEnterprise().getLiquidityToken().decimals()) - int8(baseToken.decimals());
+        int8 decimalsDiff = int8(getEnterprise().getLiquidityToken().decimals()) - int8(_baseToken.decimals());
 
         uint256 basePrice = g(amount, getEnterprise().getBondingLambda()) * duration;
 
         if (decimalsDiff > 0) {
-            basePrice = ((basePrice * baseRate) / 10**uint8(decimalsDiff)) >> 64;
+            basePrice = ((basePrice * _baseRate) / 10**uint8(decimalsDiff)) >> 64;
         } else if (decimalsDiff < 0) {
-            basePrice = ((basePrice * baseRate) * 10**(uint8(-decimalsDiff))) >> 64;
+            basePrice = ((basePrice * _baseRate) * 10**(uint8(-decimalsDiff))) >> 64;
         } else {
-            basePrice = (basePrice * baseRate) >> 64;
+            basePrice = (basePrice * _baseRate) >> 64;
         }
         return uint112(basePrice);
     }

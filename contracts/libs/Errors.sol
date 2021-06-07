@@ -96,7 +96,7 @@ library Errors {
     string internal constant ES_INVALID_CONVERTER_ADDRESS = "63";
     string internal constant ES_INVALID_BORROWER_LOAN_RETURN_GRACE_PERIOD = "64";
     string internal constant ES_INVALID_ENTERPRISE_LOAN_COLLECT_GRACE_PERIOD = "65";
-    string internal constant ES_INTEREST_HALF_LIFE_NOT_GT_0 = "66";
+    string internal constant ES_INTEREST_GAP_HALVING_PERIOD_NOT_GT_0 = "66";
     string internal constant ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED = "67";
     string internal constant ES_INVALID_BASE_TOKEN_ADDRESS = "68";
     string internal constant ES_INVALID_LOAN_DURATION_RANGE = "69";

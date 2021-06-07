@@ -13,13 +13,13 @@ contract Enterprise is EnterpriseStorage {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Metadata;
 
-    event ServiceRegistered(address indexed powerToken, uint32 halfLife, uint112 factor);
+    event ServiceRegistered(address indexed powerToken, uint32 gapHalvingPeriod, uint112 factor);
     event Borrowed(address indexed powerToken, uint256 tokenId, uint32 from, uint32 to);
 
     function registerService(
         string memory serviceName,
         string memory symbol,
-        uint32 halfLife,
+        uint32 gapHalvingPeriod,
         uint112 baseRate,
         IERC20Metadata baseToken,
         uint16 serviceFeePercent,
@@ -41,7 +41,7 @@ contract Enterprise is EnterpriseStorage {
             this,
             baseRate,
             minGCFee,
-            halfLife,
+            gapHalvingPeriod,
             uint16(_powerTokens.length),
             baseToken,
             minLoanDuration,
@@ -52,7 +52,7 @@ contract Enterprise is EnterpriseStorage {
         _powerTokens.push(powerToken);
         _registeredPowerTokens[powerToken] = true;
 
-        emit ServiceRegistered(address(powerToken), halfLife, baseRate);
+        emit ServiceRegistered(address(powerToken), gapHalvingPeriod, baseRate);
     }
 
     function borrow(
@@ -82,7 +82,7 @@ contract Enterprise is EnterpriseStorage {
 
             uint256 convertedLiquidityTokens = loanCost;
 
-            if (address(paymentToken) != address(powerToken.baseToken())) {
+            if (address(paymentToken) != address(powerToken.getBaseToken())) {
                 paymentToken.approve(address(_converter), loanCost);
                 convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
             }
@@ -101,7 +101,7 @@ contract Enterprise is EnterpriseStorage {
         uint256 tokenId = _borrowToken.getNextTokenId();
         _loanInfo[tokenId] = LoanInfo(
             amount,
-            powerToken.index(),
+            powerToken.getIndex(),
             borrowingTime,
             maturityTime,
             maturityTime + _borrowerLoanReturnGracePeriod,
@@ -143,7 +143,7 @@ contract Enterprise is EnterpriseStorage {
 
         paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
         uint256 convertedLiquidityTokens = loanCost;
-        if (address(paymentToken) != address(powerToken.baseToken())) {
+        if (address(paymentToken) != address(powerToken.getBaseToken())) {
             paymentToken.approve(address(_converter), loanCost);
             convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
         }
