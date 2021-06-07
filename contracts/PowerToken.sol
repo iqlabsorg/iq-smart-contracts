@@ -220,7 +220,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
 
     /**
      * @dev
-     * f(x) = 1 - λln(x)
+     * f(x) = ((1 - t) * k) / (x - t) + (1 - k)
      * h(x) = x * f((T - x) / T)
      * g(x) = h(U + x) - h(U)
      */
@@ -230,7 +230,9 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
 
         int8 decimalsDiff = int8(getEnterprise().getLiquidityToken().decimals()) - int8(_baseToken.decimals());
 
-        uint256 basePrice = g(amount, getEnterprise().getBondingLambda()) * duration;
+        (uint256 pole, uint256 slope) = getEnterprise().getBondingCurve();
+
+        uint256 basePrice = g(amount, pole, slope) * duration;
 
         if (decimalsDiff > 0) {
             basePrice = ((basePrice * _baseRate) / 10**uint8(decimalsDiff)) >> 64;
@@ -242,22 +244,32 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         return uint112(basePrice);
     }
 
-    function g(uint256 x, uint256 lambda) internal view returns (uint256) {
+    function g(
+        uint128 x,
+        uint256 pole,
+        uint256 slope
+    ) internal view returns (uint256) {
         uint256 usedReserve = getEnterprise().getUsedReserve();
         uint256 reserve = getEnterprise().getReserve();
 
-        return h(usedReserve + x, lambda, reserve) - h(usedReserve, lambda, reserve);
-    }
-
-    function f(uint128 x, uint256 lambda) internal pure returns (uint256) {
-        return ONE + ((lambda * uint128(ExpMath.log_2(int128(x)))) >> 64);
+        return h(usedReserve + x, pole, slope, reserve) - h(usedReserve, pole, slope, reserve);
     }
 
     function h(
         uint256 x,
-        uint256 lambda,
+        uint256 pole,
+        uint256 slope,
         uint256 reserve
     ) internal pure returns (uint256) {
-        return (x * f(uint128((reserve << 64) / ((reserve - x))), lambda)) >> 64;
+        return (x * f(uint128(((reserve - x) << 64) / reserve), pole, slope)) >> 64;
+    }
+
+    function f(
+        uint256 x,
+        uint256 pole,
+        uint256 slope
+    ) internal pure returns (uint256) {
+        if (x <= pole) return type(uint128).max;
+        return (((ONE - pole) * slope)) / (x - pole) + (ONE - slope);
     }
 }

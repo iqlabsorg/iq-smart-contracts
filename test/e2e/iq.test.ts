@@ -95,9 +95,9 @@ describe('IQ Protocol E2E', () => {
   });
 
   describe('Lend-Borrow-Return-Withdraw', () => {
-    const LEND_AMOUNT = ONE_TOKEN * 1000000n;
+    const LEND_AMOUNT = ONE_TOKEN * 1_000_000n;
     const BORROW_AMOUNT = ONE_TOKEN * 50n;
-    const MAX_PAYMENT_AMOUNT = ONE_TOKEN * 5000000n;
+    const MAX_PAYMENT_AMOUNT = ONE_TOKEN * 5_000_000n;
     let powerToken: PowerToken;
     let liquidityTokenId: BigNumber;
 
@@ -124,6 +124,18 @@ describe('IQ Protocol E2E', () => {
     });
 
     it('should borrow-return-remove liquidity', async () => {
+      console.log(
+        'Estimate:',
+        (
+          await enterprise.estimateLoan(
+            powerToken.address,
+            token.address,
+            BORROW_AMOUNT,
+            ONE_DAY
+          )
+        ).toString()
+      );
+
       // 4. Borrow
       const borrowTx = await borrow(
         enterprise,

@@ -76,11 +76,16 @@
     },
     {
       "inputs": [],
-      "name": "getBondingLambda",
+      "name": "getBondingCurve",
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "",
+          "name": "pole",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "slope",
           "type": "uint256"
         }
       ],
@@ -614,11 +619,16 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "lambda",
+          "name": "pole",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "slope",
           "type": "uint256"
         }
       ],
-      "name": "setBondingLambda",
+      "name": "setBondingCurve",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

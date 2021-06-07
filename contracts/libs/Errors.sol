@@ -110,4 +110,6 @@ library Errors {
 
     string internal constant E_ENTERPRISE_SHUTDOWN = "75";
     string internal constant E_INVALID_LOAN_AMOUNT = "76";
+    string internal constant ES_INVALID_BONDING_POLE = "77";
+    string internal constant ES_INVALID_BONDING_SLOPE = "78";
 }

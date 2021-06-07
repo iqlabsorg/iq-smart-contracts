@@ -102,7 +102,8 @@ abstract contract EnterpriseStorage is InitializableOwnable {
      */
     uint256 internal _totalShares;
 
-    uint256 internal _bondingLambda;
+    uint256 internal _bondingSlope;
+    uint256 internal _bondingPole;
 
     string internal _name;
     string internal _baseUri;
@@ -147,7 +148,8 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         _interestGapHalvingPeriod = 4 hours;
         _borrowerLoanReturnGracePeriod = 12 hours;
         _enterpriseLoanCollectGracePeriod = 1 days;
-        _bondingLambda = 1 << 64;
+        _bondingPole = uint256(5 << 64) / 100; // 5%
+        _bondingSlope = uint256(3 << 64) / 10; // 0.3
     }
 
     function initializeTokens(
@@ -282,8 +284,8 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         return getReserve() - _usedReserve;
     }
 
-    function getBondingLambda() external view returns (uint256) {
-        return _bondingLambda;
+    function getBondingCurve() external view returns (uint256 pole, uint256 slope) {
+        return (_bondingPole, _bondingSlope);
     }
 
     function setEnterpriseCollector(address newCollector) external onlyOwner {
@@ -301,8 +303,11 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         _converter = newConverter;
     }
 
-    function setBondingLambda(uint256 lambda) external onlyOwner {
-        _bondingLambda = lambda;
+    function setBondingCurve(uint256 pole, uint256 slope) external onlyOwner {
+        require(pole <= uint256(3 << 64) / 10, Errors.ES_INVALID_BONDING_POLE); // max is 30%
+        require(slope <= (1 << 64), Errors.ES_INVALID_BONDING_SLOPE);
+        _bondingPole = pole;
+        _bondingSlope = slope;
     }
 
     function setBorrowerLoanReturnGracePeriod(uint32 newPeriod) external onlyOwner {

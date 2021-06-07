@@ -24,12 +24,16 @@ import {
   estimateLoan,
   fromTokens,
   getBorrowToken,
+  getInterestToken,
+  getInterestTokenId,
   getProxyImplementation,
   getTokenId,
   increaseTime,
+  nextBlock,
   ONE_DAY,
   ONE_HOUR,
   registerService,
+  setNextBlockTimestamp,
   toTokens,
 } from './utils';
 import {Wallet} from '@ethersproject/wallet';
@@ -514,6 +518,12 @@ describe('Enterprise', () => {
         ONE_TOKEN * 400n,
         borrower
       );
+      const borrowReceipt = await borrowTx1.wait();
+
+      const borrowBlock = await ethers.provider.getBlock(
+        borrowReceipt.blockNumber
+      );
+      const borrowTimestamp = borrowBlock.timestamp;
 
       const borrower1Paid = borrowerBalance1.sub(
         await token.balanceOf(borrower.address)
@@ -521,27 +531,28 @@ describe('Enterprise', () => {
 
       const borrowTokenId1 = await getTokenId(enterprise, borrowTx1);
 
-      await increaseTime(ONE_HOUR * 4);
+      await nextBlock(borrowTimestamp + ONE_HOUR * 4);
 
       expect(
         toTokens(await enterprise.getOwedInterest(tokenId1), 3)
       ).to.approximately(toTokens(borrower1Paid.div(2), 3), 0.001);
 
-      await increaseTime(ONE_HOUR * 4);
+      await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
+      await expect(enterprise.removeLiquidity(tokenId1)).to.be.revertedWith(
+        '46'
+      );
+
+      await setNextBlockTimestamp(borrowTimestamp + ONE_HOUR * 8);
+      const liquidityTx = await enterprise.addLiquidity(ONE_TOKEN * 2_000n);
+      const tokenId2 = await getInterestTokenId(enterprise, liquidityTx);
 
       expect(
         toTokens(await enterprise.getOwedInterest(tokenId1), 3)
       ).to.approximately(toTokens(borrower1Paid.mul(3).div(4), 3), 0.001);
 
-      await expect(enterprise.removeLiquidity(tokenId1)).to.be.revertedWith(
-        '46'
-      );
-
-      const tokenId2 = await addLiquidity(enterprise, ONE_TOKEN * 2_000n);
-
       expect(await enterprise.getOwedInterest(tokenId2)).to.eq(0);
 
-      await increaseTime(ONE_HOUR * 4);
+      await nextBlock(borrowTimestamp + ONE_HOUR * 12);
 
       const [L1, L2] = await Promise.all([
         enterprise.getLiquidityInfo(tokenId1),
@@ -549,9 +560,8 @@ describe('Enterprise', () => {
       ]);
 
       const LP2interest = borrower1Paid
-        .div(8)
         .mul(L2.shares)
-        .div(L1.shares.add(L2.shares));
+        .div(L1.shares.add(L2.shares).mul(8));
 
       expect(
         toTokens(await enterprise.getOwedInterest(tokenId2), 3)

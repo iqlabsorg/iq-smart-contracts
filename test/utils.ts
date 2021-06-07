@@ -27,6 +27,10 @@ export const increaseTime = async (seconds: number): Promise<void> => {
   const time = await currentTime();
   await nextBlock(time + seconds);
 };
+export const setNextBlockTimestamp = async (
+  timestamp: number
+): Promise<unknown> =>
+  ethers.provider.send('evm_setNextBlockTimestamp', [timestamp]);
 export const currentTime = async (): Promise<number> => {
   const block = await ethers.provider.getBlock('latest');
   return block.timestamp;
@@ -202,12 +206,13 @@ export const estimateLoan = (
   usedReserves: number,
   amount: number,
   duration: number,
-  lambda = 1.0
+  pole = 0.05,
+  slope = 0.3
 ): number => {
   return g(amount) * basePrice * duration;
 
   function f(x: number) {
-    return 1.0 - lambda * Math.log2(x);
+    return ((1.0 - pole) * slope) / (x - pole) + (1.0 - slope);
   }
 
   function h(x: number) {

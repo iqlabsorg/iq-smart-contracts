@@ -326,7 +326,7 @@ contract Enterprise is EnterpriseStorage {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
 
         uint256 liquidity = _sharesToLiquidity(liquidityInfo.shares);
-        // Due to rounding errors calculated liquidity could insignificantly
+        // Due to rounding errors calculated liquidity could be insignificantly
         // less than provided liquidity
         return liquidity <= liquidityInfo.amount ? 0 : liquidity - liquidityInfo.amount;
     }
