@@ -212,7 +212,10 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
         bytes memory _data
     ) internal virtual {
         _transfer(from, to, tokenId);
-        require(_checkOnERC721Received(from, to, tokenId, _data), Errors.ERC721_TRANSFER_TO_NON_ERC721RECEIVER_IMPLEMENTER);
+        require(
+            _checkOnERC721Received(from, to, tokenId, _data),
+            Errors.ERC721_TRANSFER_TO_NON_ERC721RECEIVER_IMPLEMENTER
+        );
     }
 
     /**

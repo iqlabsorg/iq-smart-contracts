@@ -4,6 +4,7 @@ chai.use(waffle.solidity);
 const {expect} = chai;
 
 import {
+  BorrowToken,
   Enterprise,
   ERC20Mock,
   ERC20Mock__factory,
@@ -22,7 +23,8 @@ import {
   deployEnterprise,
   estimateLoan,
   fromTokens,
-  getInterestTokenId,
+  getBorrowToken,
+  getProxyImplementation,
   getTokenId,
   increaseTime,
   ONE_DAY,
@@ -42,7 +44,7 @@ describe('Enterprise', () => {
   let enterprise: Enterprise;
   let token: IERC20Metadata;
   const ONE_TOKEN = 10n ** 18n;
-  const HALF_LIFE = ONE_DAY;
+  const GAP_HALVING_PERIOD = ONE_DAY;
   const BASE_RATE = baseRate(
     100n * ONE_TOKEN,
     BigInt(ONE_DAY),
@@ -71,7 +73,7 @@ describe('Enterprise', () => {
 
       powerToken = await registerService(
         enterprise,
-        HALF_LIFE,
+        GAP_HALVING_PERIOD,
         BASE_RATE,
         token.address,
         300, // 3%
@@ -138,10 +140,7 @@ describe('Enterprise', () => {
       });
 
       it('should be possible to remove liquidity', async () => {
-        const liquidityTx = await enterprise
-          .connect(lender)
-          .addLiquidity(ONE_TOKEN);
-        const tokenId = await getInterestTokenId(enterprise, liquidityTx);
+        const tokenId = await addLiquidity(enterprise, ONE_TOKEN, lender);
 
         await enterprise.connect(lender).removeLiquidity(tokenId);
 
@@ -150,10 +149,7 @@ describe('Enterprise', () => {
       });
 
       it('should be possible to transfer interest token', async () => {
-        const liquidityTx = await enterprise
-          .connect(lender)
-          .addLiquidity(ONE_TOKEN);
-        const tokenId = await getInterestTokenId(enterprise, liquidityTx);
+        const tokenId = await addLiquidity(enterprise, ONE_TOKEN, lender);
 
         await interestToken
           .connect(lender)
@@ -164,10 +160,8 @@ describe('Enterprise', () => {
       });
 
       it('should be possible to remove liquidity on transfered interest token', async () => {
-        const liquidityTx = await enterprise
-          .connect(lender)
-          .addLiquidity(ONE_TOKEN);
-        const tokenId = await getInterestTokenId(enterprise, liquidityTx);
+        const tokenId = await addLiquidity(enterprise, ONE_TOKEN, lender);
+
         await interestToken
           .connect(lender)
           .transferFrom(lender.address, stranger.address, tokenId);
@@ -280,7 +274,7 @@ describe('Enterprise', () => {
       beforeEach(async () => {
         powerToken = await registerService(
           enterprise,
-          HALF_LIFE,
+          GAP_HALVING_PERIOD,
           BASE_RATE,
           token.address,
           300, // 3%
@@ -326,7 +320,7 @@ describe('Enterprise', () => {
       beforeEach(async () => {
         powerToken = await registerService(
           enterprise,
-          HALF_LIFE,
+          GAP_HALVING_PERIOD,
           baseRate(
             100n * ONE_TOKEN,
             BigInt(ONE_DAY),
@@ -410,13 +404,74 @@ describe('Enterprise', () => {
     });
   });
 
+  describe('withdraw interest', () => {
+    let powerToken: PowerToken;
+    beforeEach(async () => {
+      enterprise = await deployEnterprise('Test', token.address);
+      powerToken = await registerService(
+        enterprise,
+        GAP_HALVING_PERIOD,
+        baseRate(100n * ONE_TOKEN, BigInt(ONE_DAY), ONE_TOKEN * 3n),
+        token.address,
+        0, // 0%
+        ONE_HOUR * 12,
+        ONE_DAY * 60,
+        0,
+        true
+      );
+      await token.transfer(lender.address, ONE_TOKEN * 10_000n);
+      await token.transfer(borrower.address, ONE_TOKEN * 1_000n);
+    });
+
+    it('should be possible to withdraw interest', async () => {
+      const tokenId = await addLiquidity(
+        enterprise,
+        ONE_TOKEN * 10_000n,
+        lender
+      );
+      const loanCost = await enterprise.estimateLoan(
+        powerToken.address,
+        token.address,
+        ONE_TOKEN * 1_000n,
+        ONE_DAY * 15
+      );
+      await borrow(
+        enterprise,
+        powerToken,
+        token,
+        ONE_TOKEN * 1_000n,
+        ONE_DAY * 15,
+        ONE_TOKEN * 1_000n,
+        borrower
+      );
+      await increaseTime(ONE_DAY * 50);
+      const [, , totalSharesBefore] = await enterprise.getInfo();
+      const liquidityInfoBefore = await enterprise.getLiquidityInfo(tokenId);
+      const balanceBefore = await token.balanceOf(lender.address);
+      const reservesBefore = await enterprise.getReserve();
+
+      await enterprise.connect(lender).withdrawInterest(tokenId);
+
+      const liquidityInfoAfter = await enterprise.getLiquidityInfo(tokenId);
+      const balanceAfter = await token.balanceOf(lender.address);
+      expect(toTokens(loanCost, 5)).to.approximately(
+        toTokens(balanceAfter.sub(balanceBefore).toBigInt(), 5),
+        0.00001
+      );
+      const shares = totalSharesBefore
+        .mul(liquidityInfoBefore.amount)
+        .div(reservesBefore);
+      expect(liquidityInfoAfter.shares).to.eq(shares);
+    });
+  });
+
   describe('multi borrow scenario', () => {
     let powerToken: IPowerToken;
     beforeEach(async () => {
       enterprise = await deployEnterprise('Test', token.address);
       powerToken = await registerService(
         enterprise,
-        HALF_LIFE,
+        GAP_HALVING_PERIOD,
         baseRate(100n * ONE_TOKEN, BigInt(ONE_DAY), ONE_TOKEN * 3n),
         token.address,
         0, // 0%
@@ -428,9 +483,8 @@ describe('Enterprise', () => {
       await token.transfer(borrower.address, ONE_TOKEN * 1000n);
     });
 
-    it('add-borrow-add-borrow-return-return-remove', async () => {
-      const liquidityTx1 = await addLiquidity(enterprise, ONE_TOKEN * 10_000n);
-      const tokenId1 = await getInterestTokenId(enterprise, liquidityTx1);
+    it('scenario', async () => {
+      const tokenId1 = await addLiquidity(enterprise, ONE_TOKEN * 10_000n);
 
       expect(await enterprise.getOwedInterest(tokenId1)).to.eq(0);
 
@@ -483,9 +537,7 @@ describe('Enterprise', () => {
         '46'
       );
 
-      const liquidityTx2 = await addLiquidity(enterprise, ONE_TOKEN * 1_000n);
-
-      const tokenId2 = await getInterestTokenId(enterprise, liquidityTx2);
+      const tokenId2 = await addLiquidity(enterprise, ONE_TOKEN * 2_000n);
 
       expect(await enterprise.getOwedInterest(tokenId2)).to.eq(0);
 
@@ -505,13 +557,271 @@ describe('Enterprise', () => {
         toTokens(await enterprise.getOwedInterest(tokenId2), 3)
       ).to.approximately(toTokens(LP2interest, 3), 0.001);
 
+      await increaseTime(ONE_DAY * 5);
+
       await enterprise.removeLiquidity(tokenId1);
+      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
+        '46'
+      );
+      await enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n);
+      const loanInfo2 = await enterprise.getLiquidityInfo(tokenId2);
+      expect(loanInfo2.amount).to.eq(ONE_TOKEN * 1_990n);
+
+      await expect(
+        enterprise.connect(stranger).returnLoan(borrowTokenId1)
+      ).to.be.revertedWith('53');
+
+      await increaseTime(ONE_DAY * 5);
+
+      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
+        '46'
+      );
+      await expect(
+        enterprise.connect(stranger).returnLoan(borrowTokenId1)
+      ).to.be.revertedWith('54'); // still cannot return loan
+
+      await increaseTime(ONE_DAY);
+
+      await enterprise.connect(stranger).returnLoan(borrowTokenId1);
+
+      await expect(
+        enterprise.connect(borrower).returnLoan(borrowTokenId1)
+      ).to.be.revertedWith('48');
+
+      await enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 1_990n);
+
+      expect(await enterprise.getOwedInterest(tokenId2))
+        .to.eq(await enterprise.getAvailableReserve())
+        .to.eq(await enterprise.getReserve());
+
+      await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
+      await enterprise.increaseLiquidity(tokenId2, ONE_TOKEN * 2_000n);
+
+      const loanInfo3 = await enterprise.getLiquidityInfo(tokenId2);
+      expect(loanInfo3.amount).to.eq(ONE_TOKEN * 2_000n);
+
+      const interest = await enterprise.getOwedInterest(tokenId2);
+
+      expect(await enterprise.getReserve()).to.eq(
+        interest.add(ONE_TOKEN * 2000n)
+      );
     });
   });
 
   describe('Enterprise upgradabilitiy', () => {
     beforeEach(async () => {
       enterprise = await deployEnterprise('Test', token.address);
+    });
+
+    it('should be possible upgrade Enterprise', async () => {
+      const Enterprise = await ethers.getContractFactory('Enterprise');
+      const enterpriseImpl = await Enterprise.deploy();
+
+      await enterprise.upgradeEnterprise(enterpriseImpl.address);
+
+      expect(await getProxyImplementation(enterprise, enterprise)).eq(
+        enterpriseImpl.address
+      );
+    });
+
+    it('should be possible upgrade PowerToken', async () => {
+      const powerToken = await registerService(
+        enterprise,
+        GAP_HALVING_PERIOD,
+        BASE_RATE,
+        token.address,
+        0,
+        0,
+        0,
+        0,
+        true
+      );
+
+      const PowerToken = await ethers.getContractFactory('PowerToken');
+      const powerTokenImpl = await PowerToken.deploy();
+
+      await enterprise.upgradePowerToken(
+        powerToken.address,
+        powerTokenImpl.address
+      );
+
+      expect(await getProxyImplementation(enterprise, powerToken)).eq(
+        powerTokenImpl.address
+      );
+    });
+
+    it('should be possible to upgrade BorrowToken', async () => {
+      const BorrowToken = await ethers.getContractFactory('BorrowToken');
+      const borrowToken = BorrowToken.attach(await enterprise.getBorrowToken());
+      const borrowTokenImpl = await BorrowToken.deploy();
+
+      await enterprise.upgradeBorrowToken(borrowTokenImpl.address);
+
+      expect(await getProxyImplementation(enterprise, borrowToken)).eq(
+        borrowTokenImpl.address
+      );
+    });
+
+    it('should be possible to upgrade InterestToken', async () => {
+      const InterestToken = await ethers.getContractFactory('InterestToken');
+      const interestToken = InterestToken.attach(
+        await enterprise.getInterestToken()
+      );
+      const interestTokenImpl = await InterestToken.deploy();
+
+      await enterprise.upgradeInterestToken(interestTokenImpl.address);
+
+      expect(await getProxyImplementation(enterprise, interestToken)).eq(
+        interestTokenImpl.address
+      );
+    });
+  });
+
+  describe('After enterprise shutdown', () => {
+    let powerToken: PowerToken;
+    let tokenId: BigNumber;
+    let borrowId: BigNumber;
+    beforeEach(async () => {
+      enterprise = await deployEnterprise('Test', token.address);
+      powerToken = await registerService(
+        enterprise,
+        GAP_HALVING_PERIOD,
+        BASE_RATE,
+        token.address,
+        0,
+        0,
+        ONE_DAY * 365,
+        0,
+        true
+      );
+      tokenId = await addLiquidity(enterprise, ONE_TOKEN * 10_000n);
+      await token.transfer(borrower.address, ONE_TOKEN * 1000n);
+      const borrowTx = await borrow(
+        enterprise,
+        powerToken,
+        token,
+        ONE_TOKEN * 500n,
+        ONE_DAY,
+        ONE_TOKEN * 1000n,
+        borrower
+      );
+
+      borrowId = await getTokenId(enterprise, borrowTx);
+
+      await enterprise.shutdownEnterpriseForever();
+    });
+
+    it('should not be possible to add liquidity', async () => {
+      await expect(addLiquidity(enterprise, ONE_TOKEN)).to.be.reverted;
+    });
+
+    it('should not be possible to increase liquidity', async () => {
+      await expect(enterprise.increaseLiquidity(tokenId, ONE_TOKEN)).to.be
+        .reverted;
+    });
+
+    it('should not be possible to borrow', async () => {
+      await expect(
+        borrow(
+          enterprise,
+          powerToken,
+          token,
+          ONE_TOKEN * 500n,
+          ONE_DAY,
+          ONE_TOKEN * 1000n,
+          borrower
+        )
+      ).to.be.reverted;
+    });
+
+    it('should to be possible to reborrow', async () => {
+      await expect(
+        enterprise.reborrow(
+          borrowId,
+          token.address,
+          ONE_DAY,
+          ONE_TOKEN * 1_000n
+        )
+      ).to.be.reverted;
+    });
+
+    it('should be possible to remove liquidity without returning loan', async () => {
+      await enterprise.removeLiquidity(tokenId);
+    });
+
+    it('should be possible to return loan', async () => {
+      await enterprise.connect(borrower).returnLoan(borrowId);
+    });
+
+    it('should be possible to decrease liquidity', async () => {
+      await enterprise.decreaseLiquidity(tokenId, ONE_TOKEN);
+    });
+
+    it('should be possible to withdraw interest', async () => {
+      await enterprise.withdrawInterest(tokenId);
+    });
+  });
+
+  describe('PowerToken transfer', () => {
+    let powerToken: PowerToken;
+    let borrowToken: BorrowToken;
+    let borrowId: BigNumber;
+    beforeEach(async () => {
+      enterprise = await deployEnterprise('Test', token.address);
+
+      borrowToken = await getBorrowToken(enterprise);
+
+      powerToken = await registerService(
+        enterprise,
+        GAP_HALVING_PERIOD,
+        BASE_RATE,
+        token.address,
+        300, // 3%
+        ONE_HOUR * 12,
+        ONE_DAY * 60,
+        ONE_TOKEN,
+        true
+      );
+
+      await token.transfer(borrower.address, ONE_TOKEN * 1_000n);
+
+      await addLiquidity(enterprise, ONE_TOKEN * 10_000n);
+      const borrowTx = await borrow(
+        enterprise,
+        powerToken,
+        token,
+        ONE_TOKEN * 100n,
+        ONE_DAY,
+        ONE_TOKEN * 100n,
+        borrower
+      );
+      borrowId = await getTokenId(enterprise, borrowTx);
+    });
+
+    it('should not be possible to move borrowed PowerToken directly', async () => {
+      await expect(powerToken.transfer(stranger.address, ONE_TOKEN * 100n)).to
+        .be.reverted;
+    });
+
+    it('should be possible to move borrowed PowerToken by moving BorrowToken', async () => {
+      await borrowToken
+        .connect(borrower)
+        .transferFrom(borrower.address, stranger.address, borrowId);
+
+      expect(await powerToken.balanceOf(borrower.address)).to.eq(0);
+      expect(await powerToken.balanceOf(stranger.address)).to.eq(
+        ONE_TOKEN * 100n
+      );
+    });
+
+    it('should not be possible to move expired borrowed PowerToken', async () => {
+      await increaseTime(ONE_DAY * 2);
+
+      await expect(
+        borrowToken
+          .connect(borrower)
+          .transferFrom(borrower.address, stranger.address, borrowId)
+      ).to.be.reverted;
     });
   });
 });

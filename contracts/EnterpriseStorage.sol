@@ -20,7 +20,7 @@ import "./libs/Errors.sol";
  * Governance system. For example: OpenZeppelin `TimelockController` contract can
  * be used as an `owner` of this contract
  */
-contract EnterpriseStorage is InitializableOwnable {
+abstract contract EnterpriseStorage is InitializableOwnable {
     struct LoanInfo {
         // slot 1, 0 bytes left
         uint112 amount; // 14 bytes
@@ -58,7 +58,7 @@ contract EnterpriseStorage is InitializableOwnable {
      */
     IBorrowToken internal _borrowToken;
     EnterpriseFactory internal _factory;
-    uint32 internal _interestHalfLife;
+    uint32 internal _interestGapHalvingPeriod;
     bool internal _enterpriseShutdown;
 
     IConverter internal _converter;
@@ -144,7 +144,7 @@ contract EnterpriseStorage is InitializableOwnable {
         _converter = converter;
         _enterpriseVault = owner;
         _enterpriseCollector = owner;
-        _interestHalfLife = 4 hours;
+        _interestGapHalvingPeriod = 4 hours;
         _borrowerLoanReturnGracePeriod = 12 hours;
         _enterpriseLoanCollectGracePeriod = 1 days;
         _bondingLambda = 1 << 64;
@@ -210,8 +210,8 @@ contract EnterpriseStorage is InitializableOwnable {
         return _enterpriseLoanCollectGracePeriod;
     }
 
-    function getInterestHalfLife() external view returns (uint32) {
-        return _interestHalfLife;
+    function getInterestGapHalvingPeriod() external view returns (uint32) {
+        return _interestGapHalvingPeriod;
     }
 
     function getConverter() external view returns (IConverter) {
@@ -229,7 +229,7 @@ contract EnterpriseStorage is InitializableOwnable {
             string memory name,
             string memory baseUri,
             uint256 totalShares,
-            uint32 interestHalfLife,
+            uint32 interestGapHalvingPeriod,
             uint32 borrowerLoanReturnGracePeriod,
             uint32 enterpriseLoanCollectGracePeriod,
             uint16 gcFeePercent,
@@ -244,7 +244,7 @@ contract EnterpriseStorage is InitializableOwnable {
             _name,
             _baseUri,
             _totalShares,
-            _interestHalfLife,
+            _interestGapHalvingPeriod,
             _borrowerLoanReturnGracePeriod,
             _enterpriseLoanCollectGracePeriod,
             _gcFeePercent,
@@ -261,10 +261,12 @@ contract EnterpriseStorage is InitializableOwnable {
     }
 
     function getLoanInfo(uint256 tokenId) external view returns (LoanInfo memory) {
+        _borrowToken.ownerOf(tokenId); // will throw on non existent tokenId
         return _loanInfo[tokenId];
     }
 
     function getLiquidityInfo(uint256 tokenId) external view returns (LiquidityInfo memory) {
+        _interestToken.ownerOf(tokenId); // will throw on non existent tokenId
         return _liquidityInfo[tokenId];
     }
 
@@ -319,9 +321,9 @@ contract EnterpriseStorage is InitializableOwnable {
         _baseUri = baseUri;
     }
 
-    function setInterestHalfLife(uint32 interestHalfLife) external onlyOwner {
-        require(interestHalfLife > 0, Errors.ES_INTEREST_HALF_LIFE_NOT_GT_0);
-        _interestHalfLife = interestHalfLife;
+    function setInterestGapHalvingPeriod(uint32 interestGapHalvingPeriod) external onlyOwner {
+        require(interestGapHalvingPeriod > 0, Errors.ES_INTEREST_GAP_HALVING_PERIOD_NOT_GT_0);
+        _interestGapHalvingPeriod = interestGapHalvingPeriod;
     }
 
     function upgradePowerToken(PowerToken powerToken, address implementation) external onlyOwner {
@@ -377,7 +379,7 @@ contract EnterpriseStorage is InitializableOwnable {
             ExpMath.halfLife(
                 _streamingReserveUpdated,
                 _streamingReserveTarget - _streamingReserve,
-                _interestHalfLife,
+                _interestGapHalvingPeriod,
                 uint32(block.timestamp)
             );
     }

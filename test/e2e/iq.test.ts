@@ -10,7 +10,6 @@ import {
   borrow,
   deployEnterprise,
   estimateLoan,
-  getInterestTokenId,
   getPowerToken,
   getTokenId,
   increaseTime,
@@ -89,7 +88,9 @@ describe('IQ Protocol E2E', () => {
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
       const powerToken = await getPowerToken(enterprise, await txPromise);
-      expect(await powerToken.gapHalvingPeriod()).to.equal(GAP_HALVING_PERIOD);
+      expect(await powerToken.getGapHalvingPeriod()).to.equal(
+        GAP_HALVING_PERIOD
+      );
     });
   });
 
@@ -116,12 +117,9 @@ describe('IQ Protocol E2E', () => {
       );
       powerToken = await getPowerToken(enterprise, tx);
 
-      // 2.1 Approve
-
-      const liquidityTx = await addLiquidity(enterprise, LEND_AMOUNT);
-
       // 3. Lend
-      liquidityTokenId = await getInterestTokenId(enterprise, liquidityTx);
+      liquidityTokenId = await addLiquidity(enterprise, LEND_AMOUNT);
+
       await token.transfer(user.address, MAX_PAYMENT_AMOUNT);
     });
 

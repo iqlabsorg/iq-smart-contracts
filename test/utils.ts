@@ -1,5 +1,5 @@
 import {BigNumber, BigNumberish} from '@ethersproject/bignumber';
-import {ContractTransaction} from 'ethers';
+import {Contract, ContractTransaction} from 'ethers';
 import {ethers} from 'hardhat';
 import {
   BorrowToken,
@@ -10,6 +10,7 @@ import {
   InterestToken,
   IPowerToken,
   PowerToken,
+  ProxyAdmin,
 } from '../typechain';
 import {Wallet} from '@ethersproject/wallet';
 
@@ -222,17 +223,41 @@ export const addLiquidity = async (
   enterprise: Enterprise,
   amount: BigNumberish,
   user?: Wallet
-): Promise<ContractTransaction> => {
+): Promise<BigNumber> => {
   const ERC20 = await ethers.getContractFactory('ERC20Mock');
   const token = ERC20.attach(await enterprise.getLiquidityToken());
 
   if (user) {
     await token.connect(user).approve(enterprise.address, amount);
-    return enterprise.connect(user).addLiquidity(amount);
+    return getInterestTokenId(
+      enterprise,
+      await enterprise.connect(user).addLiquidity(amount)
+    );
   } else {
     await token.approve(enterprise.address, amount);
-    return enterprise.addLiquidity(amount);
+    return getInterestTokenId(
+      enterprise,
+      await enterprise.addLiquidity(amount)
+    );
   }
+};
+
+export const getProxyAdmin = async (
+  enterprise: Enterprise
+): Promise<ProxyAdmin> => {
+  const proxyAdminAddress = await enterprise.getProxyAdmin();
+  const ProxyAdmin = await ethers.getContractFactory('ProxyAdmin');
+  return ProxyAdmin.attach(proxyAdminAddress) as ProxyAdmin;
+};
+
+export const getProxyImplementation = async (
+  enterprise: Enterprise,
+  proxy: Contract | string
+): Promise<string> => {
+  const proxyAdmin = await getProxyAdmin(enterprise);
+  return proxyAdmin.getProxyImplementation(
+    typeof proxy === 'string' ? proxy : proxy.address
+  );
 };
 
 export const borrow = async (

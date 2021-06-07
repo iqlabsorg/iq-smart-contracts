@@ -20,7 +20,7 @@ contract InterestToken is IInterestToken, EnterpriseOwnable, ERC721Enumerable {
     }
 
     function getNextTokenId() public view returns (uint256) {
-        return _tokenIdTracker;
+        return uint256(keccak256(abi.encodePacked("i", _tokenIdTracker)));
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -29,7 +29,7 @@ contract InterestToken is IInterestToken, EnterpriseOwnable, ERC721Enumerable {
     }
 
     function mint(address to) external override onlyEnterprise returns (uint256) {
-        uint256 tokenId = _tokenIdTracker;
+        uint256 tokenId = getNextTokenId();
         _safeMint(to, tokenId);
         _tokenIdTracker++;
         return tokenId;

@@ -2,7 +2,7 @@ import {ethers, waffle} from 'hardhat';
 import {expect} from 'chai';
 import {BigNumberish, Wallet} from 'ethers';
 import {Enterprise, ERC20Mock, PowerToken} from '../typechain';
-import {baseRate, deployEnterprise, registerService} from './utils';
+import {baseRate, deployEnterprise, ONE_DAY, registerService} from './utils';
 
 type EnegryTestCase = [BigNumberish, number, BigNumberish];
 
@@ -15,7 +15,7 @@ describe('PowerToken', function () {
   let enterprise: Enterprise;
   let powerToken: PowerToken;
 
-  const HALF_LIFE = 100;
+  const GAP_HALVING_PERIOD = 100;
 
   beforeEach(async () => {
     [user] = await waffle.provider.getWallets();
@@ -24,12 +24,12 @@ describe('PowerToken', function () {
 
     powerToken = await registerService(
       enterprise,
-      HALF_LIFE,
+      GAP_HALVING_PERIOD,
       baseRate(100n, 86400n, 3n),
       token.address,
       300,
       0,
-      86400 * 365,
+      ONE_DAY * 365,
       ONE_TOKEN,
       true
     );
@@ -38,8 +38,12 @@ describe('PowerToken', function () {
   describe('energy', () => {
     (
       [
-        [ONE_ETHER * 1000n, HALF_LIFE, ONE_ETHER * 500n],
-        [ONE_ETHER * 9999n, HALF_LIFE, ethers.utils.parseEther('4999.5')],
+        [ONE_ETHER * 1000n, GAP_HALVING_PERIOD, ONE_ETHER * 500n],
+        [
+          ONE_ETHER * 9999n,
+          GAP_HALVING_PERIOD,
+          ethers.utils.parseEther('4999.5'),
+        ],
       ] as EnegryTestCase[]
     ).forEach(([amount, period, expected], idx) => {
       it(`should calculate energy: ${idx}`, async () => {
@@ -59,6 +63,26 @@ describe('PowerToken', function () {
 
         expect(result).to.equal(expected);
       });
+    });
+  });
+
+  describe('Basic', () => {
+    it('should be possible to set base rate', async () => {
+      await powerToken.setBaseRate(5, token.address, ONE_TOKEN);
+      expect(await powerToken.getBaseRate()).to.eq(5);
+      expect(await powerToken.getMinGCFee()).to.eq(ONE_TOKEN);
+    });
+
+    it('should be possible to set service fee percent', async () => {
+      await powerToken.setServiceFeePercent(500);
+
+      expect(await powerToken.getServiceFeePercent()).to.eq(500);
+    });
+
+    it('should be possible to set loan duration limits', async () => {
+      await powerToken.setLoanDurationLimits(1, 200);
+      expect(await powerToken.getMinLoanDuration()).to.eq(1);
+      expect(await powerToken.getMaxLoanDuration()).to.eq(200);
     });
   });
 });

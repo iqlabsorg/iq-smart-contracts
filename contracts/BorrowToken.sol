@@ -20,8 +20,8 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
         ERC721.initialize(name, symbol);
     }
 
-    function getNextTokenId() external view override returns (uint256) {
-        return _tokenIdTracker;
+    function getNextTokenId() public view override returns (uint256) {
+        return uint256(keccak256(abi.encodePacked("b", _tokenIdTracker)));
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -30,19 +30,19 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
     }
 
     function mint(address to) external override onlyEnterprise returns (uint256) {
-        uint256 tokenId = _tokenIdTracker;
+        uint256 tokenId = getNextTokenId();
         _safeMint(to, tokenId);
         _tokenIdTracker++;
         return tokenId;
     }
 
     function burn(uint256 tokenId, address burner) external override onlyEnterprise {
-        _burn(tokenId);
-
         Enterprise enterprise = getEnterprise();
         Enterprise.LoanInfo memory loan = enterprise.getLoanInfo(tokenId);
         IERC20 paymentToken = IERC20(enterprise.paymentToken(loan.gcFeeTokenIndex));
         paymentToken.safeTransfer(burner, loan.gcFee);
+
+        _burn(tokenId);
     }
 
     function _beforeTokenTransfer(
