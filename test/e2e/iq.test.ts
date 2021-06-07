@@ -159,30 +159,27 @@ describe('IQ Protocol E2E', () => {
 
       const balanceBefore = await token.balanceOf(user.address);
 
-      await token.connect(user).approve(enterprise.address, MAX_PAYMENT_AMOUNT);
+      await borrow(
+        enterprise,
+        powerToken,
+        token,
+        BORROW1,
+        ONE_DAY,
+        MAX_PAYMENT_AMOUNT,
+        user
+      );
+      await borrow(
+        enterprise,
+        powerToken,
+        token,
+        BORROW2,
+        ONE_DAY,
+        MAX_PAYMENT_AMOUNT,
+        user
+      );
 
-      await enterprise
-        .connect(user)
-        .borrow(
-          powerToken.address,
-          token.address,
-          BORROW1,
-          MAX_PAYMENT_AMOUNT,
-          86400
-        );
-      await enterprise
-        .connect(user)
-        .borrow(
-          powerToken.address,
-          token.address,
-          BORROW2,
-          MAX_PAYMENT_AMOUNT,
-          86400
-        );
       const balanceAfter = await token.balanceOf(user.address);
-
       const diff = balanceBefore.toBigInt() - balanceAfter.toBigInt();
-
       expect(toTokens(diff, 8)).to.be.approximately(ONE_SHOT_BORROW_COST, 0.1);
     });
   });
