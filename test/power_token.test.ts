@@ -44,7 +44,7 @@ describe('PowerToken', function () {
     ).forEach(([amount, period, expected], idx) => {
       it(`should calculate energy: ${idx}`, async () => {
         await token.approve(powerToken.address, amount);
-        const tx = await enterprise.wrap(powerToken.address, amount);
+        const tx = await powerToken.wrap(amount);
 
         const block = await ethers.provider.getBlock(
           (

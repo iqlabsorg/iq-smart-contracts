@@ -7,7 +7,6 @@ import {
   EnterpriseFactory,
   IConverter,
   IERC20,
-  IEstimator,
   InterestToken,
   IPowerToken,
   PowerToken,
@@ -35,12 +34,8 @@ export const currentTime = async (): Promise<number> => {
 export const deployEnterprise = async (
   name: string,
   token: string,
-  converterAddress?: string,
-  estimatorImpl?: string
+  converterAddress?: string
 ): Promise<Enterprise> => {
-  const estimator = (await ethers.getContract(
-    'DefaultEstimator'
-  )) as IEstimator;
   const converter = (await ethers.getContract(
     'DefaultConverter'
   )) as IConverter;
@@ -49,11 +44,10 @@ export const deployEnterprise = async (
     'EnterpriseFactory'
   )) as EnterpriseFactory;
   const tx = await factory.deploy(
-    'Testing',
+    name,
     token,
     'https://test.iq.space',
     0, // 0% gc fee
-    estimatorImpl || estimator.address,
     converterAddress || converter.address
   );
 

@@ -70,7 +70,7 @@ library Errors {
     string internal constant E_INVALID_BASE_TOKEN_ADDRESS = "40";
     string internal constant E_SERVICE_LIMIT_REACHED = "41";
     string internal constant E_INVALID_LOAN_DURATION_RANGE = "42";
-    string internal constant E_SERVICE_HALF_LIFE_NOT_GT_0 = "43";
+    string internal constant E_SERVICE_GAP_HALVING_PERIOD_NOT_GT_0 = "43";
     string internal constant E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN = "44"; // Interest payment token is disabled or not supported
     string internal constant E_LOAN_DURATION_OUT_OF_RANGE = "45"; // Loan duration is out of allowed range
     string internal constant E_INSUFFICIENT_LIQUIDITY = "46";

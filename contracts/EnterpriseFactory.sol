@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "./Enterprise.sol";
-import "./interfaces/IEstimator.sol";
 import "./interfaces/IConverter.sol";
 import "./InterestToken.sol";
 import "./BorrowToken.sol";
@@ -49,24 +48,20 @@ contract EnterpriseFactory {
         IERC20Metadata liquidityToken,
         string calldata baseUri,
         uint16 gcFeePercent,
-        address estimatorImpl,
         IConverter converter
     ) external returns (Enterprise) {
         ProxyAdmin proxyAdmin = new ProxyAdmin();
 
         Enterprise enterprise = Enterprise(deployProxy(_enterpriseImpl, proxyAdmin));
         proxyAdmin.transferOwnership(address(enterprise));
-        IEstimator estimator = IEstimator(deployProxy(estimatorImpl, proxyAdmin));
         {
-            enterprise.initialize(name, baseUri, gcFeePercent, estimator, converter, proxyAdmin, msg.sender);
+            enterprise.initialize(name, baseUri, gcFeePercent, converter, proxyAdmin, msg.sender);
         }
         {
             InterestToken interestToken = _deployInterestToken(liquidityToken.symbol(), enterprise, proxyAdmin);
             BorrowToken borrowToken = _deployBorrowToken(liquidityToken.symbol(), enterprise, proxyAdmin);
             enterprise.initializeTokens(liquidityToken, interestToken, borrowToken);
         }
-
-        estimator.initialize(enterprise);
 
         emit EnterpriseDeployed(msg.sender, address(liquidityToken), name, baseUri, address(enterprise));
 

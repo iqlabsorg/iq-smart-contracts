@@ -33,7 +33,7 @@ import {
 import {Wallet} from '@ethersproject/wallet';
 import {BigNumber} from 'ethers';
 
-describe.only('Enterprise', () => {
+describe('Enterprise', () => {
   let deployer: Wallet;
   let lender: Wallet;
   let borrower: Wallet;
@@ -92,7 +92,7 @@ describe.only('Enterprise', () => {
         await token.transfer(user.address, ONE_TOKEN);
         await token.connect(user).approve(powerToken.address, ONE_TOKEN);
 
-        await enterprise.connect(user).wrap(powerToken.address, ONE_TOKEN);
+        await powerToken.connect(user).wrap(ONE_TOKEN);
       });
       it('should be possible to wrap liquidty tokens', async () => {
         expect(await powerToken.balanceOf(user.address)).to.eq(ONE_TOKEN);
@@ -101,7 +101,7 @@ describe.only('Enterprise', () => {
       });
 
       it('should be possible to unwrap liquidty tokens', async () => {
-        await enterprise.connect(user).unwrap(powerToken.address, ONE_TOKEN);
+        await powerToken.connect(user).unwrap(ONE_TOKEN);
 
         expect(await powerToken.balanceOf(user.address)).to.eq(0);
         expect(await token.balanceOf(powerToken.address)).to.eq(0);
@@ -118,9 +118,7 @@ describe.only('Enterprise', () => {
       it('should be possible to unwrap transferred power tokens', async () => {
         await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
 
-        await enterprise
-          .connect(stranger)
-          .unwrap(powerToken.address, ONE_TOKEN);
+        await powerToken.connect(stranger).unwrap(ONE_TOKEN);
 
         expect(await token.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
         expect(await powerToken.balanceOf(stranger.address)).to.eq(0);
@@ -430,7 +428,7 @@ describe.only('Enterprise', () => {
       await token.transfer(borrower.address, ONE_TOKEN * 1000n);
     });
 
-    it.only('add-borrow-add-borrow-return-return-remove', async () => {
+    it('add-borrow-add-borrow-return-return-remove', async () => {
       const liquidityTx1 = await addLiquidity(enterprise, ONE_TOKEN * 10_000n);
       const tokenId1 = await getInterestTokenId(enterprise, liquidityTx1);
 

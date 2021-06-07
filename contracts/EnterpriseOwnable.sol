@@ -33,4 +33,9 @@ abstract contract EnterpriseOwnable {
         require(address(_enterprise) == msg.sender, Errors.CALLER_NOT_ENTERPRISE);
         _;
     }
+
+    modifier onlyEnterpriseOwner() {
+        require(_enterprise.owner() == msg.sender, Errors.CALLER_NOT_OWNER);
+        _;
+    }
 }

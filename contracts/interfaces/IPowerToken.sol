@@ -15,17 +15,4 @@ interface IPowerToken is IERC20Metadata {
     function mint(address account, uint256 amount) external;
 
     function burnFrom(address account, uint256 amount) external;
-
-    function wrap(
-        IERC20 liquidityToken,
-        address from,
-        address to,
-        uint256 amount
-    ) external;
-
-    function unwrap(
-        IERC20 liquidityToken,
-        address from,
-        uint256 amount
-    ) external;
 }

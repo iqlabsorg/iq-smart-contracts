@@ -4,14 +4,17 @@ chai.use(waffle.solidity);
 const {expect} = chai;
 
 import {
+  addLiquidity,
   basePrice,
   baseRate,
+  borrow,
   deployEnterprise,
   estimateLoan,
   getInterestTokenId,
   getPowerToken,
   getTokenId,
   increaseTime,
+  ONE_DAY,
   toTokens,
 } from '../utils';
 import {
@@ -47,7 +50,7 @@ describe('IQ Protocol E2E', () => {
 
     describe('InterestToken', async () => {
       let interestToken: InterestToken;
-      before(async () => {
+      beforeEach(async () => {
         const token = await enterprise.getInterestToken();
         const InterestToken = await ethers.getContractFactory('InterestToken');
         interestToken = InterestToken.attach(token) as InterestToken;
@@ -67,14 +70,14 @@ describe('IQ Protocol E2E', () => {
     });
   });
 
-  const HALF_LIFE = 86400;
+  const GAP_HALVING_PERIOD = 86400;
   const BASE_RATE = baseRate(100n, 86400n, 3n);
   describe('Service', () => {
     it('should register service', async () => {
       const txPromise = enterprise.registerService(
         'IQ Power Test',
         'IQPT',
-        HALF_LIFE,
+        GAP_HALVING_PERIOD,
         BASE_RATE,
         token.address,
         300, // 3%
@@ -86,8 +89,7 @@ describe('IQ Protocol E2E', () => {
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
       const powerToken = await getPowerToken(enterprise, await txPromise);
-      const service = await enterprise.getService(powerToken.address);
-      expect(service[2].halfLife).to.equal(HALF_LIFE);
+      expect(await powerToken.gapHalvingPeriod()).to.equal(GAP_HALVING_PERIOD);
     });
   });
 
@@ -103,7 +105,7 @@ describe('IQ Protocol E2E', () => {
       const tx = await enterprise.registerService(
         'IQ Power Test',
         'IQPT',
-        HALF_LIFE,
+        GAP_HALVING_PERIOD,
         BASE_RATE,
         token.address,
         300, // 3%
@@ -115,26 +117,25 @@ describe('IQ Protocol E2E', () => {
       powerToken = await getPowerToken(enterprise, tx);
 
       // 2.1 Approve
-      await token.approve(enterprise.address, LEND_AMOUNT);
+
+      const liquidityTx = await addLiquidity(enterprise, LEND_AMOUNT);
+
       // 3. Lend
-      const liquidityTx = await enterprise.addLiquidity(LEND_AMOUNT);
       liquidityTokenId = await getInterestTokenId(enterprise, liquidityTx);
       await token.transfer(user.address, MAX_PAYMENT_AMOUNT);
     });
 
     it('should borrow-return-remove liquidity', async () => {
-      await token.connect(user).approve(enterprise.address, MAX_PAYMENT_AMOUNT);
-
       // 4. Borrow
-      const borrowTx = await enterprise
-        .connect(user)
-        .borrow(
-          powerToken.address,
-          token.address,
-          BORROW_AMOUNT,
-          MAX_PAYMENT_AMOUNT,
-          86400
-        );
+      const borrowTx = await borrow(
+        enterprise,
+        powerToken,
+        token,
+        BORROW_AMOUNT,
+        ONE_DAY,
+        MAX_PAYMENT_AMOUNT,
+        user
+      );
 
       await increaseTime(86400);
 
@@ -156,9 +157,10 @@ describe('IQ Protocol E2E', () => {
       const BORROW1 = ONE_TOKEN * 300000n;
       const BORROW2 = ONE_TOKEN * 200000n;
 
+      const balanceBefore = await token.balanceOf(user.address);
+
       await token.connect(user).approve(enterprise.address, MAX_PAYMENT_AMOUNT);
 
-      const balanceBefore = await token.balanceOf(user.address);
       await enterprise
         .connect(user)
         .borrow(
