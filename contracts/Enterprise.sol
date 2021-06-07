@@ -82,7 +82,7 @@ contract Enterprise is EnterpriseStorage {
 
             uint256 convertedLiquidityTokens = loanCost;
 
-            if (address(paymentToken) != address(powerToken.baseToken())) {
+            if (address(paymentToken) != address(powerToken.getBaseToken())) {
                 paymentToken.approve(address(_converter), loanCost);
                 convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
             }
@@ -101,7 +101,7 @@ contract Enterprise is EnterpriseStorage {
         uint256 tokenId = _borrowToken.getNextTokenId();
         _loanInfo[tokenId] = LoanInfo(
             amount,
-            powerToken.index(),
+            powerToken.getIndex(),
             borrowingTime,
             maturityTime,
             maturityTime + _borrowerLoanReturnGracePeriod,
@@ -143,7 +143,7 @@ contract Enterprise is EnterpriseStorage {
 
         paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
         uint256 convertedLiquidityTokens = loanCost;
-        if (address(paymentToken) != address(powerToken.baseToken())) {
+        if (address(paymentToken) != address(powerToken.getBaseToken())) {
             paymentToken.approve(address(_converter), loanCost);
             convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
         }
