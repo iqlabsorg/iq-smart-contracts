@@ -35,7 +35,7 @@ contract Enterprise is EnterpriseStorage {
         {
             string memory tokenSymbol = _liquidityToken.symbol();
             string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", symbol));
-            powerToken.initialize(serviceName, powerTokenSymbol);
+            powerToken.initialize(serviceName, powerTokenSymbol, _liquidityToken.decimals());
         }
         powerToken.initialize(
             this,
