@@ -41,7 +41,7 @@ abstract contract InitializableOwnable {
      * @dev Transfers ownership of the contract to a new account (`newOwner`).
      * Can only be called by the current owner.
      */
-    function transferOwnership(address newOwner) public virtual onlyOwner {
+    function transferOwnership(address newOwner) external virtual onlyOwner {
         require(newOwner != address(0), Errors.IO_INVALID_OWNER_ADDRESS);
         emit OwnershipTransferred(owner(), newOwner);
         StorageSlot.getAddressSlot(_OWNER_SLOT).value = newOwner;

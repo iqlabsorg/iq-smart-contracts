@@ -79,21 +79,21 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
     /**
      * @dev See {IERC721Metadata-name}.
      */
-    function name() public view virtual override returns (string memory) {
+    function name() external view virtual override returns (string memory) {
         return _name;
     }
 
     /**
      * @dev See {IERC721Metadata-symbol}.
      */
-    function symbol() public view virtual override returns (string memory) {
+    function symbol() external view virtual override returns (string memory) {
         return _symbol;
     }
 
     /**
      * @dev See {IERC721Metadata-tokenURI}.
      */
-    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+    function tokenURI(uint256 tokenId) external view virtual override returns (string memory) {
         require(_exists(tokenId), Errors.ERC721META_URI_QUERY_FOR_NONEXISTENT_TOKEN);
 
         string memory baseURI = _baseURI();
@@ -111,7 +111,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
     /**
      * @dev See {IERC721-approve}.
      */
-    function approve(address to, uint256 tokenId) public virtual override {
+    function approve(address to, uint256 tokenId) external virtual override {
         address owner = ERC721.ownerOf(tokenId);
         require(to != owner, Errors.ERC721_APPROVAL_TO_CURRENT_OWNER);
 
@@ -135,7 +135,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
     /**
      * @dev See {IERC721-setApprovalForAll}.
      */
-    function setApprovalForAll(address operator, bool approved) public virtual override {
+    function setApprovalForAll(address operator, bool approved) external virtual override {
         require(operator != msg.sender, Errors.ERC721_APPROVE_TO_CALLER);
 
         _operatorApprovals[msg.sender][operator] = approved;
@@ -156,7 +156,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
         address from,
         address to,
         uint256 tokenId
-    ) public virtual override {
+    ) external virtual override {
         //solhint-disable-next-line max-line-length
         require(_isApprovedOrOwner(msg.sender, tokenId), Errors.ERC721_TRANSFER_CALLER_IS_NOT_OWNER_NOR_APPROVED);
 
@@ -170,7 +170,7 @@ contract ERC721 is ERC165, IERC721, IERC721Metadata {
         address from,
         address to,
         uint256 tokenId
-    ) public virtual override {
+    ) external virtual override {
         safeTransferFrom(from, to, tokenId, "");
     }
 

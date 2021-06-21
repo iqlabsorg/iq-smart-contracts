@@ -24,10 +24,13 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
     uint32 internal _maxLoanDuration;
     uint16 internal _serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
     bool internal _allowsPerpetual; // allows wrapping tokens into perpetual PowerTokens
-    // slot 3
-    uint256 internal _lambda;
 
     mapping(address => State) internal _states;
+
+    event BaseRateChanged(uint112 baseRate, address baseToken, uint96 minGCFee);
+    event ServiceFeePercentChanged(uint16 percent);
+    event LoanDurationLimitsChanged(uint32 minDuration, uint32 maxDuration);
+    event PerpetualAllowed();
 
     function initialize(
         Enterprise enterprise,
@@ -56,28 +59,33 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
         _maxLoanDuration = maxLoanDuration;
         _serviceFeePercent = serviceFeePercent;
         _allowsPerpetual = allowsPerpetual;
-    }
-
-    function setLambda(uint256 lambda) public onlyEnterpriseOwner {
-        _lambda = lambda;
+        emit BaseRateChanged(baseRate, address(baseToken), minGCFee);
+        emit ServiceFeePercentChanged(serviceFeePercent);
+        emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
+        if (allowsPerpetual) {
+            emit PerpetualAllowed();
+        }
     }
 
     function setBaseRate(
         uint112 baseRate,
         IERC20Metadata baseToken,
         uint96 minGCFee
-    ) public onlyEnterpriseOwner {
+    ) external onlyEnterpriseOwner {
         require(address(_baseToken) != address(0), Errors.ES_INVALID_BASE_TOKEN_ADDRESS);
 
         _baseRate = baseRate;
         _baseToken = baseToken;
         _minGCFee = minGCFee;
+
+        emit BaseRateChanged(baseRate, address(baseToken), minGCFee);
     }
 
     function setServiceFeePercent(uint16 newServiceFeePercent) external onlyEnterpriseOwner {
         require(newServiceFeePercent <= MAX_SERVICE_FEE_PERCENT, Errors.ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED);
 
         _serviceFeePercent = newServiceFeePercent;
+        emit ServiceFeePercentChanged(newServiceFeePercent);
     }
 
     function setLoanDurationLimits(uint32 minLoanDuration, uint32 maxLoanDuration) external onlyEnterpriseOwner {
@@ -85,12 +93,14 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
 
         _minLoanDuration = minLoanDuration;
         _maxLoanDuration = maxLoanDuration;
+        emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
     }
 
     function allowPerpetualForever() external onlyEnterpriseOwner {
-        require(_allowsPerpetual == false, Errors.ES_PERPETUAL_TOKENS_ALREADY_ALLOWED);
+        require(!_allowsPerpetual, Errors.ES_PERPETUAL_TOKENS_ALREADY_ALLOWED);
 
         _allowsPerpetual = true;
+        emit PerpetualAllowed();
     }
 
     function isAllowedLoanDuration(uint32 duration) public view returns (bool) {
@@ -131,10 +141,6 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
 
     function getAllowsPerpetual() external view returns (bool) {
         return _allowsPerpetual;
-    }
-
-    function getLambda() external view returns (uint256) {
-        return _lambda;
     }
 
     function getState(address account) external view returns (State memory) {

@@ -29,7 +29,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         return balanceOf(account) - _states[account].lockedBalance;
     }
 
-    function energyAt(address who, uint32 timestamp) public view returns (uint112) {
+    function energyAt(address who, uint32 timestamp) external view returns (uint112) {
         State memory state = _states[who];
         return _getEnergy(state, who, timestamp);
     }
@@ -125,7 +125,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
      * One must approve sufficient amount of liquidity tokens to
      * corresponding PowerToken address before calling this function
      */
-    function wrap(uint256 amount) public returns (bool) {
+    function wrap(uint256 amount) external returns (bool) {
         return _wrapTo(msg.sender, amount);
     }
 
@@ -135,12 +135,12 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
      * One must approve sufficient amount of liquidity tokens to
      * corresponding PowerToken address before calling this function
      */
-    function wrapTo(address to, uint256 amount) public returns (bool) {
+    function wrapTo(address to, uint256 amount) external returns (bool) {
         return _wrapTo(to, amount);
     }
 
     function _wrapTo(address to, uint256 amount) internal returns (bool) {
-        require(_allowsPerpetual == true, Errors.E_WRAPPING_NOT_ALLOWED);
+        require(_allowsPerpetual, Errors.E_WRAPPING_NOT_ALLOWED);
 
         getEnterprise().getLiquidityToken().safeTransferFrom(msg.sender, address(this), amount);
         _mint(to, amount, false);
@@ -174,7 +174,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         uint112 amount,
         uint32 duration
     )
-        public
+        external
         view
         returns (
             uint112 interest,
@@ -202,10 +202,10 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         require(isAllowedLoanDuration(duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
 
         uint112 loanBaseCost = estimateCost(amount, duration);
-        uint112 serviceBaseFee = uint112((uint256(loanBaseCost) * _serviceFeePercent) / 10_000);
+        uint256 serviceBaseFee = (uint256(loanBaseCost) * _serviceFeePercent) / 10_000;
         uint256 loanCost = getEnterprise().getConverter().estimateConvert(_baseToken, loanBaseCost, paymentToken);
 
-        serviceFee = uint112((uint256(serviceBaseFee) * loanCost) / loanBaseCost);
+        serviceFee = uint112((serviceBaseFee * loanCost) / loanBaseCost);
         interest = uint112(loanCost - serviceFee);
         gcFee = _estimateGCFee(paymentToken, amount);
     }

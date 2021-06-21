@@ -112,6 +112,22 @@ abstract contract EnterpriseStorage is InitializableOwnable {
     mapping(PowerToken => bool) internal _registeredPowerTokens;
     PowerToken[] internal _powerTokens;
 
+    event EnterpriseLoanCollectGracePeriodChanged(uint32 period);
+    event BorrowerLoanReturnGracePeriodChanged(uint32 period);
+    event BondingChanged(uint256 pole, uint256 slope);
+    event ConverterChanged(address converter);
+    event InterestGapHalvingPeriodChanged(uint32 period);
+    event GcFeePercentChanged(uint16 percent);
+    event EnterpriseShutdown();
+    event TotalSharesChanged(uint256 totalShares);
+    event UsedReserveChanged(uint256 fixedReserve);
+    event FixedReserveChanged(uint256 fixedReserve);
+    event StreamingReserveChanged(uint112 streamingReserve, uint112 streamingReserveTarget);
+    event PaymentTokenChange(address paymentToken, bool enabled);
+    event EnterpriseVaultChanged(address vault);
+    event EnterpriseCollectorChanged(address collector);
+    event BaseUriChanged(string baseUri);
+
     modifier notShutdown() {
         require(!_enterpriseShutdown, Errors.E_ENTERPRISE_SHUTDOWN);
         _;
@@ -150,6 +166,16 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         _enterpriseLoanCollectGracePeriod = 1 days;
         _bondingPole = uint256(5 << 64) / 100; // 5%
         _bondingSlope = uint256(3 << 64) / 10; // 0.3
+
+        emit BaseUriChanged(baseUri);
+        emit GcFeePercentChanged(_gcFeePercent);
+        emit ConverterChanged(address(_converter));
+        emit EnterpriseVaultChanged(_enterpriseVault);
+        emit EnterpriseCollectorChanged(_enterpriseCollector);
+        emit InterestGapHalvingPeriodChanged(_interestGapHalvingPeriod);
+        emit BorrowerLoanReturnGracePeriodChanged(_borrowerLoanReturnGracePeriod);
+        emit EnterpriseLoanCollectGracePeriodChanged(_enterpriseLoanCollectGracePeriod);
+        emit BondingChanged(_bondingPole, _bondingSlope);
     }
 
     function initializeTokens(
@@ -291,16 +317,19 @@ abstract contract EnterpriseStorage is InitializableOwnable {
     function setEnterpriseCollector(address newCollector) external onlyOwner {
         require(newCollector != address(0), Errors.ES_INVALID_COLLECTOR_ADDRESS);
         _enterpriseCollector = newCollector;
+        emit EnterpriseCollectorChanged(newCollector);
     }
 
     function setEnterpriseVault(address newVault) external onlyOwner {
         require(newVault != address(0), Errors.ES_INVALID_VAULT_ADDRESS);
         _enterpriseVault = newVault;
+        emit EnterpriseVaultChanged(newVault);
     }
 
     function setConverter(IConverter newConverter) external onlyOwner {
         require(address(newConverter) != address(0), Errors.ES_INVALID_CONVERTER_ADDRESS);
         _converter = newConverter;
+        emit ConverterChanged(address(newConverter));
     }
 
     function setBondingCurve(uint256 pole, uint256 slope) external onlyOwner {
@@ -308,27 +337,32 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         require(slope <= (1 << 64), Errors.ES_INVALID_BONDING_SLOPE);
         _bondingPole = pole;
         _bondingSlope = slope;
+        emit BondingChanged(_bondingPole, _bondingSlope);
     }
 
     function setBorrowerLoanReturnGracePeriod(uint32 newPeriod) external onlyOwner {
         require(newPeriod <= _enterpriseLoanCollectGracePeriod, Errors.ES_INVALID_BORROWER_LOAN_RETURN_GRACE_PERIOD);
 
         _borrowerLoanReturnGracePeriod = newPeriod;
+        emit BorrowerLoanReturnGracePeriodChanged(newPeriod);
     }
 
     function setEnterpriseLoanCollectGracePeriod(uint32 newPeriod) external onlyOwner {
         require(_borrowerLoanReturnGracePeriod <= newPeriod, Errors.ES_INVALID_ENTERPRISE_LOAN_COLLECT_GRACE_PERIOD);
 
         _enterpriseLoanCollectGracePeriod = newPeriod;
+        emit EnterpriseLoanCollectGracePeriodChanged(newPeriod);
     }
 
     function setBaseUri(string calldata baseUri) external onlyOwner {
         _baseUri = baseUri;
+        emit BaseUriChanged(baseUri);
     }
 
     function setInterestGapHalvingPeriod(uint32 interestGapHalvingPeriod) external onlyOwner {
         require(interestGapHalvingPeriod > 0, Errors.ES_INTEREST_GAP_HALVING_PERIOD_NOT_GT_0);
         _interestGapHalvingPeriod = interestGapHalvingPeriod;
+        emit InterestGapHalvingPeriodChanged(interestGapHalvingPeriod);
     }
 
     function upgradePowerToken(PowerToken powerToken, address implementation) external onlyOwner {
@@ -350,6 +384,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
 
     function setGcFeePercent(uint16 newGcFeePercent) external onlyOwner {
         _gcFeePercent = newGcFeePercent;
+        emit GcFeePercentChanged(newGcFeePercent);
     }
 
     function getGCFeePercent() external view returns (uint16) {
@@ -366,6 +401,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
 
         if (_paymentTokensIndex[token] > 0) {
             _paymentTokensIndex[token] = -_paymentTokensIndex[token];
+            emit PaymentTokenChange(token, false);
         }
     }
 
@@ -373,8 +409,10 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         if (_paymentTokensIndex[token] == 0) {
             _paymentTokens.push(token);
             _paymentTokensIndex[token] = int16(uint16(_paymentTokens.length));
+            emit PaymentTokenChange(token, true);
         } else if (_paymentTokensIndex[token] < 0) {
             _paymentTokensIndex[token] = -_paymentTokensIndex[token];
+            emit PaymentTokenChange(token, true);
         }
     }
 
@@ -393,6 +431,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         _streamingReserve = _getStreamingReserve();
         _streamingReserveTarget += delta;
         _streamingReserveUpdated = uint32(block.timestamp);
+        emit StreamingReserveChanged(_streamingReserve, _streamingReserveTarget);
     }
 
     function _flushStreamingReserve() internal returns (uint112 streamingReserve) {
@@ -401,5 +440,6 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         _streamingReserve = 0;
         _streamingReserveTarget -= streamingReserve;
         _streamingReserveUpdated = uint32(block.timestamp);
+        emit StreamingReserveChanged(_streamingReserve, _streamingReserveTarget);
     }
 }

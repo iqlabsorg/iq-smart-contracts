@@ -13,8 +13,9 @@ contract Enterprise is EnterpriseStorage {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Metadata;
 
-    event ServiceRegistered(address indexed powerToken, uint32 gapHalvingPeriod, uint112 factor);
-    event Borrowed(address indexed powerToken, uint256 tokenId, uint32 from, uint32 to);
+    event ServiceRegistered(address indexed powerToken, uint32 gapHalvingPeriod);
+    event Borrowed(address indexed powerToken, uint256 tokenId);
+    event Lended(uint256 tokenId);
 
     function registerService(
         string memory serviceName,
@@ -52,7 +53,7 @@ contract Enterprise is EnterpriseStorage {
         _powerTokens.push(powerToken);
         _registeredPowerTokens[powerToken] = true;
 
-        emit ServiceRegistered(address(powerToken), gapHalvingPeriod, baseRate);
+        emit ServiceRegistered(address(powerToken), gapHalvingPeriod);
     }
 
     function borrow(
@@ -114,7 +115,8 @@ contract Enterprise is EnterpriseStorage {
 
         powerToken.notifyNewLoan(tokenId);
 
-        emit Borrowed(address(powerToken), tokenId, borrowingTime, maturityTime);
+        emit Borrowed(address(powerToken), tokenId);
+        emit UsedReserveChanged(_usedReserve);
     }
 
     function reborrow(
@@ -154,28 +156,16 @@ contract Enterprise is EnterpriseStorage {
         uint112 poolInterest = uint112(convertedLiquidityTokens - serviceLiquidity);
         _increaseStreamingReserveTarget(poolInterest);
 
-        uint32 borrowingTime = loan.maturityTime;
         loan.maturityTime = loan.maturityTime + duration;
         loan.borrowerReturnGraceTime = loan.maturityTime + _borrowerLoanReturnGracePeriod;
         loan.enterpriseCollectGraceTime = loan.maturityTime + _enterpriseLoanCollectGracePeriod;
 
         powerToken.notifyNewLoan(tokenId);
 
-        emit Borrowed(address(powerToken), tokenId, borrowingTime, loan.maturityTime);
+        emit Borrowed(address(powerToken), tokenId);
     }
 
-    function estimateLoan(
-        PowerToken powerToken,
-        IERC20 paymentToken,
-        uint112 amount,
-        uint32 duration
-    ) external view notShutdown returns (uint256) {
-        require(_registeredPowerTokens[powerToken], Errors.UNREGISTERED_POWER_TOKEN);
-
-        return powerToken.estimateLoan(paymentToken, amount, duration);
-    }
-
-    function returnLoan(uint256 tokenId) public {
+    function returnLoan(uint256 tokenId) external {
         LoanInfo storage loan = _loanInfo[tokenId];
         require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
         address borrower = _borrowToken.ownerOf(tokenId);
@@ -191,6 +181,7 @@ contract Enterprise is EnterpriseStorage {
         );
         if (!_enterpriseShutdown) {
             _usedReserve -= loan.amount;
+            emit UsedReserveChanged(_usedReserve);
         }
 
         _borrowToken.burn(tokenId, msg.sender); // burns PowerTokens, returns gc fee
@@ -207,13 +198,13 @@ contract Enterprise is EnterpriseStorage {
 
         uint256 newShares = (_totalShares == 0 ? liquidityAmount : _liquidityToShares(liquidityAmount));
 
-        _fixedReserve += liquidityAmount;
+        _increaseReserve(liquidityAmount);
 
         uint256 tokenId = _interestToken.mint(msg.sender);
 
         _liquidityInfo[tokenId] = LiquidityInfo(liquidityAmount, newShares, block.number);
 
-        _totalShares += newShares;
+        _increaseShares(newShares);
     }
 
     function withdrawInterest(uint256 tokenId) external onlyInterestTokenOwner(tokenId) {
@@ -227,8 +218,8 @@ contract Enterprise is EnterpriseStorage {
 
         uint256 newShares = _liquidityToShares(liquidityInfo.amount);
         liquidityInfo.shares = newShares;
-        _totalShares -= (shares - newShares);
 
+        _decreaseShares(shares - newShares);
         _decreaseReserve(interest);
     }
 
@@ -242,8 +233,8 @@ contract Enterprise is EnterpriseStorage {
 
         _interestToken.burn(tokenId);
         _liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
-        _totalShares -= shares;
 
+        _decreaseShares(shares);
         _decreaseReserve(liquidityWithInterest);
         delete _liquidityInfo[tokenId];
     }
@@ -262,8 +253,8 @@ contract Enterprise is EnterpriseStorage {
         unchecked {
             liquidityInfo.shares -= shares;
             liquidityInfo.amount -= amount;
-            _totalShares -= shares;
         }
+        _decreaseShares(shares);
         _decreaseReserve(amount);
     }
 
@@ -272,12 +263,28 @@ contract Enterprise is EnterpriseStorage {
 
         uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount));
 
-        _fixedReserve += amount;
+        _increaseReserve(amount);
         LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
         liquidityInfo.amount += amount;
         liquidityInfo.shares += newShares;
         liquidityInfo.block = block.number;
-        _totalShares += newShares;
+        _increaseShares(newShares);
+    }
+
+    function estimateLoan(
+        PowerToken powerToken,
+        IERC20 paymentToken,
+        uint112 amount,
+        uint32 duration
+    ) external view notShutdown returns (uint256) {
+        require(_registeredPowerTokens[powerToken], Errors.UNREGISTERED_POWER_TOKEN);
+
+        return powerToken.estimateLoan(paymentToken, amount, duration);
+    }
+
+    function _increaseReserve(uint256 delta) internal {
+        _fixedReserve += delta;
+        emit FixedReserveChanged(_fixedReserve);
     }
 
     function _decreaseReserve(uint256 delta) internal {
@@ -288,6 +295,17 @@ contract Enterprise is EnterpriseStorage {
 
             _fixedReserve = _fixedReserve + streamingReserve - delta;
         }
+        emit FixedReserveChanged(_fixedReserve);
+    }
+
+    function _increaseShares(uint256 delta) internal {
+        _totalShares += delta;
+        emit TotalSharesChanged(_totalShares);
+    }
+
+    function _decreaseShares(uint256 delta) internal {
+        _totalShares -= delta;
+        emit TotalSharesChanged(_totalShares);
     }
 
     function _liquidityToShares(uint256 amount) internal view returns (uint256) {
@@ -344,5 +362,7 @@ contract Enterprise is EnterpriseStorage {
         _enterpriseShutdown = true;
         _usedReserve = 0;
         _streamingReserve = _streamingReserveTarget;
+
+        emit EnterpriseShutdown();
     }
 }
