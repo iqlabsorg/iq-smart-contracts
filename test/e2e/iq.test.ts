@@ -146,7 +146,7 @@ describe('IQ Protocol E2E', () => {
         MAX_PAYMENT_AMOUNT,
         user
       );
-
+      await expect(borrowTx).to.emit(enterprise, 'Borrowed');
       await increaseTime(86400);
 
       // 5. Burn

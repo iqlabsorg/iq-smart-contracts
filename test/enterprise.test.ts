@@ -517,6 +517,7 @@ describe('Enterprise', () => {
         ONE_TOKEN * 400n,
         borrower
       );
+      await expect(borrowTx1).to.emit(enterprise, 'Borrowed');
       const borrowReceipt = await borrowTx1.wait();
 
       const borrowBlock = await ethers.provider.getBlock(
@@ -568,11 +569,11 @@ describe('Enterprise', () => {
 
       await increaseTime(ONE_DAY * 5);
 
-      await enterprise.removeLiquidity(tokenId1);
+      await expect(enterprise.removeLiquidity(tokenId1)).to.emit(enterprise, 'LiquidityRemoved');
       await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
         '46'
       );
-      await enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n);
+      await expect(enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n)).to.emit(enterprise, 'LiquidityDecreased');
       const loanInfo2 = await enterprise.getLiquidityInfo(tokenId2);
       expect(loanInfo2.amount).to.eq(ONE_TOKEN * 1_990n);
 
@@ -591,7 +592,7 @@ describe('Enterprise', () => {
 
       await increaseTime(ONE_DAY);
 
-      await enterprise.connect(stranger).returnLoan(borrowTokenId1);
+      await expect(enterprise.connect(stranger).returnLoan(borrowTokenId1)).to.emit(enterprise, 'LoanReturned');
 
       await expect(
         enterprise.connect(borrower).returnLoan(borrowTokenId1)
@@ -604,7 +605,7 @@ describe('Enterprise', () => {
         .to.eq(await enterprise.getReserve());
 
       await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
-      await enterprise.increaseLiquidity(tokenId2, ONE_TOKEN * 2_000n);
+      await expect(enterprise.increaseLiquidity(tokenId2, ONE_TOKEN * 2_000n)).to.emit(enterprise, 'LiquidityIncreased');
 
       const loanInfo3 = await enterprise.getLiquidityInfo(tokenId2);
       expect(loanInfo3.amount).to.eq(ONE_TOKEN * 2_000n);

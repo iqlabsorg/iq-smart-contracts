@@ -14,8 +14,13 @@ contract Enterprise is EnterpriseStorage {
     using SafeERC20 for IERC20Metadata;
 
     event ServiceRegistered(address indexed powerToken);
-    event Borrowed(address indexed powerToken, uint256 borrowTokenId);
-    event Lended(uint256 interestTokenId);
+    event Borrowed(address indexed powerToken, uint256 indexed borrowTokenId);
+    event LiquidityAdded(uint256 indexed interestTokenId, uint256 amount);
+    event LiquidityIncreased(uint256 indexed interestTokenId, uint256 amount);
+    event LiquidityDecreased(uint256 indexed interestTokenId, uint256 amount);
+    event LiquidityRemoved(uint256 indexed interestTokenId, uint256 amount);
+    event InterestWithdrawn(uint256 indexed interestTokenId, uint256 amount);
+    event LoanReturned(uint256 indexed borrowTokenId);
 
     function registerService(
         string memory serviceName,
@@ -187,6 +192,7 @@ contract Enterprise is EnterpriseStorage {
         _borrowToken.burn(borrowTokenId, msg.sender); // burns PowerTokens, returns gc fee
 
         delete _loanInfo[borrowTokenId];
+        emit LoanReturned(borrowTokenId);
     }
 
     /**
@@ -205,6 +211,7 @@ contract Enterprise is EnterpriseStorage {
         _liquidityInfo[interestTokenId] = LiquidityInfo(liquidityAmount, newShares, block.number);
 
         _increaseShares(newShares);
+        emit LiquidityAdded(interestTokenId, liquidityAmount);
     }
 
     function withdrawInterest(uint256 interestTokenId) external onlyInterestTokenOwner(interestTokenId) {
@@ -221,6 +228,7 @@ contract Enterprise is EnterpriseStorage {
 
         _decreaseShares(shares - newShares);
         _decreaseReserve(interest);
+        emit InterestWithdrawn(interestTokenId, interest);
     }
 
     function removeLiquidity(uint256 interestTokenId) external onlyInterestTokenOwner(interestTokenId) {
@@ -237,6 +245,7 @@ contract Enterprise is EnterpriseStorage {
         _decreaseShares(shares);
         _decreaseReserve(liquidityWithInterest);
         delete _liquidityInfo[interestTokenId];
+        emit LiquidityRemoved(interestTokenId, liquidityWithInterest);
     }
 
     function decreaseLiquidity(uint256 interestTokenId, uint256 amount) external onlyInterestTokenOwner(interestTokenId) {
@@ -256,6 +265,7 @@ contract Enterprise is EnterpriseStorage {
         }
         _decreaseShares(shares);
         _decreaseReserve(amount);
+        emit LiquidityDecreased(interestTokenId, amount);
     }
 
     function increaseLiquidity(uint256 interestTokenId, uint256 amount) external notShutdown onlyInterestTokenOwner(interestTokenId) {
@@ -269,6 +279,7 @@ contract Enterprise is EnterpriseStorage {
         liquidityInfo.shares += newShares;
         liquidityInfo.block = block.number;
         _increaseShares(newShares);
+        emit LiquidityIncreased(interestTokenId, amount);
     }
 
     function estimateLoan(
