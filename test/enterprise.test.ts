@@ -1,8 +1,5 @@
-import {ethers, waffle} from 'hardhat';
+import { ethers, waffle } from 'hardhat';
 import chai from 'chai';
-chai.use(waffle.solidity);
-const {expect} = chai;
-
 import {
   BorrowToken,
   Enterprise,
@@ -24,10 +21,9 @@ import {
   estimateLoan,
   fromTokens,
   getBorrowToken,
-  getInterestToken,
+  getBorrowTokenId,
   getInterestTokenId,
   getProxyImplementation,
-  getTokenId,
   increaseTime,
   nextBlock,
   ONE_DAY,
@@ -36,8 +32,11 @@ import {
   setNextBlockTimestamp,
   toTokens,
 } from './utils';
-import {Wallet} from '@ethersproject/wallet';
-import {BigNumber} from 'ethers';
+import { Wallet } from '@ethersproject/wallet';
+import { BigNumber } from 'ethers';
+
+chai.use(waffle.solidity);
+const {expect} = chai;
 
 describe('Enterprise', () => {
   let deployer: Wallet;
@@ -177,15 +176,15 @@ describe('Enterprise', () => {
       });
     });
     describe('borrow / reborrow / return', () => {
-      const LIQIDITY = ONE_TOKEN * 1000n;
+      const LIQUIDITY = ONE_TOKEN * 1000n;
       const BORROW_AMOUNT = ONE_TOKEN * 100n;
       let tokenId: BigNumber;
 
       beforeEach(async () => {
         await token.transfer(borrower.address, ONE_TOKEN * 5n);
-        await token.transfer(lender.address, LIQIDITY);
+        await token.transfer(lender.address, LIQUIDITY);
 
-        await addLiquidity(enterprise, LIQIDITY, lender);
+        await addLiquidity(enterprise, LIQUIDITY, lender);
 
         const borrowTx = await borrow(
           enterprise,
@@ -197,7 +196,7 @@ describe('Enterprise', () => {
           borrower
         );
 
-        tokenId = await getTokenId(enterprise, borrowTx);
+        tokenId = await getBorrowTokenId(enterprise, borrowTx);
       });
 
       it('should be possible to borrow tokens', async () => {
@@ -207,7 +206,7 @@ describe('Enterprise', () => {
         expect(await token.balanceOf(borrower.address)).to.be.below(
           ONE_TOKEN * 5n
         );
-        expect(await token.balanceOf(enterprise.address)).to.be.above(LIQIDITY);
+        expect(await token.balanceOf(enterprise.address)).to.be.above(LIQUIDITY);
       });
 
       it('should be possible to reborrow tokens', async () => {
@@ -240,7 +239,7 @@ describe('Enterprise', () => {
         expect(await token.balanceOf(borrower.address)).to.be.above(
           balanceBefore
         );
-        expect(await token.balanceOf(enterprise.address)).to.be.above(LIQIDITY);
+        expect(await token.balanceOf(enterprise.address)).to.be.above(LIQUIDITY);
       });
     });
   });
@@ -490,11 +489,11 @@ describe('Enterprise', () => {
     it('scenario', async () => {
       const tokenId1 = await addLiquidity(enterprise, ONE_TOKEN * 10_000n);
 
-      expect(await enterprise.getOwedInterest(tokenId1)).to.eq(0);
+      expect(await enterprise.getAccruedInterest(tokenId1)).to.eq(0);
 
       await increaseTime(ONE_DAY / 2);
 
-      expect(await enterprise.getOwedInterest(tokenId1)).to.eq(0);
+      expect(await enterprise.getAccruedInterest(tokenId1)).to.eq(0);
 
       const borrowerBalance1 = await token.balanceOf(borrower.address);
       await expect(
@@ -529,12 +528,12 @@ describe('Enterprise', () => {
         await token.balanceOf(borrower.address)
       );
 
-      const borrowTokenId1 = await getTokenId(enterprise, borrowTx1);
+      const borrowTokenId1 = await getBorrowTokenId(enterprise, borrowTx1);
 
       await nextBlock(borrowTimestamp + ONE_HOUR * 4);
 
       expect(
-        toTokens(await enterprise.getOwedInterest(tokenId1), 3)
+        toTokens(await enterprise.getAccruedInterest(tokenId1), 3)
       ).to.approximately(toTokens(borrower1Paid.div(2), 3), 0.001);
 
       await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
@@ -547,10 +546,10 @@ describe('Enterprise', () => {
       const tokenId2 = await getInterestTokenId(enterprise, liquidityTx);
 
       expect(
-        toTokens(await enterprise.getOwedInterest(tokenId1), 3)
+        toTokens(await enterprise.getAccruedInterest(tokenId1), 3)
       ).to.approximately(toTokens(borrower1Paid.mul(3).div(4), 3), 0.001);
 
-      expect(await enterprise.getOwedInterest(tokenId2)).to.eq(0);
+      expect(await enterprise.getAccruedInterest(tokenId2)).to.eq(0);
 
       await nextBlock(borrowTimestamp + ONE_HOUR * 12);
 
@@ -564,7 +563,7 @@ describe('Enterprise', () => {
         .div(L1.shares.add(L2.shares).mul(8));
 
       expect(
-        toTokens(await enterprise.getOwedInterest(tokenId2), 3)
+        toTokens(await enterprise.getAccruedInterest(tokenId2), 3)
       ).to.approximately(toTokens(LP2interest, 3), 0.001);
 
       await increaseTime(ONE_DAY * 5);
@@ -600,7 +599,7 @@ describe('Enterprise', () => {
 
       await enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 1_990n);
 
-      expect(await enterprise.getOwedInterest(tokenId2))
+      expect(await enterprise.getAccruedInterest(tokenId2))
         .to.eq(await enterprise.getAvailableReserve())
         .to.eq(await enterprise.getReserve());
 
@@ -610,7 +609,7 @@ describe('Enterprise', () => {
       const loanInfo3 = await enterprise.getLiquidityInfo(tokenId2);
       expect(loanInfo3.amount).to.eq(ONE_TOKEN * 2_000n);
 
-      const interest = await enterprise.getOwedInterest(tokenId2);
+      const interest = await enterprise.getAccruedInterest(tokenId2);
 
       expect(await enterprise.getReserve()).to.eq(
         interest.add(ONE_TOKEN * 2000n)
@@ -618,7 +617,7 @@ describe('Enterprise', () => {
     });
   });
 
-  describe('Enterprise upgradabilitiy', () => {
+  describe('Enterprise upgradability', () => {
     beforeEach(async () => {
       enterprise = await deployEnterprise('Test', token.address);
     });
@@ -716,7 +715,7 @@ describe('Enterprise', () => {
         borrower
       );
 
-      borrowId = await getTokenId(enterprise, borrowTx);
+      borrowId = await getBorrowTokenId(enterprise, borrowTx);
 
       await enterprise.shutdownEnterpriseForever();
     });
@@ -805,7 +804,7 @@ describe('Enterprise', () => {
         ONE_TOKEN * 100n,
         borrower
       );
-      borrowId = await getTokenId(enterprise, borrowTx);
+      borrowId = await getBorrowTokenId(enterprise, borrowTx);
     });
 
     it('should not be possible to move borrowed PowerToken directly', async () => {

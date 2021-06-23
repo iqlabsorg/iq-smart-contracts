@@ -104,7 +104,7 @@ export const getPowerToken = async (
   return PowerToken.attach(powerTokenAddress) as PowerToken;
 };
 
-export const getTokenId = async (
+export const getBorrowTokenId = async (
   enterprise: Enterprise,
   borrowTx: ContractTransaction
 ): Promise<BigNumber> => {
@@ -115,7 +115,7 @@ export const getTokenId = async (
     receipt.blockNumber
   );
 
-  return events[0].args?.tokenId;
+  return BigNumber.from(events[0].args?.borrowTokenId);
 };
 
 export const getInterestTokenId = async (
@@ -134,7 +134,7 @@ export const getInterestTokenId = async (
     receipt.blockNumber
   );
 
-  return events[0].args?.tokenId;
+  return BigNumber.from(events[0].args?.tokenId);
 };
 
 export const getInterestToken = async (

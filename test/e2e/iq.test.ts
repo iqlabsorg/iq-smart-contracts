@@ -11,7 +11,7 @@ import {
   deployEnterprise,
   estimateLoan,
   getPowerToken,
-  getTokenId,
+  getBorrowTokenId,
   increaseTime,
   ONE_DAY,
   toTokens,
@@ -150,7 +150,7 @@ describe('IQ Protocol E2E', () => {
       await increaseTime(86400);
 
       // 5. Burn
-      const tokenId = await getTokenId(enterprise, borrowTx);
+      const tokenId = await getBorrowTokenId(enterprise, borrowTx);
       await enterprise.connect(user).returnLoan(tokenId);
 
       await enterprise.removeLiquidity(liquidityTokenId);

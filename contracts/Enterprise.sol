@@ -13,9 +13,9 @@ contract Enterprise is EnterpriseStorage {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Metadata;
 
-    event ServiceRegistered(address indexed powerToken, uint32 gapHalvingPeriod);
-    event Borrowed(address indexed powerToken, uint256 tokenId);
-    event Lended(uint256 tokenId);
+    event ServiceRegistered(address indexed powerToken);
+    event Borrowed(address indexed powerToken, uint256 borrowTokenId);
+    event Lended(uint256 interestTokenId);
 
     function registerService(
         string memory serviceName,
@@ -53,7 +53,7 @@ contract Enterprise is EnterpriseStorage {
         _powerTokens.push(powerToken);
         _registeredPowerTokens[powerToken] = true;
 
-        emit ServiceRegistered(address(powerToken), gapHalvingPeriod);
+        emit ServiceRegistered(address(powerToken));
     }
 
     function borrow(
@@ -99,8 +99,8 @@ contract Enterprise is EnterpriseStorage {
         paymentToken.safeTransferFrom(msg.sender, address(_borrowToken), gcFee);
         uint32 borrowingTime = uint32(block.timestamp);
         uint32 maturityTime = borrowingTime + duration;
-        uint256 tokenId = _borrowToken.getNextTokenId();
-        _loanInfo[tokenId] = LoanInfo(
+        uint256 borrowTokenId = _borrowToken.getNextTokenId();
+        _loanInfo[borrowTokenId] = LoanInfo(
             amount,
             powerToken.getIndex(),
             borrowingTime,
@@ -111,22 +111,22 @@ contract Enterprise is EnterpriseStorage {
             uint16(paymentTokenIndex(paymentToken))
         );
 
-        assert(_borrowToken.mint(msg.sender) == tokenId); // also mints PowerTokens
+        assert(_borrowToken.mint(msg.sender) == borrowTokenId); // also mints PowerTokens
 
-        powerToken.notifyNewLoan(tokenId);
+        powerToken.notifyNewLoan(borrowTokenId);
 
-        emit Borrowed(address(powerToken), tokenId);
+        emit Borrowed(address(powerToken), borrowTokenId);
         emit UsedReserveChanged(_usedReserve);
     }
 
     function reborrow(
-        uint256 tokenId,
+        uint256 borrowTokenId,
         IERC20 paymentToken,
         uint32 duration,
         uint256 maxPayment
     ) external notShutdown {
         require(isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
-        LoanInfo storage loan = _loanInfo[tokenId];
+        LoanInfo storage loan = _loanInfo[borrowTokenId];
         require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
         PowerToken powerToken = _powerTokens[loan.powerTokenIndex];
         require(powerToken.isAllowedLoanDuration(duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
@@ -160,15 +160,15 @@ contract Enterprise is EnterpriseStorage {
         loan.borrowerReturnGraceTime = loan.maturityTime + _borrowerLoanReturnGracePeriod;
         loan.enterpriseCollectGraceTime = loan.maturityTime + _enterpriseLoanCollectGracePeriod;
 
-        powerToken.notifyNewLoan(tokenId);
+        powerToken.notifyNewLoan(borrowTokenId);
 
-        emit Borrowed(address(powerToken), tokenId);
+        emit Borrowed(address(powerToken), borrowTokenId);
     }
 
-    function returnLoan(uint256 tokenId) external {
-        LoanInfo storage loan = _loanInfo[tokenId];
+    function returnLoan(uint256 borrowTokenId) external {
+        LoanInfo storage loan = _loanInfo[borrowTokenId];
         require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
-        address borrower = _borrowToken.ownerOf(tokenId);
+        address borrower = _borrowToken.ownerOf(borrowTokenId);
         uint32 timestamp = uint32(block.timestamp);
 
         require(
@@ -184,9 +184,9 @@ contract Enterprise is EnterpriseStorage {
             emit UsedReserveChanged(_usedReserve);
         }
 
-        _borrowToken.burn(tokenId, msg.sender); // burns PowerTokens, returns gc fee
+        _borrowToken.burn(borrowTokenId, msg.sender); // burns PowerTokens, returns gc fee
 
-        delete _loanInfo[tokenId];
+        delete _loanInfo[borrowTokenId];
     }
 
     /**
@@ -200,18 +200,18 @@ contract Enterprise is EnterpriseStorage {
 
         _increaseReserve(liquidityAmount);
 
-        uint256 tokenId = _interestToken.mint(msg.sender);
+        uint256 interestTokenId = _interestToken.mint(msg.sender);
 
-        _liquidityInfo[tokenId] = LiquidityInfo(liquidityAmount, newShares, block.number);
+        _liquidityInfo[interestTokenId] = LiquidityInfo(liquidityAmount, newShares, block.number);
 
         _increaseShares(newShares);
     }
 
-    function withdrawInterest(uint256 tokenId) external onlyInterestTokenOwner(tokenId) {
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+    function withdrawInterest(uint256 interestTokenId) external onlyInterestTokenOwner(interestTokenId) {
+        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
         uint256 shares = liquidityInfo.shares;
 
-        uint256 interest = getOwedInterest(tokenId);
+        uint256 interest = getAccruedInterest(interestTokenId);
         require(interest <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         _liquidityToken.safeTransfer(msg.sender, interest);
@@ -223,24 +223,24 @@ contract Enterprise is EnterpriseStorage {
         _decreaseReserve(interest);
     }
 
-    function removeLiquidity(uint256 tokenId) external onlyInterestTokenOwner(tokenId) {
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+    function removeLiquidity(uint256 interestTokenId) external onlyInterestTokenOwner(interestTokenId) {
+        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
         require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
         uint256 shares = liquidityInfo.shares;
 
         uint256 liquidityWithInterest = _sharesToLiquidity(shares);
         require(liquidityWithInterest <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
-        _interestToken.burn(tokenId);
+        _interestToken.burn(interestTokenId);
         _liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
 
         _decreaseShares(shares);
         _decreaseReserve(liquidityWithInterest);
-        delete _liquidityInfo[tokenId];
+        delete _liquidityInfo[interestTokenId];
     }
 
-    function decreaseLiquidity(uint256 tokenId, uint256 amount) external onlyInterestTokenOwner(tokenId) {
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+    function decreaseLiquidity(uint256 interestTokenId, uint256 amount) external onlyInterestTokenOwner(interestTokenId) {
+        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
         require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
         require(liquidityInfo.amount >= amount, Errors.E_INSUFFICIENT_LIQUIDITY);
         require(amount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
@@ -258,13 +258,13 @@ contract Enterprise is EnterpriseStorage {
         _decreaseReserve(amount);
     }
 
-    function increaseLiquidity(uint256 tokenId, uint256 amount) external notShutdown onlyInterestTokenOwner(tokenId) {
+    function increaseLiquidity(uint256 interestTokenId, uint256 amount) external notShutdown onlyInterestTokenOwner(interestTokenId) {
         _liquidityToken.safeTransferFrom(msg.sender, address(this), amount);
 
         uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount));
 
         _increaseReserve(amount);
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
         liquidityInfo.amount += amount;
         liquidityInfo.shares += newShares;
         liquidityInfo.block = block.number;
@@ -319,15 +319,15 @@ contract Enterprise is EnterpriseStorage {
     function loanTransfer(
         address from,
         address to,
-        uint256 tokenId
+        uint256 borrowTokenId
     ) external onlyBorrowToken {
-        uint112 amount = _loanInfo[tokenId].amount;
+        uint112 amount = _loanInfo[borrowTokenId].amount;
         require(amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
 
-        bool isExpiredBorrow = (block.timestamp > _loanInfo[tokenId].maturityTime);
+        bool isExpiredBorrow = (block.timestamp > _loanInfo[borrowTokenId].maturityTime);
         bool isMinting = (from == address(0));
         bool isBurning = (to == address(0));
-        PowerToken powerToken = _powerTokens[_loanInfo[tokenId].powerTokenIndex];
+        PowerToken powerToken = _powerTokens[_loanInfo[borrowTokenId].powerTokenIndex];
 
         if (isBurning) {
             powerToken.burnFrom(from, amount);
@@ -340,8 +340,8 @@ contract Enterprise is EnterpriseStorage {
         }
     }
 
-    function getOwedInterest(uint256 tokenId) public view returns (uint256) {
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[tokenId];
+    function getAccruedInterest(uint256 interestTokenId) public view returns (uint256) {
+        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
 
         uint256 liquidity = _sharesToLiquidity(liquidityInfo.shares);
         // Due to rounding errors calculated liquidity could be insignificantly
