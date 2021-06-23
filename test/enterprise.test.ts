@@ -34,6 +34,7 @@ import {
 } from './utils';
 import { Wallet } from '@ethersproject/wallet';
 import { BigNumber } from 'ethers';
+import { Errors } from './errors';
 
 chai.use(waffle.solidity);
 const {expect} = chai;
@@ -506,7 +507,7 @@ describe('Enterprise', () => {
           ONE_TOKEN * 300n,
           borrower
         )
-      ).to.be.revertedWith('47'); // 300 tokens is not enough
+      ).to.be.revertedWith(Errors.E_LOAN_COST_SLIPPAGE); // 300 tokens is not enough
 
       const borrowTx1 = await borrow(
         enterprise,
@@ -539,7 +540,7 @@ describe('Enterprise', () => {
 
       await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
       await expect(enterprise.removeLiquidity(tokenId1)).to.be.revertedWith(
-        '46'
+        Errors.E_INSUFFICIENT_LIQUIDITY
       );
 
       await setNextBlockTimestamp(borrowTimestamp + ONE_HOUR * 8);
@@ -571,7 +572,7 @@ describe('Enterprise', () => {
 
       await expect(enterprise.removeLiquidity(tokenId1)).to.emit(enterprise, 'LiquidityRemoved');
       await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
-        '46'
+        Errors.E_INSUFFICIENT_LIQUIDITY
       );
       await expect(enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n)).to.emit(enterprise, 'LiquidityDecreased');
       const loanInfo2 = await enterprise.getLiquidityInfo(tokenId2);
@@ -579,16 +580,16 @@ describe('Enterprise', () => {
 
       await expect(
         enterprise.connect(stranger).returnLoan(borrowTokenId1)
-      ).to.be.revertedWith('53');
+      ).to.be.revertedWith(Errors.E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD);
 
       await increaseTime(ONE_DAY * 5);
 
       await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
-        '46'
+        Errors.E_INSUFFICIENT_LIQUIDITY
       );
       await expect(
         enterprise.connect(stranger).returnLoan(borrowTokenId1)
-      ).to.be.revertedWith('54'); // still cannot return loan
+      ).to.be.revertedWith(Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD); // still cannot return loan
 
       await increaseTime(ONE_DAY);
 
@@ -596,7 +597,7 @@ describe('Enterprise', () => {
 
       await expect(
         enterprise.connect(borrower).returnLoan(borrowTokenId1)
-      ).to.be.revertedWith('48');
+      ).to.be.revertedWith(Errors.E_INVALID_LOAN_TOKEN_ID);
 
       await enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 1_990n);
 
