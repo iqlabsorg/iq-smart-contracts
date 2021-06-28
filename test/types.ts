@@ -94,3 +94,11 @@ export enum Errors {
   ES_INVALID_BONDING_POLE = '77',
   ES_INVALID_BONDING_SLOPE = '78',
 }
+
+export enum LiquidityChangeType {
+  WithdrawInterest,
+  Add,
+  Remove,
+  Increase,
+  Decrease
+}

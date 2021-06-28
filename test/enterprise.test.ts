@@ -34,7 +34,7 @@ import {
 } from './utils';
 import { Wallet } from '@ethersproject/wallet';
 import { BigNumber } from 'ethers';
-import { Errors } from './errors';
+import { Errors, LiquidityChangeType } from './types';
 
 chai.use(waffle.solidity);
 const {expect} = chai;
@@ -539,9 +539,7 @@ describe('Enterprise', () => {
       ).to.approximately(toTokens(borrower1Paid.div(2), 3), 0.001);
 
       await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
-      await expect(enterprise.removeLiquidity(tokenId1)).to.be.revertedWith(
-        Errors.E_INSUFFICIENT_LIQUIDITY
-      );
+      await expect(enterprise.removeLiquidity(tokenId1)).to.be.revertedWith(Errors.E_INSUFFICIENT_LIQUIDITY);
 
       await setNextBlockTimestamp(borrowTimestamp + ONE_HOUR * 8);
       const liquidityTx = await enterprise.addLiquidity(ONE_TOKEN * 2_000n);
@@ -570,11 +568,12 @@ describe('Enterprise', () => {
 
       await increaseTime(ONE_DAY * 5);
 
-      await expect(enterprise.removeLiquidity(tokenId1)).to.emit(enterprise, 'LiquidityRemoved');
-      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
-        Errors.E_INSUFFICIENT_LIQUIDITY
-      );
-      await expect(enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n)).to.emit(enterprise, 'LiquidityDecreased');
+      await expect(enterprise.removeLiquidity(tokenId1)).to.emit(enterprise, 'LiquidityChanged');
+      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(Errors.E_INSUFFICIENT_LIQUIDITY);
+      await expect(enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n))
+        .to.emit(enterprise, 'LiquidityChanged')
+        .withArgs(tokenId2, LiquidityChangeType.Decrease, ONE_TOKEN * 10n);
+
       const loanInfo2 = await enterprise.getLiquidityInfo(tokenId2);
       expect(loanInfo2.amount).to.eq(ONE_TOKEN * 1_990n);
 
@@ -584,9 +583,7 @@ describe('Enterprise', () => {
 
       await increaseTime(ONE_DAY * 5);
 
-      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
-        Errors.E_INSUFFICIENT_LIQUIDITY
-      );
+      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(Errors.E_INSUFFICIENT_LIQUIDITY);
       await expect(
         enterprise.connect(stranger).returnLoan(borrowTokenId1)
       ).to.be.revertedWith(Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD); // still cannot return loan
@@ -606,7 +603,9 @@ describe('Enterprise', () => {
         .to.eq(await enterprise.getReserve());
 
       await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
-      await expect(enterprise.increaseLiquidity(tokenId2, ONE_TOKEN * 2_000n)).to.emit(enterprise, 'LiquidityIncreased');
+      await expect(enterprise.increaseLiquidity(tokenId2, ONE_TOKEN * 2_000n))
+        .to.emit(enterprise, 'LiquidityChanged')
+        .withArgs(tokenId2, LiquidityChangeType.Increase, ONE_TOKEN * 2_000n);
 
       const loanInfo3 = await enterprise.getLiquidityInfo(tokenId2);
       expect(loanInfo3.amount).to.eq(ONE_TOKEN * 2_000n);
