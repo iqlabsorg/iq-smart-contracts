@@ -216,7 +216,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
     }
 
-    function notifyNewLoan(uint256 tokenId) external {}
+    function notifyNewLoan(uint256 borrowTokenId) external {}
 
     /**
      * @dev

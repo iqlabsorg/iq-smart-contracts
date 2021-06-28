@@ -138,8 +138,8 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         _;
     }
 
-    modifier onlyInterestTokenOwner(uint256 tokenId) {
-        require(_interestToken.ownerOf(tokenId) == msg.sender, Errors.CALLER_NOT_OWNER);
+    modifier onlyInterestTokenOwner(uint256 interestTokenId) {
+        require(_interestToken.ownerOf(interestTokenId) == msg.sender, Errors.CALLER_NOT_OWNER);
         _;
     }
 
@@ -288,14 +288,14 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         return _powerTokens;
     }
 
-    function getLoanInfo(uint256 tokenId) external view returns (LoanInfo memory) {
-        _borrowToken.ownerOf(tokenId); // will throw on non existent tokenId
-        return _loanInfo[tokenId];
+    function getLoanInfo(uint256 borrowTokenId) external view returns (LoanInfo memory) {
+        _borrowToken.ownerOf(borrowTokenId); // will throw on non existent tokenId
+        return _loanInfo[borrowTokenId];
     }
 
-    function getLiquidityInfo(uint256 tokenId) external view returns (LiquidityInfo memory) {
-        _interestToken.ownerOf(tokenId); // will throw on non existent tokenId
-        return _liquidityInfo[tokenId];
+    function getLiquidityInfo(uint256 interestTokenId) external view returns (LiquidityInfo memory) {
+        _interestToken.ownerOf(interestTokenId); // will throw on non existent tokenId
+        return _liquidityInfo[interestTokenId];
     }
 
     function getReserve() public view returns (uint256) {
