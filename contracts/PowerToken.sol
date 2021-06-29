@@ -202,16 +202,15 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         require(isAllowedLoanDuration(duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
 
         uint112 loanBaseCost = estimateCost(amount, duration);
-        uint256 serviceBaseFee = (uint256(loanBaseCost) * _serviceFeePercent) / 10_000;
         uint256 loanCost = getEnterprise().getConverter().estimateConvert(_baseToken, loanBaseCost, paymentToken);
 
-        serviceFee = uint112((serviceBaseFee * loanCost) / loanBaseCost);
+        serviceFee = uint112((loanCost * _serviceFeePercent) / 10_000);
         interest = uint112(loanCost - serviceFee);
-        gcFee = _estimateGCFee(paymentToken, amount);
+        gcFee = _estimateGCFee(paymentToken, loanCost);
     }
 
-    function _estimateGCFee(IERC20 paymentToken, uint112 amount) internal view returns (uint112) {
-        uint112 gcFeeAmount = uint112((uint256(amount) * getEnterprise().getGCFeePercent()) / 10_000);
+    function _estimateGCFee(IERC20 paymentToken, uint256 amount) internal view returns (uint112) {
+        uint112 gcFeeAmount = uint112((amount * getEnterprise().getGCFeePercent()) / 10_000);
         uint112 minGcFee = uint112(getEnterprise().getConverter().estimateConvert(_baseToken, _minGCFee, paymentToken));
         return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
     }

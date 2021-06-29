@@ -161,7 +161,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         _converter = converter;
         _enterpriseVault = owner;
         _enterpriseCollector = owner;
-        _interestGapHalvingPeriod = 4 hours;
+        _interestGapHalvingPeriod = 7 days;
         _borrowerLoanReturnGracePeriod = 12 hours;
         _enterpriseLoanCollectGracePeriod = 1 days;
         _bondingPole = uint256(5 << 64) / 100; // 5%
