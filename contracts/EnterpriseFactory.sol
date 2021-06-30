@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "./Enterprise.sol";
@@ -12,8 +11,6 @@ import "./PowerToken.sol";
 import "./libs/Errors.sol";
 
 contract EnterpriseFactory {
-    using Clones for address;
-
     event EnterpriseDeployed(
         address indexed creator,
         address indexed liquidityToken,

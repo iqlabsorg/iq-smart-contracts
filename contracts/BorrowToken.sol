@@ -21,7 +21,7 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
     }
 
     function getNextTokenId() public view override returns (uint256) {
-        return uint256(keccak256(abi.encodePacked("b", _tokenIdTracker)));
+        return uint256(keccak256(abi.encodePacked("b", address(this), _tokenIdTracker)));
     }
 
     function _baseURI() internal view override returns (string memory) {

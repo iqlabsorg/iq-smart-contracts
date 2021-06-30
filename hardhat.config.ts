@@ -72,6 +72,10 @@ const config: HardhatUserConfig = {
       url: node_url('goerli'),
       accounts: accounts('goerli'),
     },
+    binance: {
+      url: node_url('binance'),
+      accounts: accounts('binance'),
+    },
     binanceTestnet: {
       url: node_url('binanceTestnet'),
       accounts: accounts('binanceTestnet'),

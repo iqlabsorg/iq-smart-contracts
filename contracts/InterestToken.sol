@@ -20,7 +20,7 @@ contract InterestToken is IInterestToken, EnterpriseOwnable, ERC721Enumerable {
     }
 
     function getNextTokenId() public view returns (uint256) {
-        return uint256(keccak256(abi.encodePacked("i", _tokenIdTracker)));
+        return uint256(keccak256(abi.encodePacked("i", address(this), _tokenIdTracker)));
     }
 
     function _baseURI() internal view override returns (string memory) {
