@@ -1,4 +1,4 @@
-import { ethers, waffle } from 'hardhat';
+import {ethers, waffle} from 'hardhat';
 import chai from 'chai';
 import {
   BorrowToken,
@@ -17,6 +17,7 @@ import {
   basePrice,
   baseRate,
   borrow,
+  currentTime,
   deployEnterprise,
   estimateLoan,
   fromTokens,
@@ -28,13 +29,14 @@ import {
   nextBlock,
   ONE_DAY,
   ONE_HOUR,
+  reborrow,
   registerService,
   setNextBlockTimestamp,
   toTokens,
 } from './utils';
-import { Wallet } from '@ethersproject/wallet';
-import { BigNumber } from 'ethers';
-import { Errors, LiquidityChangeType } from './types';
+import {Wallet} from '@ethersproject/wallet';
+import {BigNumber} from 'ethers';
+import {Errors, LiquidityChangeType} from './types';
 
 chai.use(waffle.solidity);
 const {expect} = chai;
@@ -207,7 +209,9 @@ describe('Enterprise', () => {
         expect(await token.balanceOf(borrower.address)).to.be.below(
           ONE_TOKEN * 5n
         );
-        expect(await token.balanceOf(enterprise.address)).to.be.above(LIQUIDITY);
+        expect(await token.balanceOf(enterprise.address)).to.be.above(
+          LIQUIDITY
+        );
       });
 
       it('should be possible to reborrow tokens', async () => {
@@ -218,9 +222,14 @@ describe('Enterprise', () => {
         const loanInfoBefore = await enterprise.getLoanInfo(tokenId);
         await increaseTime(ONE_DAY);
 
-        await enterprise
-          .connect(borrower)
-          .reborrow(tokenId, token.address, ONE_DAY, ONE_TOKEN * 5n);
+        await reborrow(
+          enterprise,
+          tokenId,
+          token,
+          ONE_DAY,
+          ONE_TOKEN * 5n,
+          borrower
+        );
 
         expect(await token.balanceOf(borrower.address)).to.be.below(
           ONE_TOKEN * 5n
@@ -240,7 +249,9 @@ describe('Enterprise', () => {
         expect(await token.balanceOf(borrower.address)).to.be.above(
           balanceBefore
         );
-        expect(await token.balanceOf(enterprise.address)).to.be.above(LIQUIDITY);
+        expect(await token.balanceOf(enterprise.address)).to.be.above(
+          LIQUIDITY
+        );
       });
     });
   });
@@ -289,6 +300,7 @@ describe('Enterprise', () => {
         );
       });
       it('should be possible to borrow paying with USDC', async () => {
+        const enterpriseBalance = await token.balanceOf(enterprise.address);
         const usdcBalance = ONE_USDC * 1000n;
         await usdc.transfer(user.address, usdcBalance);
 
@@ -317,6 +329,59 @@ describe('Enterprise', () => {
         expect(
           toTokens(usdcBalance - balanceAfter.toBigInt(), 3, USDC_DECIMALS)
         ).to.closeTo(loan * 0.35, 0.1);
+        expect(await token.balanceOf(enterprise.address)).to.be.above(
+          enterpriseBalance
+        );
+      });
+
+      it('should be possible to reborrow paying with USDC', async () => {
+        const enterpriseBalance = await token.balanceOf(enterprise.address);
+        const usdcBalance = ONE_USDC * 1000n;
+        await usdc.transfer(user.address, usdcBalance);
+        await token.transfer(user.address, ONE_TOKEN * 1000n);
+        const tokenBalance = await token.balanceOf(user.address);
+        const loan = estimateLoan(
+          basePrice(100, ONE_DAY, 3),
+          100000,
+          0,
+          10000,
+          ONE_DAY
+        );
+        const borrowTx = await borrow(
+          enterprise,
+          powerToken,
+          token,
+          ONE_TOKEN * 10000n,
+          ONE_DAY,
+          tokenBalance,
+          user
+        );
+        const borrowTokenId = await getBorrowTokenId(enterprise, borrowTx);
+        await increaseTime(ONE_DAY);
+        const enterpriseBalance2 = await token.balanceOf(enterprise.address);
+
+        await reborrow(
+          enterprise,
+          borrowTokenId,
+          usdc,
+          ONE_DAY,
+          usdcBalance,
+          user
+        );
+
+        expect(await powerToken.balanceOf(user.address)).to.eq(
+          ONE_TOKEN * 10000n
+        );
+        const balanceAfter = await usdc.balanceOf(user.address);
+        expect(
+          toTokens(usdcBalance - balanceAfter.toBigInt(), 3, USDC_DECIMALS)
+        ).to.closeTo(loan * 0.35, 0.1);
+        const enterpriseBalanceAfter = await token.balanceOf(
+          enterprise.address
+        );
+        expect(enterpriseBalanceAfter).to.be.above(enterpriseBalance);
+        expect(enterpriseBalanceAfter).to.be.above(enterpriseBalance2);
+        expect(enterpriseBalance2).to.be.above(enterpriseBalance);
       });
     });
 
@@ -343,6 +408,7 @@ describe('Enterprise', () => {
       it('should be possible to borrow paying with USDC', async () => {
         const usdcBalance = ONE_USDC * 1000n;
         await usdc.transfer(user.address, usdcBalance);
+        const enterpriseBalance = await token.balanceOf(enterprise.address);
 
         const loan = estimateLoan(
           basePrice(100, ONE_DAY, 1.5),
@@ -369,9 +435,63 @@ describe('Enterprise', () => {
         expect(
           toTokens(usdcBalance - balanceAfter.toBigInt(), 3, USDC_DECIMALS)
         ).to.closeTo(loan, 0.001);
+        expect(await token.balanceOf(enterprise.address)).to.be.above(
+          enterpriseBalance
+        );
+      });
+
+      it('should be possible to reborrow paying with USDC', async () => {
+        const usdcBalance = ONE_USDC * 1000n;
+        await usdc.transfer(user.address, usdcBalance);
+        await token.transfer(user.address, ONE_TOKEN * 1000n);
+        const tokenBalance = await token.balanceOf(user.address);
+        const enterpriseBalance = await token.balanceOf(enterprise.address);
+        const loan = estimateLoan(
+          basePrice(100.0, ONE_DAY, 1.5),
+          100000.0,
+          0,
+          10000.0,
+          ONE_DAY
+        );
+        const borrowTx = await borrow(
+          enterprise,
+          powerToken,
+          token,
+          ONE_TOKEN * 10000n,
+          ONE_DAY,
+          tokenBalance,
+          user
+        );
+        const borrowTokenId = await getBorrowTokenId(enterprise, borrowTx);
+        await increaseTime(ONE_DAY);
+
+        const enterpriseBalance2 = await token.balanceOf(enterprise.address);
+        await reborrow(
+          enterprise,
+          borrowTokenId,
+          usdc,
+          ONE_DAY,
+          usdcBalance,
+          user
+        );
+
+        expect(await powerToken.balanceOf(user.address)).to.eq(
+          ONE_TOKEN * 10000n
+        );
+        const balanceAfter = await usdc.balanceOf(user.address);
+        expect(
+          toTokens(usdcBalance - balanceAfter.toBigInt(), 3, USDC_DECIMALS)
+        ).to.closeTo(loan, 0.01);
+        const enterpriseBalanceAfter = await token.balanceOf(
+          enterprise.address
+        );
+        expect(enterpriseBalanceAfter).to.be.above(enterpriseBalance);
+        expect(enterpriseBalanceAfter).to.be.above(enterpriseBalance2);
+        expect(enterpriseBalance2).to.be.above(enterpriseBalance);
       });
 
       it('should be possible to borrow paying with liquidity tokens', async () => {
+        const enterpriseBalance = await token.balanceOf(enterprise.address);
         const tokenBalance = ONE_TOKEN * 1000n;
         await token.transfer(user.address, tokenBalance);
         const loan = estimateLoan(
@@ -404,6 +524,64 @@ describe('Enterprise', () => {
         expect(
           toTokens(tokenBalance - balanceAfter.toBigInt(), 3, 18)
         ).to.closeTo(toTokens(convertedLoan, 3), 0.001);
+        expect(await token.balanceOf(enterprise.address)).to.be.above(
+          enterpriseBalance
+        );
+      });
+
+      it('should be possible to reborrow paying with liquidity tokens', async () => {
+        const enterpriseBalance = await token.balanceOf(enterprise.address);
+        const tokenBalance = ONE_TOKEN * 1000n;
+        const usdcBalance = ONE_USDC * 1000n;
+        await usdc.transfer(user.address, usdcBalance);
+        await token.transfer(user.address, tokenBalance);
+        const loan = estimateLoan(
+          basePrice(100, ONE_DAY, 1.5),
+          100000,
+          0,
+          10000,
+          ONE_DAY
+        );
+        const convertedLoan = await converter.estimateConvert(
+          usdc.address,
+          fromTokens(loan, 6, USDC_DECIMALS),
+          token.address
+        );
+        const borrowTx = await borrow(
+          enterprise,
+          powerToken,
+          usdc,
+          ONE_TOKEN * 10000n,
+          ONE_DAY,
+          usdcBalance,
+          user
+        );
+        const borrowTokenId = await getBorrowTokenId(enterprise, borrowTx);
+        await increaseTime(ONE_DAY);
+        const enterpriseBalance2 = await token.balanceOf(enterprise.address);
+
+        await reborrow(
+          enterprise,
+          borrowTokenId,
+          token,
+          ONE_DAY,
+          tokenBalance,
+          user
+        );
+
+        expect(await powerToken.balanceOf(user.address)).to.eq(
+          ONE_TOKEN * 10000n
+        );
+        const balanceAfter = await token.balanceOf(user.address);
+        expect(
+          toTokens(tokenBalance - balanceAfter.toBigInt(), 3, 18)
+        ).to.closeTo(toTokens(convertedLoan, 3), 0.01);
+        const enterpriseBalanceAfter = await token.balanceOf(
+          enterprise.address
+        );
+        expect(enterpriseBalanceAfter).to.be.above(enterpriseBalance);
+        expect(enterpriseBalanceAfter).to.be.above(enterpriseBalance2);
+        expect(enterpriseBalance2).to.be.above(enterpriseBalance);
       });
     });
   });
@@ -448,7 +626,7 @@ describe('Enterprise', () => {
         ONE_TOKEN * 1_000n,
         borrower
       );
-      await increaseTime(ONE_DAY * 50);
+      await increaseTime(ONE_DAY * 365);
       const [, , totalSharesBefore] = await enterprise.getInfo();
       const liquidityInfoBefore = await enterprise.getLiquidityInfo(tokenId);
       const balanceBefore = await token.balanceOf(lender.address);
@@ -458,6 +636,7 @@ describe('Enterprise', () => {
 
       const liquidityInfoAfter = await enterprise.getLiquidityInfo(tokenId);
       const balanceAfter = await token.balanceOf(lender.address);
+
       expect(toTokens(loanCost, 5)).to.approximately(
         toTokens(balanceAfter.sub(balanceBefore).toBigInt(), 5),
         0.00001
@@ -471,12 +650,13 @@ describe('Enterprise', () => {
 
   describe('multi borrow scenario', () => {
     let powerToken: IPowerToken;
+    let interestRateGapHalvingPeriod: number;
     beforeEach(async () => {
       enterprise = await deployEnterprise('Test', token.address);
       powerToken = await registerService(
         enterprise,
         GAP_HALVING_PERIOD,
-        baseRate(100n * ONE_TOKEN, BigInt(ONE_DAY), ONE_TOKEN * 3n),
+        baseRate(1000n * ONE_TOKEN, BigInt(ONE_DAY), ONE_TOKEN * 3n),
         token.address,
         0, // 0%
         ONE_HOUR * 12,
@@ -485,6 +665,9 @@ describe('Enterprise', () => {
         true
       );
       await token.transfer(borrower.address, ONE_TOKEN * 1000n);
+
+      interestRateGapHalvingPeriod =
+        await enterprise.getInterestGapHalvingPeriod();
     });
 
     it('scenario', async () => {
@@ -503,19 +686,19 @@ describe('Enterprise', () => {
           powerToken,
           token,
           ONE_TOKEN * 1_000n,
-          ONE_DAY * 10,
-          ONE_TOKEN * 300n,
+          ONE_DAY * 30,
+          ONE_TOKEN * 50n,
           borrower
         )
-      ).to.be.revertedWith(Errors.E_LOAN_COST_SLIPPAGE); // 300 tokens is not enough
+      ).to.be.revertedWith(Errors.E_LOAN_COST_SLIPPAGE); // 50 tokens is not enough
 
       const borrowTx1 = await borrow(
         enterprise,
         powerToken,
         token,
         ONE_TOKEN * 1_000n,
-        ONE_DAY * 10,
-        ONE_TOKEN * 400n,
+        ONE_DAY * 30,
+        ONE_TOKEN * 800n,
         borrower
       );
       await expect(borrowTx1).to.emit(enterprise, 'Borrowed');
@@ -532,16 +715,20 @@ describe('Enterprise', () => {
 
       const borrowTokenId1 = await getBorrowTokenId(enterprise, borrowTx1);
 
-      await nextBlock(borrowTimestamp + ONE_HOUR * 4);
+      await nextBlock(borrowTimestamp + interestRateGapHalvingPeriod);
 
       expect(
         toTokens(await enterprise.getAccruedInterest(tokenId1), 3)
       ).to.approximately(toTokens(borrower1Paid.div(2), 3), 0.001);
 
       await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
-      await expect(enterprise.removeLiquidity(tokenId1)).to.be.revertedWith(Errors.E_INSUFFICIENT_LIQUIDITY);
+      await expect(enterprise.removeLiquidity(tokenId1)).to.be.revertedWith(
+        Errors.E_INSUFFICIENT_LIQUIDITY
+      );
 
-      await setNextBlockTimestamp(borrowTimestamp + ONE_HOUR * 8);
+      await setNextBlockTimestamp(
+        borrowTimestamp + interestRateGapHalvingPeriod * 2
+      );
       const liquidityTx = await enterprise.addLiquidity(ONE_TOKEN * 2_000n);
       const tokenId2 = await getInterestTokenId(enterprise, liquidityTx);
 
@@ -551,7 +738,7 @@ describe('Enterprise', () => {
 
       expect(await enterprise.getAccruedInterest(tokenId2)).to.eq(0);
 
-      await nextBlock(borrowTimestamp + ONE_HOUR * 12);
+      await nextBlock(borrowTimestamp + interestRateGapHalvingPeriod * 3);
 
       const [L1, L2] = await Promise.all([
         enterprise.getLiquidityInfo(tokenId1),
@@ -568,8 +755,13 @@ describe('Enterprise', () => {
 
       await increaseTime(ONE_DAY * 5);
 
-      await expect(enterprise.removeLiquidity(tokenId1)).to.emit(enterprise, 'LiquidityChanged');
-      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(Errors.E_INSUFFICIENT_LIQUIDITY);
+      await expect(enterprise.removeLiquidity(tokenId1)).to.emit(
+        enterprise,
+        'LiquidityChanged'
+      );
+      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
+        Errors.E_INSUFFICIENT_LIQUIDITY
+      );
       await expect(enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n))
         .to.emit(enterprise, 'LiquidityChanged')
         .withArgs(tokenId2, LiquidityChangeType.Decrease, ONE_TOKEN * 10n);
@@ -579,18 +771,26 @@ describe('Enterprise', () => {
 
       await expect(
         enterprise.connect(stranger).returnLoan(borrowTokenId1)
-      ).to.be.revertedWith(Errors.E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD);
+      ).to.be.revertedWith(
+        Errors.E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD
+      );
 
-      await increaseTime(ONE_DAY * 5);
+      await increaseTime(ONE_DAY * 4.5); // because of 12 hours of borrower and enterprise grace period
 
-      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(Errors.E_INSUFFICIENT_LIQUIDITY);
+      await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
+        Errors.E_INSUFFICIENT_LIQUIDITY
+      );
       await expect(
         enterprise.connect(stranger).returnLoan(borrowTokenId1)
-      ).to.be.revertedWith(Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD); // still cannot return loan
+      ).to.be.revertedWith(
+        Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD
+      ); // still cannot return loan
 
       await increaseTime(ONE_DAY);
 
-      await expect(enterprise.connect(stranger).returnLoan(borrowTokenId1)).to.emit(enterprise, 'LoanReturned');
+      await expect(
+        enterprise.connect(stranger).returnLoan(borrowTokenId1)
+      ).to.emit(enterprise, 'LoanReturned');
 
       await expect(
         enterprise.connect(borrower).returnLoan(borrowTokenId1)

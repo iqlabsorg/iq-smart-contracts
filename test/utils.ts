@@ -285,16 +285,38 @@ export const borrow = async (
         duration,
         maxPayment
       );
-  } else {
-    await paymentToken.approve(enterprise.address, maxPayment);
-    return enterprise.borrow(
-      powerToken.address,
-      paymentToken.address,
-      amount,
-      duration,
-      maxPayment
-    );
   }
+  await paymentToken.approve(enterprise.address, maxPayment);
+  return enterprise.borrow(
+    powerToken.address,
+    paymentToken.address,
+    amount,
+    duration,
+    maxPayment
+  );
+};
+
+export const reborrow = async (
+  enterprise: Enterprise,
+  borrowTokenId: BigNumberish,
+  paymentToken: IERC20,
+  duration: number,
+  maxPayment: BigNumberish,
+  user?: Wallet
+): Promise<ContractTransaction> => {
+  if (user) {
+    await paymentToken.connect(user).approve(enterprise.address, maxPayment);
+    return enterprise
+      .connect(user)
+      .reborrow(borrowTokenId, paymentToken.address, duration, maxPayment);
+  }
+  await paymentToken.approve(enterprise.address, maxPayment);
+  return enterprise.reborrow(
+    borrowTokenId,
+    paymentToken.address,
+    duration,
+    maxPayment
+  );
 };
 
 export const registerService = async (
