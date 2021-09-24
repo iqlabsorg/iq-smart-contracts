@@ -203,32 +203,6 @@
       "type": "event"
     },
     {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "totalShares",
-          "type": "uint256"
-        }
-      ],
-      "name": "TotalSharesChanged",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "fixedReserve",
-          "type": "uint256"
-        }
-      ],
-      "name": "UsedReserveChanged",
-      "type": "event"
-    },
-    {
       "inputs": [
         {
           "internalType": "address",

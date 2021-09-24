@@ -119,8 +119,6 @@ abstract contract EnterpriseStorage is InitializableOwnable {
     event InterestGapHalvingPeriodChanged(uint32 period);
     event GcFeePercentChanged(uint16 percent);
     event EnterpriseShutdown();
-    event TotalSharesChanged(uint256 totalShares);
-    event UsedReserveChanged(uint256 fixedReserve);
     event FixedReserveChanged(uint256 fixedReserve);
     event StreamingReserveChanged(uint112 streamingReserve, uint112 streamingReserveTarget);
     event PaymentTokenChange(address paymentToken, bool enabled);
