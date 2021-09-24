@@ -128,52 +128,26 @@ contract Enterprise is EnterpriseStorage {
         require(loanAmount > 0, Errors.E_INVALID_LOAN_AMOUNT);
         require(loanAmount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
-        // The loan cost consists of three components:
-        uint112 interest;
-        uint112 serviceFee;
-        uint112 gcFee;
+        // Estimate loan cost.
+        (uint112 interest, uint112 serviceFee, uint112 gcFee) = powerToken.estimateLoanDetailed(
+            paymentToken,
+            loanAmount,
+            duration
+        );
         {
-            // Estimate loan cost.
-            (uint112 interestAmount, uint112 serviceFeeAmount, uint112 gcFeeAmount) = powerToken.estimateLoanDetailed(
-                paymentToken,
-                loanAmount,
-                duration
-            );
-
-            // Copy values to reuse in parent scope.
-            interest = interestAmount;
-            serviceFee = serviceFeeAmount;
-            gcFee = gcFeeAmount;
-
+            // Ensure no loan payment slippage.
             // GC fee does not go to the pool but must be accounted for slippage calculation.
             uint256 loanCost = interest + serviceFee;
             require(loanCost + gcFee <= maxPayment, Errors.E_LOAN_COST_SLIPPAGE);
 
-            // Transfer loan payment to the enterprise.
-            paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
+            // Handle loan payment transfer and distribution.
+            handleLoanPayment(paymentToken, loanCost, serviceFee, interest);
+
             // Transfer GC fee to the borrow token contract.
             paymentToken.safeTransferFrom(msg.sender, address(_borrowToken), gcFee);
 
-            // Initially assume loan cost payment is made in liquidity tokens.
-            uint256 loanCostInLiquidityTokens = loanCost;
-            uint256 serviceFeeInLiquidityTokens = serviceFee;
-            uint112 interestInLiquidityTokens = interest;
-
-            // Should the loan cost payment be made in tokens other than liquidity tokens,
-            // the payment amount gets converted to liquidity tokens automatically.
-            if (address(paymentToken) != address(_liquidityToken)) {
-                paymentToken.approve(address(_converter), loanCost);
-                loanCostInLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
-                serviceFeeInLiquidityTokens = (serviceFee * loanCostInLiquidityTokens) / loanCost;
-                interestInLiquidityTokens = uint112(loanCostInLiquidityTokens - serviceFeeInLiquidityTokens);
-            }
-
-            // Transfer service fee (liquidity tokens) to the enterprise vault.
-            _liquidityToken.safeTransfer(_enterpriseVault, serviceFeeInLiquidityTokens);
-
-            // Update used reserve & streaming target.
+            // Update used reserve.
             _usedReserve += loanAmount;
-            _increaseStreamingReserveTarget(interestInLiquidityTokens);
         }
 
         // Calculate loan timestamps.
@@ -233,38 +207,29 @@ contract Enterprise is EnterpriseStorage {
         require(powerToken.isAllowedLoanDuration(duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
         require(loan.maturityTime + duration >= block.timestamp, Errors.E_INVALID_LOAN_DURATION);
 
-        // emulating here loan return
+        // Emulate loan return to ensure correct reserves during new loan estimation.
         _usedReserve -= loan.amount;
-
+        // Estimate new loan cost.
         (uint112 interest, uint112 serviceFee, ) = powerToken.estimateLoanDetailed(paymentToken, loan.amount, duration);
-
-        // emulating here borrow
+        // Emulate borrowing.
         unchecked {
-            _usedReserve += loan.amount; // safe, because previously we successfully decreased it
+            // Safe since used reserve value was successfully decreased earlier.
+            _usedReserve += loan.amount;
         }
-        uint256 loanCost = interest + serviceFee;
 
+        // Ensure no loan payment slippage.
+        uint256 loanCost = interest + serviceFee;
         require(loanCost <= maxPayment, Errors.E_LOAN_COST_SLIPPAGE);
 
-        paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
-        {
-            uint256 convertedLiquidityTokens = loanCost;
-            if (address(paymentToken) != address(_liquidityToken)) {
-                paymentToken.approve(address(_converter), loanCost);
-                convertedLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
-            }
+        // Handle loan payment transfer and distribution.
+        handleLoanPayment(paymentToken, loanCost, serviceFee, interest);
 
-            uint256 serviceLiquidity = (serviceFee * convertedLiquidityTokens) / loanCost;
-            _liquidityToken.safeTransfer(_enterpriseVault, serviceLiquidity);
-
-            uint112 poolInterest = uint112(convertedLiquidityTokens - serviceLiquidity);
-            _increaseStreamingReserveTarget(poolInterest);
-        }
-
+        // Calculate new loan timestamps.
         uint32 newMaturityTime = loan.maturityTime + duration;
         uint32 newBorrowerReturnGraceTime = newMaturityTime + _borrowerLoanReturnGracePeriod;
         uint32 newEnterpriseCollectGraceTime = newMaturityTime + _enterpriseLoanCollectGracePeriod;
 
+        // Update loan details.
         loan.maturityTime = newMaturityTime;
         loan.borrowerReturnGraceTime = newBorrowerReturnGraceTime;
         loan.enterpriseCollectGraceTime = newEnterpriseCollectGraceTime;
@@ -282,6 +247,35 @@ contract Enterprise is EnterpriseStorage {
             newBorrowerReturnGraceTime,
             newEnterpriseCollectGraceTime
         );
+    }
+
+    function handleLoanPayment(
+        IERC20 paymentToken,
+        uint256 loanCost,
+        uint256 serviceFee,
+        uint112 interest
+    ) internal {
+        // Transfer loan payment to the enterprise.
+        paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
+
+        // Initially assume loan cost payment is made in liquidity tokens.
+        uint256 loanCostInLiquidityTokens = loanCost;
+        uint256 serviceFeeInLiquidityTokens = serviceFee;
+        uint112 interestInLiquidityTokens = interest;
+
+        // Should the loan cost payment be made in tokens other than liquidity tokens,
+        // the payment amount gets converted to liquidity tokens automatically.
+        if (address(paymentToken) != address(_liquidityToken)) {
+            paymentToken.approve(address(_converter), loanCost);
+            loanCostInLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
+            serviceFeeInLiquidityTokens = (serviceFee * loanCostInLiquidityTokens) / loanCost;
+            interestInLiquidityTokens = uint112(loanCostInLiquidityTokens - serviceFeeInLiquidityTokens);
+        }
+
+        // Transfer service fee (liquidity tokens) to the enterprise vault.
+        _liquidityToken.safeTransfer(_enterpriseVault, serviceFeeInLiquidityTokens);
+        // Update streaming target.
+        _increaseStreamingReserveTarget(interestInLiquidityTokens);
     }
 
     function returnLoan(uint256 borrowTokenId) external {
