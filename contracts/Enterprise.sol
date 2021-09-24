@@ -327,8 +327,7 @@ contract Enterprise is EnterpriseStorage {
         uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount));
 
         // Increase total reserves & shares.
-        _increaseReserve(amount);
-        _totalShares += newShares;
+        _increaseReserveAndShares(amount, newShares);
 
         // Mint new interest token and associate liquidity information.
         uint256 interestTokenId = _interestToken.mint(msg.sender);
@@ -359,8 +358,7 @@ contract Enterprise is EnterpriseStorage {
         uint256 remainingShares = _liquidityToShares(liquidityInfo.amount);
 
         // Decrease total reserves & shares.
-        _decreaseReserve(accruedInterest);
-        _totalShares -= (liquidityInfo.shares - remainingShares);
+        _decreaseReserveAndShares(accruedInterest, liquidityInfo.shares - remainingShares);
 
         // Update interest token liquidity information.
         liquidityInfo.shares = remainingShares;
@@ -389,8 +387,7 @@ contract Enterprise is EnterpriseStorage {
         _liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
 
         // Decrease total reserves & shares.
-        _decreaseReserve(liquidityWithInterest);
-        _totalShares -= shares;
+        _decreaseReserveAndShares(liquidityWithInterest, shares);
 
         // Burn interest token and delete associated liquidity information.
         _interestToken.burn(interestTokenId);
@@ -426,8 +423,7 @@ contract Enterprise is EnterpriseStorage {
         }
 
         // Decrease total reserves & shares.
-        _decreaseReserve(amount);
-        _totalShares -= shares;
+        _decreaseReserveAndShares(amount, shares);
 
         // Update interest token liquidity information.
         unchecked {
@@ -458,8 +454,7 @@ contract Enterprise is EnterpriseStorage {
         uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount));
 
         // Increase total reserves & shares.
-        _totalShares += newShares;
-        _increaseReserve(amount);
+        _increaseReserveAndShares(amount, newShares);
 
         // Update interest token liquidity information.
         LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
@@ -489,20 +484,21 @@ contract Enterprise is EnterpriseStorage {
         return powerToken.estimateLoan(paymentToken, amount, duration);
     }
 
-    function _increaseReserve(uint256 delta) internal {
-        _fixedReserve += delta;
+    function _increaseReserveAndShares(uint256 reserveDelta, uint256 sharesDelta) internal {
+        _totalShares += sharesDelta;
+        _fixedReserve += reserveDelta;
         emit FixedReserveChanged(_fixedReserve);
     }
 
-    function _decreaseReserve(uint256 delta) internal {
-        if (_fixedReserve >= delta) {
+    function _decreaseReserveAndShares(uint256 reserveDelta, uint256 sharesDelta) internal {
+        _totalShares -= sharesDelta;
+        if (_fixedReserve >= reserveDelta) {
             unchecked {
-                _fixedReserve -= delta;
+                _fixedReserve -= reserveDelta;
             }
         } else {
             uint256 streamingReserve = _flushStreamingReserve();
-
-            _fixedReserve = _fixedReserve + streamingReserve - delta;
+            _fixedReserve = _fixedReserve + streamingReserve - reserveDelta;
         }
         emit FixedReserveChanged(_fixedReserve);
     }
