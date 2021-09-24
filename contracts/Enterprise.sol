@@ -128,12 +128,12 @@ contract Enterprise is EnterpriseStorage {
         require(loanAmount > 0, Errors.E_INVALID_LOAN_AMOUNT);
         require(loanAmount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
+        // The loan cost consists of three components:
         uint112 interest;
         uint112 serviceFee;
         uint112 gcFee;
         {
             // Estimate loan cost.
-            // The loan cost consists of three components:
             (uint112 interestAmount, uint112 serviceFeeAmount, uint112 gcFeeAmount) = powerToken.estimateLoanDetailed(
                 paymentToken,
                 loanAmount,
@@ -154,23 +154,29 @@ contract Enterprise is EnterpriseStorage {
             // Transfer GC fee to the borrow token contract.
             paymentToken.safeTransferFrom(msg.sender, address(_borrowToken), gcFee);
 
+            // Initially assume loan cost payment is made in liquidity tokens.
+            uint256 loanCostInLiquidityTokens = loanCost;
+            uint256 serviceFeeInLiquidityTokens = serviceFee;
+            uint112 interestInLiquidityTokens = interest;
+
             // Should the loan cost payment be made in tokens other than liquidity tokens,
             // the payment amount gets converted to liquidity tokens automatically.
-            uint256 loanCostInLiquidityTokens = loanCost;
             if (address(paymentToken) != address(_liquidityToken)) {
                 paymentToken.approve(address(_converter), loanCost);
                 loanCostInLiquidityTokens = _converter.convert(paymentToken, loanCost, _liquidityToken);
+                serviceFeeInLiquidityTokens = (serviceFee * loanCostInLiquidityTokens) / loanCost;
+                interestInLiquidityTokens = uint112(loanCostInLiquidityTokens - serviceFeeInLiquidityTokens);
             }
 
-            uint256 serviceFeeInLiquidityTokens = (serviceFee * loanCostInLiquidityTokens) / loanCost;
+            // Transfer service fee (liquidity tokens) to the enterprise vault.
             _liquidityToken.safeTransfer(_enterpriseVault, serviceFeeInLiquidityTokens);
 
+            // Update used reserve & streaming target.
             _usedReserve += loanAmount;
-
-            uint112 poolInterest = uint112(loanCostInLiquidityTokens - serviceFeeInLiquidityTokens);
-            _increaseStreamingReserveTarget(poolInterest);
+            _increaseStreamingReserveTarget(interestInLiquidityTokens);
         }
 
+        // Calculate loan timestamps.
         uint32 borrowingTime = uint32(block.timestamp);
         uint32 maturityTime = borrowingTime + duration;
         uint32 borrowerReturnGraceTime = maturityTime + _borrowerLoanReturnGracePeriod;
