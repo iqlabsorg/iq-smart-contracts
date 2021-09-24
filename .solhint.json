@@ -14,6 +14,9 @@
     "func-visibility": ["error", {"ignoreConstructors": true}],
     "not-rely-on-time": "off",
     "reason-string": ["warn", {"maxLength": 64}],
-    "ordering": "warn"
+    "ordering": "warn",
+    "comprehensive-interface": "warn",
+    "modifier-name-mixedcase": "warn",
+    "max-line-length": "warn"
   }
 }
