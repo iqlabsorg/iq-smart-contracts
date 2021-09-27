@@ -324,7 +324,8 @@ contract Enterprise is EnterpriseStorage {
         _liquidityToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // Calculate number of new shares to be issued.
-        uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount));
+        uint256 reserve = getReserve();
+        uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount, reserve));
 
         // Increase total reserves & shares.
         _increaseReserveAndShares(amount, newShares);
@@ -339,7 +340,7 @@ contract Enterprise is EnterpriseStorage {
             LiquidityChangeType.Add,
             amount,
             _totalShares,
-            getReserve(),
+            reserve + amount,
             _usedReserve
         );
     }
@@ -355,7 +356,8 @@ contract Enterprise is EnterpriseStorage {
         _liquidityToken.safeTransfer(msg.sender, accruedInterest);
 
         // Recalculate the remaining number of shares after interest withdrawal.
-        uint256 remainingShares = _liquidityToShares(liquidityInfo.amount);
+        uint256 reserve = getReserve();
+        uint256 remainingShares = _liquidityToShares(liquidityInfo.amount, reserve);
 
         // Decrease total reserves & shares.
         _decreaseReserveAndShares(accruedInterest, liquidityInfo.shares - remainingShares);
@@ -369,7 +371,7 @@ contract Enterprise is EnterpriseStorage {
             LiquidityChangeType.WithdrawInterest,
             accruedInterest,
             _totalShares,
-            getReserve(),
+            reserve - accruedInterest,
             _usedReserve
         );
     }
@@ -380,7 +382,8 @@ contract Enterprise is EnterpriseStorage {
 
         // Calculate owing liquidity amount including accrued interest.
         uint256 shares = liquidityInfo.shares;
-        uint256 liquidityWithInterest = _sharesToLiquidity(shares);
+        uint256 reserve = getReserve();
+        uint256 liquidityWithInterest = _sharesToLiquidity(shares, reserve);
         require(liquidityWithInterest <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         // Transfer liquidity tokens to the interest token owner.
@@ -399,7 +402,7 @@ contract Enterprise is EnterpriseStorage {
             LiquidityChangeType.Remove,
             liquidityWithInterest,
             _totalShares,
-            getReserve(),
+            reserve - liquidityWithInterest,
             _usedReserve
         );
     }
@@ -417,7 +420,8 @@ contract Enterprise is EnterpriseStorage {
         _liquidityToken.safeTransfer(msg.sender, amount);
 
         // Calculate number of shares to be destroyed.
-        uint256 shares = _liquidityToShares(amount);
+        uint256 reserve = getReserve();
+        uint256 shares = _liquidityToShares(amount, reserve);
         if (shares > liquidityInfo.shares) {
             shares = liquidityInfo.shares;
         }
@@ -437,7 +441,7 @@ contract Enterprise is EnterpriseStorage {
             LiquidityChangeType.Decrease,
             amount,
             _totalShares,
-            getReserve(),
+            reserve - amount,
             _usedReserve
         );
     }
@@ -451,7 +455,8 @@ contract Enterprise is EnterpriseStorage {
         _liquidityToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // Calculate number of new shares to be issued.
-        uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount));
+        uint256 reserve = getReserve();
+        uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount, reserve));
 
         // Increase total reserves & shares.
         _increaseReserveAndShares(amount, newShares);
@@ -468,7 +473,7 @@ contract Enterprise is EnterpriseStorage {
             LiquidityChangeType.Increase,
             amount,
             _totalShares,
-            getReserve(),
+            reserve + amount,
             _usedReserve
         );
     }
@@ -503,12 +508,12 @@ contract Enterprise is EnterpriseStorage {
         emit FixedReserveChanged(_fixedReserve);
     }
 
-    function _liquidityToShares(uint256 amount) internal view returns (uint256) {
-        return (_totalShares * amount) / getReserve();
+    function _liquidityToShares(uint256 amount, uint256 reserve) internal view returns (uint256) {
+        return (_totalShares * amount) / reserve;
     }
 
-    function _sharesToLiquidity(uint256 shares) internal view returns (uint256) {
-        return (getReserve() * shares) / _totalShares;
+    function _sharesToLiquidity(uint256 shares, uint256 reserve) internal view returns (uint256) {
+        return (reserve * shares) / _totalShares;
     }
 
     function loanTransfer(
@@ -538,7 +543,7 @@ contract Enterprise is EnterpriseStorage {
     function getAccruedInterest(uint256 interestTokenId) public view returns (uint256) {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
 
-        uint256 liquidity = _sharesToLiquidity(liquidityInfo.shares);
+        uint256 liquidity = _sharesToLiquidity(liquidityInfo.shares, getReserve());
         // Due to rounding errors calculated liquidity could be insignificantly
         // less than provided liquidity
         return liquidity <= liquidityInfo.amount ? 0 : liquidity - liquidityInfo.amount;
