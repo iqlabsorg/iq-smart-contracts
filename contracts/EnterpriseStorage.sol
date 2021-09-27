@@ -204,11 +204,11 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         return _borrowToken;
     }
 
-    function paymentTokenIndex(IERC20 token) public view returns (int16) {
+    function getPaymentTokenIndex(IERC20 token) public view returns (int16) {
         return _paymentTokensIndex[address(token)] - 1;
     }
 
-    function paymentToken(uint256 index) external view returns (address) {
+    function getPaymentToken(uint256 index) external view returns (address) {
         return _paymentTokens[index];
     }
 

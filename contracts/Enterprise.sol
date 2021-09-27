@@ -166,7 +166,7 @@ contract Enterprise is EnterpriseStorage {
             borrowerReturnGraceTime,
             enterpriseCollectGraceTime,
             gcFee,
-            uint16(paymentTokenIndex(paymentToken))
+            uint16(getPaymentTokenIndex(paymentToken))
         );
 
         // Mint borrow token to the borrower address.
