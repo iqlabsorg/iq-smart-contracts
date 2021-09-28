@@ -119,8 +119,6 @@ abstract contract EnterpriseStorage is InitializableOwnable {
     event InterestGapHalvingPeriodChanged(uint32 period);
     event GcFeePercentChanged(uint16 percent);
     event EnterpriseShutdown();
-    event TotalSharesChanged(uint256 totalShares);
-    event UsedReserveChanged(uint256 fixedReserve);
     event FixedReserveChanged(uint256 fixedReserve);
     event StreamingReserveChanged(uint112 streamingReserve, uint112 streamingReserveTarget);
     event PaymentTokenChange(address paymentToken, bool enabled);
@@ -206,11 +204,11 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         return _borrowToken;
     }
 
-    function paymentTokenIndex(IERC20 token) public view returns (int16) {
+    function getPaymentTokenIndex(IERC20 token) public view returns (int16) {
         return _paymentTokensIndex[address(token)] - 1;
     }
 
-    function paymentToken(uint256 index) external view returns (address) {
+    function getPaymentToken(uint256 index) external view returns (address) {
         return _paymentTokens[index];
     }
 

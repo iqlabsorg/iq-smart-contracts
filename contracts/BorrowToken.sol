@@ -39,7 +39,7 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
     function burn(uint256 tokenId, address burner) external override onlyEnterprise {
         Enterprise enterprise = getEnterprise();
         Enterprise.LoanInfo memory loan = enterprise.getLoanInfo(tokenId);
-        IERC20 paymentToken = IERC20(enterprise.paymentToken(loan.gcFeeTokenIndex));
+        IERC20 paymentToken = IERC20(enterprise.getPaymentToken(loan.gcFeeTokenIndex));
         paymentToken.safeTransfer(burner, loan.gcFee);
 
         _burn(tokenId);

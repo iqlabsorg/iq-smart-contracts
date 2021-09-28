@@ -100,5 +100,5 @@ export enum LiquidityChangeType {
   Add,
   Remove,
   Increase,
-  Decrease
+  Decrease,
 }

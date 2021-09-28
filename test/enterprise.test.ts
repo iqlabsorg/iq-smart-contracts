@@ -17,7 +17,6 @@ import {
   basePrice,
   baseRate,
   borrow,
-  currentTime,
   deployEnterprise,
   estimateLoan,
   fromTokens,
@@ -36,7 +35,7 @@ import {
 } from './utils';
 import {Wallet} from '@ethersproject/wallet';
 import {BigNumber} from 'ethers';
-import {Errors, LiquidityChangeType} from './types';
+import {Errors} from './types';
 
 chai.use(waffle.solidity);
 const {expect} = chai;
@@ -762,9 +761,9 @@ describe('Enterprise', () => {
       await expect(enterprise.removeLiquidity(tokenId2)).to.be.revertedWith(
         Errors.E_INSUFFICIENT_LIQUIDITY
       );
-      await expect(enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n))
-        .to.emit(enterprise, 'LiquidityChanged')
-        .withArgs(tokenId2, LiquidityChangeType.Decrease, ONE_TOKEN * 10n);
+      await expect(
+        enterprise.decreaseLiquidity(tokenId2, ONE_TOKEN * 10n)
+      ).to.emit(enterprise, 'LiquidityChanged');
 
       const loanInfo2 = await enterprise.getLiquidityInfo(tokenId2);
       expect(loanInfo2.amount).to.eq(ONE_TOKEN * 1_990n);
@@ -803,9 +802,9 @@ describe('Enterprise', () => {
         .to.eq(await enterprise.getReserve());
 
       await token.approve(enterprise.address, ONE_TOKEN * 2_000n);
-      await expect(enterprise.increaseLiquidity(tokenId2, ONE_TOKEN * 2_000n))
-        .to.emit(enterprise, 'LiquidityChanged')
-        .withArgs(tokenId2, LiquidityChangeType.Increase, ONE_TOKEN * 2_000n);
+      await expect(
+        enterprise.increaseLiquidity(tokenId2, ONE_TOKEN * 2_000n)
+      ).to.emit(enterprise, 'LiquidityChanged');
 
       const loanInfo3 = await enterprise.getLiquidityInfo(tokenId2);
       expect(loanInfo3.amount).to.eq(ONE_TOKEN * 2_000n);
