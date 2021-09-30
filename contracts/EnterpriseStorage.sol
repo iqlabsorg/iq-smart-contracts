@@ -363,21 +363,29 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         emit InterestGapHalvingPeriodChanged(interestGapHalvingPeriod);
     }
 
-    function upgradePowerToken(PowerToken powerToken, address implementation) external onlyOwner {
-        require(_registeredPowerTokens[powerToken], Errors.UNREGISTERED_POWER_TOKEN);
-        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(powerToken))), implementation);
-    }
-
-    function upgradeBorrowToken(address implementation) external onlyOwner {
-        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(_borrowToken))), implementation);
-    }
-
-    function upgradeInterestToken(address implementation) external onlyOwner {
-        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(_interestToken))), implementation);
-    }
-
-    function upgradeEnterprise(address implementation) external onlyOwner {
-        getProxyAdmin().upgrade(TransparentUpgradeableProxy(payable(address(this))), implementation);
+    function upgrade(
+        address enterpriseImplementation,
+        address borrowTokenImplementation,
+        address interestTokenImplementation,
+        address powerTokenImplementation,
+        PowerToken[] calldata powerTokens
+    ) external onlyOwner {
+        ProxyAdmin admin = getProxyAdmin();
+        if (enterpriseImplementation != address(0)) {
+            admin.upgrade(TransparentUpgradeableProxy(payable(address(this))), enterpriseImplementation);
+        }
+        if (borrowTokenImplementation != address(0)) {
+            admin.upgrade(TransparentUpgradeableProxy(payable(address(_borrowToken))), borrowTokenImplementation);
+        }
+        if (interestTokenImplementation != address(0)) {
+            admin.upgrade(TransparentUpgradeableProxy(payable(address(_interestToken))), interestTokenImplementation);
+        }
+        if (powerTokenImplementation != address(0)) {
+            for (uint256 i = 0; i < powerTokens.length; i++) {
+                require(_registeredPowerTokens[powerTokens[i]], Errors.UNREGISTERED_POWER_TOKEN);
+                admin.upgrade(TransparentUpgradeableProxy(payable(address(powerTokens[i]))), powerTokenImplementation);
+            }
+        }
     }
 
     function setGcFeePercent(uint16 newGcFeePercent) external onlyOwner {
