@@ -7,7 +7,9 @@ import '@nomiclabs/hardhat-waffle';
 import '@typechain/hardhat';
 import 'solidity-coverage';
 import 'hardhat-contract-sizer';
-import {node_url, accounts} from './utils/network';
+import {node_url, accounts, privateKey} from './utils/network';
+import './tasks/allow-perpetual';
+import './tasks/set-base-rate';
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -73,12 +75,12 @@ const config: HardhatUserConfig = {
       accounts: accounts('goerli'),
     },
     binance: {
-      url: node_url('binance'),
+      url: 'https://bsc-dataseed.binance.org/',
       accounts: accounts('binance'),
     },
     binanceTestnet: {
-      url: node_url('binanceTestnet'),
-      accounts: accounts('binanceTestnet'),
+      url: 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+      accounts: privateKey('binanceTestnet'),
     },
   },
   paths: {

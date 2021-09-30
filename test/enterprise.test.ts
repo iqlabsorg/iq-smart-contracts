@@ -826,7 +826,13 @@ describe('Enterprise', () => {
       const Enterprise = await ethers.getContractFactory('Enterprise');
       const enterpriseImpl = await Enterprise.deploy();
 
-      await enterprise.upgradeEnterprise(enterpriseImpl.address);
+      await enterprise.upgrade(
+        enterpriseImpl.address,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        []
+      );
 
       expect(await getProxyImplementation(enterprise, enterprise)).eq(
         enterpriseImpl.address
@@ -849,9 +855,12 @@ describe('Enterprise', () => {
       const PowerToken = await ethers.getContractFactory('PowerToken');
       const powerTokenImpl = await PowerToken.deploy();
 
-      await enterprise.upgradePowerToken(
-        powerToken.address,
-        powerTokenImpl.address
+      await enterprise.upgrade(
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        powerTokenImpl.address,
+        [powerToken.address]
       );
 
       expect(await getProxyImplementation(enterprise, powerToken)).eq(
@@ -864,7 +873,13 @@ describe('Enterprise', () => {
       const borrowToken = BorrowToken.attach(await enterprise.getBorrowToken());
       const borrowTokenImpl = await BorrowToken.deploy();
 
-      await enterprise.upgradeBorrowToken(borrowTokenImpl.address);
+      await enterprise.upgrade(
+        ethers.constants.AddressZero,
+        borrowTokenImpl.address,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        []
+      );
 
       expect(await getProxyImplementation(enterprise, borrowToken)).eq(
         borrowTokenImpl.address
@@ -878,7 +893,13 @@ describe('Enterprise', () => {
       );
       const interestTokenImpl = await InterestToken.deploy();
 
-      await enterprise.upgradeInterestToken(interestTokenImpl.address);
+      await enterprise.upgrade(
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        interestTokenImpl.address,
+        ethers.constants.AddressZero,
+        []
+      );
 
       expect(await getProxyImplementation(enterprise, interestToken)).eq(
         interestTokenImpl.address

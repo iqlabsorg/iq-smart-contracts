@@ -921,55 +921,31 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "implementation",
-          "type": "address"
-        }
-      ],
-      "name": "upgradeBorrowToken",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "implementation",
-          "type": "address"
-        }
-      ],
-      "name": "upgradeEnterprise",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "implementation",
-          "type": "address"
-        }
-      ],
-      "name": "upgradeInterestToken",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "contract PowerToken",
-          "name": "powerToken",
+          "name": "enterpriseImplementation",
           "type": "address"
         },
         {
           "internalType": "address",
-          "name": "implementation",
+          "name": "borrowTokenImplementation",
           "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "interestTokenImplementation",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "powerTokenImplementation",
+          "type": "address"
+        },
+        {
+          "internalType": "contract PowerToken[]",
+          "name": "powerTokens",
+          "type": "address[]"
         }
       ],
-      "name": "upgradePowerToken",
+      "name": "upgrade",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
