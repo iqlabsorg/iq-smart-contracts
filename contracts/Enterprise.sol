@@ -25,7 +25,9 @@ contract Enterprise is EnterpriseStorage {
         uint256 indexed interestTokenId,
         address indexed liquidityProvider,
         LiquidityChangeType indexed changeType,
+        uint256 amountDelta,
         uint256 amount,
+        uint256 shares,
         uint256 totalShares,
         uint256 reserve,
         uint256 usedReserve
@@ -319,28 +321,30 @@ contract Enterprise is EnterpriseStorage {
      * One must approve sufficient amount of liquidity tokens to
      * Enterprise address before calling this function
      */
-    function addLiquidity(uint256 amount) external notShutdown {
+    function addLiquidity(uint256 liquidityAmount) external notShutdown {
         // Transfer liquidity tokens to the enterprise.
-        _liquidityToken.safeTransferFrom(msg.sender, address(this), amount);
+        _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
 
         // Calculate number of new shares to be issued.
         uint256 reserve = getReserve();
-        uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount, reserve));
+        uint256 shares = (_totalShares == 0 ? liquidityAmount : _liquidityToShares(liquidityAmount, reserve));
 
         // Increase total reserves & shares.
-        _increaseReserveAndShares(amount, newShares);
+        _increaseReserveAndShares(liquidityAmount, shares);
 
         // Mint new interest token and associate liquidity information.
         uint256 interestTokenId = _interestToken.mint(msg.sender);
-        _liquidityInfo[interestTokenId] = LiquidityInfo(amount, newShares, block.number);
+        _liquidityInfo[interestTokenId] = LiquidityInfo(liquidityAmount, shares, block.number);
 
         emit LiquidityChanged(
             interestTokenId,
             msg.sender,
             LiquidityChangeType.Add,
-            amount,
+            liquidityAmount,
+            liquidityAmount,
+            shares,
             _totalShares,
-            reserve + amount,
+            reserve + liquidityAmount,
             _usedReserve
         );
     }
@@ -356,20 +360,23 @@ contract Enterprise is EnterpriseStorage {
         _liquidityToken.safeTransfer(msg.sender, accruedInterest);
 
         // Recalculate the remaining number of shares after interest withdrawal.
+        uint256 liquidityAmount = liquidityInfo.amount;
         uint256 reserve = getReserve();
-        uint256 remainingShares = _liquidityToShares(liquidityInfo.amount, reserve);
+        uint256 shares = _liquidityToShares(liquidityAmount, reserve);
 
         // Decrease total reserves & shares.
-        _decreaseReserveAndShares(accruedInterest, liquidityInfo.shares - remainingShares);
+        _decreaseReserveAndShares(accruedInterest, liquidityInfo.shares - shares);
 
         // Update interest token liquidity information.
-        liquidityInfo.shares = remainingShares;
+        liquidityInfo.shares = shares;
 
         emit LiquidityChanged(
             interestTokenId,
             msg.sender,
             LiquidityChangeType.WithdrawInterest,
             accruedInterest,
+            liquidityAmount,
+            shares,
             _totalShares,
             reserve - accruedInterest,
             _usedReserve
@@ -401,79 +408,89 @@ contract Enterprise is EnterpriseStorage {
             msg.sender,
             LiquidityChangeType.Remove,
             liquidityWithInterest,
+            0,
+            0,
             _totalShares,
             reserve - liquidityWithInterest,
             _usedReserve
         );
     }
 
-    function decreaseLiquidity(uint256 interestTokenId, uint256 amount)
+    function decreaseLiquidity(uint256 interestTokenId, uint256 liquidityAmount)
         external
         onlyInterestTokenOwner(interestTokenId)
     {
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
+        LiquidityInfo memory liquidityInfo = _liquidityInfo[interestTokenId];
         require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
-        require(liquidityInfo.amount >= amount, Errors.E_INSUFFICIENT_LIQUIDITY);
-        require(amount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
+        require(liquidityInfo.amount >= liquidityAmount, Errors.E_INSUFFICIENT_LIQUIDITY);
+        require(liquidityAmount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         // Transfer liquidity tokens to the interest token owner.
-        _liquidityToken.safeTransfer(msg.sender, amount);
+        _liquidityToken.safeTransfer(msg.sender, liquidityAmount);
 
         // Calculate number of shares to be destroyed.
         uint256 reserve = getReserve();
-        uint256 shares = _liquidityToShares(amount, reserve);
-        if (shares > liquidityInfo.shares) {
-            shares = liquidityInfo.shares;
+        uint256 sharesDelta = _liquidityToShares(liquidityAmount, reserve);
+        if (sharesDelta > liquidityInfo.shares) {
+            sharesDelta = liquidityInfo.shares;
         }
 
         // Decrease total reserves & shares.
-        _decreaseReserveAndShares(amount, shares);
+        _decreaseReserveAndShares(liquidityAmount, sharesDelta);
 
         // Update interest token liquidity information.
         unchecked {
-            liquidityInfo.shares -= shares;
-            liquidityInfo.amount -= amount;
+            liquidityInfo.shares -= sharesDelta;
+            liquidityInfo.amount -= liquidityAmount;
         }
+        _liquidityInfo[interestTokenId].shares = liquidityInfo.shares;
+        _liquidityInfo[interestTokenId].amount = liquidityInfo.amount;
 
         emit LiquidityChanged(
             interestTokenId,
             msg.sender,
             LiquidityChangeType.Decrease,
-            amount,
+            liquidityAmount,
+            liquidityInfo.amount,
+            liquidityInfo.shares,
             _totalShares,
-            reserve - amount,
+            reserve - liquidityAmount,
             _usedReserve
         );
     }
 
-    function increaseLiquidity(uint256 interestTokenId, uint256 amount)
+    function increaseLiquidity(uint256 interestTokenId, uint256 liquidityAmount)
         external
         notShutdown
         onlyInterestTokenOwner(interestTokenId)
     {
         // Transfer liquidity tokens to the enterprise.
-        _liquidityToken.safeTransferFrom(msg.sender, address(this), amount);
+        _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
 
         // Calculate number of new shares to be issued.
         uint256 reserve = getReserve();
-        uint256 newShares = (_totalShares == 0 ? amount : _liquidityToShares(amount, reserve));
+        uint256 sharesDelta = (_totalShares == 0 ? liquidityAmount : _liquidityToShares(liquidityAmount, reserve));
 
         // Increase total reserves & shares.
-        _increaseReserveAndShares(amount, newShares);
+        _increaseReserveAndShares(liquidityAmount, sharesDelta);
 
         // Update interest token liquidity information.
         LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
-        liquidityInfo.amount += amount;
-        liquidityInfo.shares += newShares;
+        uint256 amount = liquidityInfo.amount + liquidityAmount;
+        uint256 shares = liquidityInfo.shares + sharesDelta;
+        liquidityInfo.amount = amount;
+        liquidityInfo.shares = shares;
         liquidityInfo.block = block.number;
 
         emit LiquidityChanged(
             interestTokenId,
             msg.sender,
             LiquidityChangeType.Increase,
+            liquidityAmount,
             amount,
+            shares,
             _totalShares,
-            reserve + amount,
+            reserve + liquidityAmount,
             _usedReserve
         );
     }
