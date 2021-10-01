@@ -52,7 +52,12 @@ export function getPrivateKey(networkName?: string): string {
     const privateKey = process.env['PRIVATE_KEY_' + networkName.toUpperCase()];
     if (privateKey && privateKey !== '') return privateKey;
   }
-  return process.env.PRIVATE_KEY || '0x';
+
+  const privateKey = process.env.PRIVATE_KEY;
+  if (privateKey && privateKey !== '') return privateKey;
+
+  // default private key (hardhat)
+  return '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 }
 
 export function privateKey(networkName?: string): string[] {
