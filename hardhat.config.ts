@@ -8,8 +8,6 @@ import '@typechain/hardhat';
 import 'solidity-coverage';
 import 'hardhat-contract-sizer';
 import {node_url, accounts, privateKey} from './utils/network';
-import './tasks/allow-perpetual';
-import './tasks/set-base-rate';
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -22,7 +20,7 @@ const config: HardhatUserConfig = {
     },
   },
   contractSizer: {
-    runOnCompile: process.env.REPORT_SIZE ? true : false,
+    runOnCompile: !!process.env.REPORT_SIZE,
     disambiguatePaths: false,
   },
   namedAccounts: {
@@ -89,7 +87,7 @@ const config: HardhatUserConfig = {
   gasReporter: {
     currency: 'USD',
     gasPrice: 100,
-    enabled: process.env.REPORT_GAS ? true : false,
+    enabled: !!process.env.REPORT_GAS,
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     maxMethodDiff: 10,
   },
