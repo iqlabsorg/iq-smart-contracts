@@ -1028,12 +1028,28 @@ describe('Enterprise', () => {
       borrowId = await getBorrowTokenId(enterprise, borrowTx);
     });
 
+    it('should not be possible to move borrow tokens by default', async () => {
+      await expect(
+        borrowToken
+          .connect(borrower)
+          .transferFrom(borrower.address, stranger.address, borrowId)
+      ).to.be.revertedWith(Errors.BT_TRANSFER_NOT_ALLOWED);
+    });
+
     it('should not be possible to move borrowed PowerToken directly', async () => {
-      await expect(powerToken.transfer(stranger.address, ONE_TOKEN * 100n)).to
-        .be.reverted;
+      expect(await powerToken.balanceOf(borrower.address)).to.eq(
+        ONE_TOKEN * 100n
+      );
+      await expect(
+        powerToken
+          .connect(borrower)
+          .transfer(stranger.address, ONE_TOKEN * 100n)
+      ).to.be.revertedWith(Errors.PT_INSUFFICIENT_AVAILABLE_BALANCE);
     });
 
     it('should be possible to move borrowed PowerToken by moving BorrowToken', async () => {
+      await borrowToken.allowTransferForever();
+
       await borrowToken
         .connect(borrower)
         .transferFrom(borrower.address, stranger.address, borrowId);
@@ -1045,13 +1061,15 @@ describe('Enterprise', () => {
     });
 
     it('should not be possible to move expired borrowed PowerToken', async () => {
+      await borrowToken.allowTransferForever();
+
       await increaseTime(ONE_DAY * 2);
 
       await expect(
         borrowToken
           .connect(borrower)
           .transferFrom(borrower.address, stranger.address, borrowId)
-      ).to.be.reverted;
+      ).to.be.revertedWith(Errors.E_LOAN_TRANSFER_NOT_ALLOWED);
     });
   });
 });

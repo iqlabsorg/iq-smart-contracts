@@ -60,15 +60,19 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         address from,
         address to,
         uint256 value,
-        bool updateLockedBalance
+        bool isBorrowedTokenTransfer
     ) internal override {
-        uint32 timestamp = uint32(block.timestamp);
+        require(
+            from == address(0) || to == address(0) || isBorrowedTokenTransfer || _allowsTransfer,
+            Errors.PT_TRANSFER_NOT_ALLOWED
+        );
 
+        uint32 timestamp = uint32(block.timestamp);
         if (from != address(0)) {
             State memory fromState = _states[from];
             fromState.energy = _getEnergy(fromState, from, timestamp);
             fromState.timestamp = timestamp;
-            if (!updateLockedBalance) {
+            if (!isBorrowedTokenTransfer) {
                 require(balanceOf(from) - value >= fromState.lockedBalance, Errors.PT_INSUFFICIENT_AVAILABLE_BALANCE);
             } else {
                 fromState.lockedBalance -= uint112(value);
@@ -80,7 +84,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             State memory toState = _states[to];
             toState.energy = _getEnergy(toState, to, timestamp);
             toState.timestamp = timestamp;
-            if (updateLockedBalance) {
+            if (isBorrowedTokenTransfer) {
                 toState.lockedBalance += uint112(value);
             }
             _states[to] = toState;

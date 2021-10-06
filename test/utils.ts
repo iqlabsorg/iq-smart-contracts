@@ -328,9 +328,10 @@ export const registerService = async (
   minLoanDuration: BigNumberish,
   maxLoanDuration: BigNumberish,
   minGCFee: BigNumberish,
-  allowsPerpetualTokens: boolean
+  allowsPerpetualTokens: boolean,
+  allowsTransfers = true
 ): Promise<PowerToken> => {
-  const txPromise = enterprise.registerService(
+  const tx = await enterprise.registerService(
     'IQ Power Test',
     'IQPT',
     halfLife,
@@ -340,8 +341,9 @@ export const registerService = async (
     minLoanDuration,
     maxLoanDuration,
     minGCFee,
-    allowsPerpetualTokens
+    allowsPerpetualTokens,
+    allowsTransfers
   );
 
-  return getPowerToken(enterprise, await txPromise);
+  return getPowerToken(enterprise, tx);
 };

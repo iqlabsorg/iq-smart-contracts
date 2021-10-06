@@ -18,7 +18,6 @@ contract EnterpriseFactory {
         string baseUri,
         address deployed
     );
-
     address private immutable _enterpriseImpl;
     address private immutable _powerTokenImpl;
     address private immutable _interestTokenImpl;

@@ -112,4 +112,8 @@ library Errors {
     string internal constant E_INVALID_LOAN_AMOUNT = "76";
     string internal constant ES_INVALID_BONDING_POLE = "77";
     string internal constant ES_INVALID_BONDING_SLOPE = "78";
+    string internal constant ES_TRANSFER_ALREADY_ALLOWED = "79";
+    string internal constant PT_TRANSFER_NOT_ALLOWED = "80";
+    string internal constant BT_TRANSFER_NOT_ALLOWED = "81";
+    string internal constant BT_TRANSFER_ALREADY_ALLOWED = "82";
 }

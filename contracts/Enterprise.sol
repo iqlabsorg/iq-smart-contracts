@@ -84,7 +84,8 @@ contract Enterprise is EnterpriseStorage {
         uint32 minLoanDuration,
         uint32 maxLoanDuration,
         uint96 minGCFee,
-        bool allowsPerpetualTokensForever
+        bool allowsPerpetualTokensForever,
+        bool allowsTransfersForever
     ) external onlyOwner notShutdown {
         require(address(baseToken) != address(0), Errors.E_INVALID_BASE_TOKEN_ADDRESS);
         require(_powerTokens.length < type(uint16).max, Errors.E_SERVICE_LIMIT_REACHED);
@@ -96,19 +97,20 @@ contract Enterprise is EnterpriseStorage {
             string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", symbol));
             powerToken.initialize(serviceName, powerTokenSymbol, _liquidityToken.decimals());
         }
-        // Configure service parameters.
-        powerToken.initialize(
-            this,
-            baseRate,
-            minGCFee,
-            gapHalvingPeriod,
-            uint16(_powerTokens.length),
-            baseToken,
-            minLoanDuration,
-            maxLoanDuration,
-            serviceFeePercent,
-            allowsPerpetualTokensForever
-        );
+        {
+            // Configure service parameters.
+            powerToken.initialize(this, baseRate, minGCFee, gapHalvingPeriod, uint16(_powerTokens.length), baseToken);
+        }
+
+        {
+            powerToken.initialize2(
+                minLoanDuration,
+                maxLoanDuration,
+                serviceFeePercent,
+                allowsPerpetualTokensForever,
+                allowsTransfersForever
+            );
+        }
 
         // Complete service registration.
         _powerTokens.push(powerToken);

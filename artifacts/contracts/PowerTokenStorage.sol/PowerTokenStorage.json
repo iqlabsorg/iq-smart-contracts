@@ -67,8 +67,21 @@
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [],
+      "name": "TransfersAllowed",
+      "type": "event"
+    },
+    {
       "inputs": [],
       "name": "allowPerpetualForever",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "allowTransferForever",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -270,7 +283,28 @@
           "internalType": "contract IERC20Metadata",
           "name": "baseToken",
           "type": "address"
-        },
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract Enterprise",
+          "name": "enterprise",
+          "type": "address"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
         {
           "internalType": "uint32",
           "name": "minLoanDuration",
@@ -290,22 +324,14 @@
           "internalType": "bool",
           "name": "allowsPerpetual",
           "type": "bool"
-        }
-      ],
-      "name": "initialize",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
+        },
         {
-          "internalType": "contract Enterprise",
-          "name": "enterprise",
-          "type": "address"
+          "internalType": "bool",
+          "name": "allowsTransfer",
+          "type": "bool"
         }
       ],
-      "name": "initialize",
+      "name": "initialize2",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

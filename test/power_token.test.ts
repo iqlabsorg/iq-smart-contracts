@@ -31,7 +31,8 @@ describe('PowerToken', function () {
       0,
       ONE_DAY * 365,
       ONE_TOKEN,
-      true
+      true,
+      false
     );
   });
 
@@ -69,6 +70,7 @@ describe('PowerToken', function () {
   describe('Basic', () => {
     it('should be possible to set base rate', async () => {
       await powerToken.setBaseRate(5, token.address, ONE_TOKEN);
+
       expect(await powerToken.getBaseRate()).to.eq(5);
       expect(await powerToken.getMinGCFee()).to.eq(ONE_TOKEN);
     });
@@ -81,8 +83,11 @@ describe('PowerToken', function () {
 
     it('should be possible to set loan duration limits', async () => {
       await powerToken.setLoanDurationLimits(1, 200);
+
       expect(await powerToken.getMinLoanDuration()).to.eq(1);
       expect(await powerToken.getMaxLoanDuration()).to.eq(200);
     });
   });
+
+  //TODO: write PowerToken transfer tests
 });

@@ -24,6 +24,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
     uint32 internal _maxLoanDuration;
     uint16 internal _serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
     bool internal _allowsPerpetual; // allows wrapping tokens into perpetual PowerTokens
+    bool internal _allowsTransfer; // allows transfers of wrapped liquidity tokens
 
     mapping(address => State) internal _states;
 
@@ -31,6 +32,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
     event ServiceFeePercentChanged(uint16 percent);
     event LoanDurationLimitsChanged(uint32 minDuration, uint32 maxDuration);
     event PerpetualAllowed();
+    event TransfersAllowed();
 
     function initialize(
         Enterprise enterprise,
@@ -38,16 +40,10 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
         uint96 minGCFee,
         uint32 gapHalvingPeriod,
         uint16 index,
-        IERC20Metadata baseToken,
-        uint32 minLoanDuration,
-        uint32 maxLoanDuration,
-        uint16 serviceFeePercent,
-        bool allowsPerpetual
+        IERC20Metadata baseToken
     ) external {
         require(_gapHalvingPeriod == 0, Errors.ALREADY_INITIALIZED);
         require(gapHalvingPeriod > 0, Errors.E_SERVICE_GAP_HALVING_PERIOD_NOT_GT_0);
-        require(serviceFeePercent <= MAX_SERVICE_FEE_PERCENT, Errors.ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED);
-        require(_minLoanDuration <= _maxLoanDuration, Errors.E_INVALID_LOAN_DURATION_RANGE);
 
         EnterpriseOwnable.initialize(enterprise);
         _baseRate = baseRate;
@@ -55,15 +51,29 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
         _gapHalvingPeriod = gapHalvingPeriod;
         _index = index;
         _baseToken = baseToken;
+        emit BaseRateChanged(baseRate, address(baseToken), minGCFee);
+    }
+
+    function initialize2(
+        uint32 minLoanDuration,
+        uint32 maxLoanDuration,
+        uint16 serviceFeePercent,
+        bool allowsPerpetual,
+        bool allowsTransfer
+    ) external {
+        require(_maxLoanDuration == 0, Errors.ALREADY_INITIALIZED);
         _minLoanDuration = minLoanDuration;
         _maxLoanDuration = maxLoanDuration;
         _serviceFeePercent = serviceFeePercent;
         _allowsPerpetual = allowsPerpetual;
-        emit BaseRateChanged(baseRate, address(baseToken), minGCFee);
+        _allowsTransfer = allowsTransfer;
         emit ServiceFeePercentChanged(serviceFeePercent);
         emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
         if (allowsPerpetual) {
             emit PerpetualAllowed();
+        }
+        if (allowsTransfer) {
+            emit TransfersAllowed();
         }
     }
 
@@ -101,6 +111,13 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
 
         _allowsPerpetual = true;
         emit PerpetualAllowed();
+    }
+
+    function allowTransferForever() external onlyEnterpriseOwner {
+        require(!_allowsTransfer, Errors.ES_TRANSFER_ALREADY_ALLOWED);
+
+        _allowsTransfer = true;
+        emit TransfersAllowed();
     }
 
     function isAllowedLoanDuration(uint32 duration) public view returns (bool) {

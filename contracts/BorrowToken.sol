@@ -4,12 +4,12 @@ pragma solidity 0.8.4;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./Enterprise.sol";
-import "./EnterpriseOwnable.sol";
-import "./token/ERC721Enumerable.sol";
+import "./BorrowTokenStorage.sol";
 
-contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
+contract BorrowToken is BorrowTokenStorage, IBorrowToken {
     using SafeERC20 for IERC20;
-    uint256 private _tokenIdTracker;
+
+    event TransfersAllowed();
 
     function initialize(
         string memory name,
@@ -18,6 +18,7 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
     ) external {
         EnterpriseOwnable.initialize(enterprise);
         ERC721.initialize(name, symbol);
+        _allowsTransfer = false;
     }
 
     function getNextTokenId() public view override returns (uint256) {
@@ -45,11 +46,20 @@ contract BorrowToken is IBorrowToken, EnterpriseOwnable, ERC721Enumerable {
         _burn(tokenId);
     }
 
+    function allowTransferForever() external onlyEnterpriseOwner {
+        require(!_allowsTransfer, Errors.BT_TRANSFER_ALREADY_ALLOWED);
+
+        _allowsTransfer = true;
+        emit TransfersAllowed();
+    }
+
     function _beforeTokenTransfer(
         address from,
         address to,
         uint256 tokenId
     ) internal override {
+        require(from == address(0) || to == address(0) || _allowsTransfer, Errors.BT_TRANSFER_NOT_ALLOWED);
+
         super._beforeTokenTransfer(from, to, tokenId);
         getEnterprise().loanTransfer(from, to, tokenId);
     }
