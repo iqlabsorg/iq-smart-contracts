@@ -1,0 +1,293 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IEnterpriseStorage",
+  "sourceName": "contracts/interfaces/IEnterpriseStorage.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "getAvailableReserve",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getBaseUri",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getBondingCurve",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "pole",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "slope",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getConverter",
+      "outputs": [
+        {
+          "internalType": "contract IConverter",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getGCFeePercent",
+      "outputs": [
+        {
+          "internalType": "uint16",
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getLiquidityToken",
+      "outputs": [
+        {
+          "internalType": "contract IERC20Metadata",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "borrowTokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getLoanInfo",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint112",
+              "name": "amount",
+              "type": "uint112"
+            },
+            {
+              "internalType": "uint16",
+              "name": "powerTokenIndex",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint32",
+              "name": "borrowingTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maturityTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "borrowerReturnGraceTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "enterpriseCollectGraceTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint112",
+              "name": "gcFee",
+              "type": "uint112"
+            },
+            {
+              "internalType": "uint16",
+              "name": "gcFeeTokenIndex",
+              "type": "uint16"
+            }
+          ],
+          "internalType": "struct IEnterpriseStorage.LoanInfo",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        }
+      ],
+      "name": "getPaymentToken",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getReserve",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getUsedReserve",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "enterpriseName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "baseUri",
+          "type": "string"
+        },
+        {
+          "internalType": "uint16",
+          "name": "gcFeePercent",
+          "type": "uint16"
+        },
+        {
+          "internalType": "contract IConverter",
+          "name": "converter",
+          "type": "address"
+        },
+        {
+          "internalType": "contract ProxyAdmin",
+          "name": "proxyAdmin",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "initialOwner",
+          "type": "address"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20Metadata",
+          "name": "liquidityToken",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IInterestToken",
+          "name": "interestToken",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IBorrowToken",
+          "name": "borrowToken",
+          "type": "address"
+        }
+      ],
+      "name": "initializeTokens",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "isSupportedPaymentToken",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

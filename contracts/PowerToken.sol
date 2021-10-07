@@ -11,7 +11,7 @@ import "./EnterpriseStorage.sol";
 import "./PowerTokenStorage.sol";
 import "./libs/Errors.sol";
 
-contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
+contract PowerToken is ERC20, PowerTokenStorage, IPowerToken {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Metadata;
 
@@ -63,8 +63,8 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         bool isBorrowedTokenTransfer
     ) internal override {
         require(
-            from == address(0) || to == address(0) || isBorrowedTokenTransfer || _allowsTransfer,
-            Errors.PT_TRANSFER_NOT_ALLOWED
+            from == address(0) || to == address(0) || isBorrowedTokenTransfer || _transfersEnabled,
+            Errors.PT_TRANSFERS_DISABLED
         );
 
         uint32 timestamp = uint32(block.timestamp);
@@ -105,7 +105,8 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             uint32 minLoanDuration,
             uint32 maxLoanDuration,
             uint16 serviceFeePercent,
-            bool allowsPerpetual
+            bool wrappingEnabled,
+            bool transfersEnabled
         )
     {
         return (
@@ -119,7 +120,8 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             _minLoanDuration,
             _maxLoanDuration,
             _serviceFeePercent,
-            _allowsPerpetual
+            _wrappingEnabled,
+            _transfersEnabled
         );
     }
 
@@ -144,7 +146,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     }
 
     function _wrapTo(address to, uint256 amount) internal returns (bool) {
-        require(_allowsPerpetual, Errors.E_WRAPPING_NOT_ALLOWED);
+        require(_wrappingEnabled, Errors.E_WRAPPING_DISABLED);
 
         getEnterprise().getLiquidityToken().safeTransferFrom(msg.sender, address(this), amount);
         _mint(to, amount, false);
@@ -158,10 +160,10 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     }
 
     function estimateLoan(
-        IERC20 paymentToken,
+        address paymentToken,
         uint112 amount,
         uint32 duration
-    ) external view returns (uint256) {
+    ) external view override returns (uint256) {
         (uint112 interest, uint112 serviceFee, uint112 gcFee) = _estimateLoanDetailed(paymentToken, amount, duration);
 
         return interest + serviceFee + gcFee;
@@ -174,12 +176,13 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
      *  3) Loan return lien
      */
     function estimateLoanDetailed(
-        IERC20 paymentToken,
+        address paymentToken,
         uint112 amount,
         uint32 duration
     )
         external
         view
+        override
         returns (
             uint112 interest,
             uint112 serviceFee,
@@ -190,7 +193,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     }
 
     function _estimateLoanDetailed(
-        IERC20 paymentToken,
+        address paymentToken,
         uint112 amount,
         uint32 duration
     )
@@ -206,20 +209,26 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         require(isAllowedLoanDuration(duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
 
         uint112 loanBaseCost = estimateCost(amount, duration);
-        uint256 loanCost = getEnterprise().getConverter().estimateConvert(_baseToken, loanBaseCost, paymentToken);
+        uint256 loanCost = getEnterprise().getConverter().estimateConvert(
+            _baseToken,
+            loanBaseCost,
+            IERC20(paymentToken)
+        );
 
         serviceFee = uint112((loanCost * _serviceFeePercent) / 10_000);
         interest = uint112(loanCost - serviceFee);
         gcFee = _estimateGCFee(paymentToken, loanCost);
     }
 
-    function _estimateGCFee(IERC20 paymentToken, uint256 amount) internal view returns (uint112) {
+    function _estimateGCFee(address paymentToken, uint256 amount) internal view returns (uint112) {
         uint112 gcFeeAmount = uint112((amount * getEnterprise().getGCFeePercent()) / 10_000);
-        uint112 minGcFee = uint112(getEnterprise().getConverter().estimateConvert(_baseToken, _minGCFee, paymentToken));
+        uint112 minGcFee = uint112(
+            getEnterprise().getConverter().estimateConvert(_baseToken, _minGCFee, IERC20(paymentToken))
+        );
         return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
     }
 
-    function notifyNewLoan(uint256 borrowTokenId) external {}
+    function notifyNewLoan(uint256 borrowTokenId) external override {}
 
     /**
      * @dev

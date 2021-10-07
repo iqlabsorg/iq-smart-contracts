@@ -3,11 +3,11 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import "./Enterprise.sol";
 import "./interfaces/IConverter.sol";
-import "./InterestToken.sol";
-import "./BorrowToken.sol";
-import "./PowerToken.sol";
+import "./interfaces/IEnterprise.sol";
+import "./interfaces/IInterestToken.sol";
+import "./interfaces/IBorrowToken.sol";
+import "./interfaces/IPowerToken.sol";
 import "./libs/Errors.sol";
 
 contract EnterpriseFactory {
@@ -45,17 +45,17 @@ contract EnterpriseFactory {
         string calldata baseUri,
         uint16 gcFeePercent,
         IConverter converter
-    ) external returns (Enterprise) {
+    ) external returns (IEnterprise) {
         ProxyAdmin proxyAdmin = new ProxyAdmin();
 
-        Enterprise enterprise = Enterprise(deployProxy(_enterpriseImpl, proxyAdmin));
+        IEnterprise enterprise = IEnterprise(deployProxy(_enterpriseImpl, proxyAdmin));
         proxyAdmin.transferOwnership(address(enterprise));
         {
             enterprise.initialize(name, baseUri, gcFeePercent, converter, proxyAdmin, msg.sender);
         }
         {
-            InterestToken interestToken = _deployInterestToken(liquidityToken.symbol(), enterprise, proxyAdmin);
-            BorrowToken borrowToken = _deployBorrowToken(liquidityToken.symbol(), enterprise, proxyAdmin);
+            IInterestToken interestToken = _deployInterestToken(liquidityToken.symbol(), enterprise, proxyAdmin);
+            IBorrowToken borrowToken = _deployBorrowToken(liquidityToken.symbol(), enterprise, proxyAdmin);
             enterprise.initializeTokens(liquidityToken, interestToken, borrowToken);
         }
 
@@ -68,32 +68,32 @@ contract EnterpriseFactory {
         return address(new TransparentUpgradeableProxy(implementation, address(admin), ""));
     }
 
-    function deployService(ProxyAdmin admin) external returns (PowerToken) {
-        return PowerToken(deployProxy(_powerTokenImpl, admin));
+    function deployService(ProxyAdmin admin) external returns (IPowerToken) {
+        return IPowerToken(deployProxy(_powerTokenImpl, admin));
     }
 
     function _deployInterestToken(
         string memory symbol,
-        Enterprise enterprise,
+        IEnterprise enterprise,
         ProxyAdmin proxyAdmin
-    ) internal returns (InterestToken) {
+    ) internal returns (IInterestToken) {
         string memory interestTokenName = string(abi.encodePacked("Interest Bearing ", symbol));
         string memory interestTokenSymbol = string(abi.encodePacked("i", symbol));
 
-        InterestToken interestToken = InterestToken(deployProxy(_interestTokenImpl, proxyAdmin));
+        IInterestToken interestToken = IInterestToken(deployProxy(_interestTokenImpl, proxyAdmin));
         interestToken.initialize(interestTokenName, interestTokenSymbol, enterprise);
         return interestToken;
     }
 
     function _deployBorrowToken(
         string memory symbol,
-        Enterprise enterprise,
+        IEnterprise enterprise,
         ProxyAdmin proxyAdmin
-    ) internal returns (BorrowToken) {
+    ) internal returns (IBorrowToken) {
         string memory borrowTokenName = string(abi.encodePacked("Borrow ", symbol));
         string memory borrowTokenSymbol = string(abi.encodePacked("b", symbol));
 
-        BorrowToken borrowToken = BorrowToken(deployProxy(_borrowTokenImpl, proxyAdmin));
+        IBorrowToken borrowToken = IBorrowToken(deployProxy(_borrowTokenImpl, proxyAdmin));
         borrowToken.initialize(borrowTokenName, borrowTokenSymbol, enterprise);
         return borrowToken;
     }

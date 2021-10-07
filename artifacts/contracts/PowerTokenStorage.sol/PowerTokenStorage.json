@@ -49,12 +49,6 @@
     },
     {
       "anonymous": false,
-      "inputs": [],
-      "name": "PerpetualAllowed",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
       "inputs": [
         {
           "indexed": false,
@@ -69,19 +63,25 @@
     {
       "anonymous": false,
       "inputs": [],
-      "name": "TransfersAllowed",
+      "name": "TransfersEnabled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "WrappingEnabled",
       "type": "event"
     },
     {
       "inputs": [],
-      "name": "allowPerpetualForever",
+      "name": "enableTransfersForever",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [],
-      "name": "allowTransferForever",
+      "name": "enableWrappingForever",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -130,7 +130,7 @@
       "name": "getEnterprise",
       "outputs": [
         {
-          "internalType": "contract Enterprise",
+          "internalType": "contract IEnterprise",
           "name": "",
           "type": "address"
         }
@@ -255,7 +255,7 @@
     {
       "inputs": [
         {
-          "internalType": "contract Enterprise",
+          "internalType": "contract IEnterprise",
           "name": "enterprise",
           "type": "address"
         },
@@ -293,7 +293,7 @@
     {
       "inputs": [
         {
-          "internalType": "contract Enterprise",
+          "internalType": "contract IEnterprise",
           "name": "enterprise",
           "type": "address"
         }
@@ -322,12 +322,12 @@
         },
         {
           "internalType": "bool",
-          "name": "allowsPerpetual",
+          "name": "wrappingEnabled",
           "type": "bool"
         },
         {
           "internalType": "bool",
-          "name": "allowsTransfer",
+          "name": "transersEnabled",
           "type": "bool"
         }
       ],

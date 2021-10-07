@@ -648,7 +648,7 @@ describe('Enterprise', () => {
   });
 
   describe('multi borrow scenario', () => {
-    let powerToken: IPowerToken;
+    let powerToken: PowerToken;
     let interestRateGapHalvingPeriod: number;
     beforeEach(async () => {
       enterprise = await deployEnterprise('Test', token.address);
@@ -1048,7 +1048,7 @@ describe('Enterprise', () => {
     });
 
     it('should be possible to move borrowed PowerToken by moving BorrowToken', async () => {
-      await borrowToken.allowTransferForever();
+      await borrowToken.enableTransfersForever();
 
       await borrowToken
         .connect(borrower)
@@ -1061,7 +1061,7 @@ describe('Enterprise', () => {
     });
 
     it('should not be possible to move expired borrowed PowerToken', async () => {
-      await borrowToken.allowTransferForever();
+      await borrowToken.enableTransfersForever();
 
       await increaseTime(ONE_DAY * 2);
 

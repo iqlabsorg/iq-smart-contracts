@@ -1,23 +1,20 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "EnterpriseOwnable",
-  "sourceName": "contracts/EnterpriseOwnable.sol",
+  "contractName": "IInterestTokenStorage",
+  "sourceName": "contracts/interfaces/IInterestTokenStorage.sol",
   "abi": [
     {
-      "inputs": [],
-      "name": "getEnterprise",
-      "outputs": [
-        {
-          "internalType": "contract IEnterprise",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
       "inputs": [
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "symbol",
+          "type": "string"
+        },
         {
           "internalType": "contract IEnterprise",
           "name": "enterprise",

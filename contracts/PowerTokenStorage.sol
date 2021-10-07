@@ -3,10 +3,12 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "./interfaces/IEnterprise.sol";
+import "./interfaces/IPowerTokenStorage.sol";
 import "./EnterpriseOwnable.sol";
 import "./libs/Errors.sol";
 
-abstract contract PowerTokenStorage is EnterpriseOwnable {
+abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
     uint16 internal constant MAX_SERVICE_FEE_PERCENT = 5000; // 50%
     struct State {
         uint112 lockedBalance;
@@ -23,25 +25,25 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
     uint32 internal _minLoanDuration;
     uint32 internal _maxLoanDuration;
     uint16 internal _serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
-    bool internal _allowsPerpetual; // allows wrapping tokens into perpetual PowerTokens
-    bool internal _allowsTransfer; // allows transfers of wrapped liquidity tokens
+    bool internal _wrappingEnabled; // allows wrapping tokens into perpetual PowerTokens
+    bool internal _transfersEnabled; // allows transfers of wrapped liquidity tokens
 
     mapping(address => State) internal _states;
 
     event BaseRateChanged(uint112 baseRate, address baseToken, uint96 minGCFee);
     event ServiceFeePercentChanged(uint16 percent);
     event LoanDurationLimitsChanged(uint32 minDuration, uint32 maxDuration);
-    event PerpetualAllowed();
-    event TransfersAllowed();
+    event WrappingEnabled();
+    event TransfersEnabled();
 
     function initialize(
-        Enterprise enterprise,
+        IEnterprise enterprise,
         uint112 baseRate,
         uint96 minGCFee,
         uint32 gapHalvingPeriod,
         uint16 index,
         IERC20Metadata baseToken
-    ) external {
+    ) external override {
         require(_gapHalvingPeriod == 0, Errors.ALREADY_INITIALIZED);
         require(gapHalvingPeriod > 0, Errors.E_SERVICE_GAP_HALVING_PERIOD_NOT_GT_0);
 
@@ -58,22 +60,22 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
         uint32 minLoanDuration,
         uint32 maxLoanDuration,
         uint16 serviceFeePercent,
-        bool allowsPerpetual,
-        bool allowsTransfer
-    ) external {
+        bool wrappingEnabled,
+        bool transersEnabled
+    ) external override {
         require(_maxLoanDuration == 0, Errors.ALREADY_INITIALIZED);
         _minLoanDuration = minLoanDuration;
         _maxLoanDuration = maxLoanDuration;
         _serviceFeePercent = serviceFeePercent;
-        _allowsPerpetual = allowsPerpetual;
-        _allowsTransfer = allowsTransfer;
+        _wrappingEnabled = wrappingEnabled;
+        _transfersEnabled = transersEnabled;
         emit ServiceFeePercentChanged(serviceFeePercent);
         emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
-        if (allowsPerpetual) {
-            emit PerpetualAllowed();
+        if (wrappingEnabled) {
+            emit WrappingEnabled();
         }
-        if (allowsTransfer) {
-            emit TransfersAllowed();
+        if (transersEnabled) {
+            emit TransfersEnabled();
         }
     }
 
@@ -106,21 +108,21 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
         emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
     }
 
-    function allowPerpetualForever() external onlyEnterpriseOwner {
-        require(!_allowsPerpetual, Errors.ES_PERPETUAL_TOKENS_ALREADY_ALLOWED);
+    function enableWrappingForever() external onlyEnterpriseOwner {
+        require(!_wrappingEnabled, Errors.ES_WRAPPING_ALREADY_ENABLED);
 
-        _allowsPerpetual = true;
-        emit PerpetualAllowed();
+        _wrappingEnabled = true;
+        emit WrappingEnabled();
     }
 
-    function allowTransferForever() external onlyEnterpriseOwner {
-        require(!_allowsTransfer, Errors.ES_TRANSFER_ALREADY_ALLOWED);
+    function enableTransfersForever() external onlyEnterpriseOwner {
+        require(!_transfersEnabled, Errors.ES_TRANSFERS_ALREADY_ENABLED);
 
-        _allowsTransfer = true;
-        emit TransfersAllowed();
+        _transfersEnabled = true;
+        emit TransfersEnabled();
     }
 
-    function isAllowedLoanDuration(uint32 duration) public view returns (bool) {
+    function isAllowedLoanDuration(uint32 duration) public view override returns (bool) {
         return _minLoanDuration <= duration && duration <= _maxLoanDuration;
     }
 
@@ -136,7 +138,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
         return _gapHalvingPeriod;
     }
 
-    function getIndex() external view returns (uint16) {
+    function getIndex() external view override returns (uint16) {
         return _index;
     }
 
@@ -157,7 +159,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable {
     }
 
     function getAllowsPerpetual() external view returns (bool) {
-        return _allowsPerpetual;
+        return _wrappingEnabled;
     }
 
     function getState(address account) external view returns (State memory) {

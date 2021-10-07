@@ -9,6 +9,7 @@ import "./interfaces/IPowerToken.sol";
 import "./interfaces/IInterestToken.sol";
 import "./interfaces/IBorrowToken.sol";
 import "./interfaces/IConverter.sol";
+import "./interfaces/IEnterpriseStorage.sol";
 import "./InitializableOwnable.sol";
 import "./EnterpriseFactory.sol";
 import "./math/ExpMath.sol";
@@ -20,20 +21,7 @@ import "./libs/Errors.sol";
  * Governance system. For example: OpenZeppelin `TimelockController` contract can
  * be used as an `owner` of this contract
  */
-abstract contract EnterpriseStorage is InitializableOwnable {
-    struct LoanInfo {
-        // slot 1, 0 bytes left
-        uint112 amount; // 14 bytes
-        uint16 powerTokenIndex; // 2 bytes, index in powerToken array
-        uint32 borrowingTime; // 4 bytes
-        uint32 maturityTime; // 4 bytes
-        uint32 borrowerReturnGraceTime; // 4 bytes
-        uint32 enterpriseCollectGraceTime; // 4 bytes
-        // slot 2, 16 bytes left
-        uint112 gcFee; // 14 bytes, loan return reward
-        uint16 gcFeeTokenIndex; // 2 bytes, index in `_paymentTokens` array
-    }
-
+abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage {
     struct LiquidityInfo {
         uint256 amount;
         uint256 shares;
@@ -109,8 +97,8 @@ abstract contract EnterpriseStorage is InitializableOwnable {
     string internal _baseUri;
     mapping(uint256 => LoanInfo) internal _loanInfo;
     mapping(uint256 => LiquidityInfo) internal _liquidityInfo;
-    mapping(PowerToken => bool) internal _registeredPowerTokens;
-    PowerToken[] internal _powerTokens;
+    mapping(address => bool) internal _registeredPowerTokens;
+    IPowerToken[] internal _powerTokens;
 
     event EnterpriseLoanCollectGracePeriodChanged(uint32 period);
     event BorrowerLoanReturnGracePeriodChanged(uint32 period);
@@ -148,7 +136,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         IConverter converter,
         ProxyAdmin proxyAdmin,
         address owner
-    ) external {
+    ) external override {
         require(bytes(_name).length == 0, Errors.ALREADY_INITIALIZED);
         InitializableOwnable.initialize(owner);
         StorageSlot.getAddressSlot(_PROXY_ADMIN_SLOT).value = address(proxyAdmin);
@@ -180,7 +168,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         IERC20Metadata liquidityToken,
         IInterestToken interestToken,
         IBorrowToken borrowToken
-    ) external {
+    ) external override {
         require(address(_liquidityToken) == address(0), Errors.ALREADY_INITIALIZED);
         _liquidityToken = liquidityToken;
         _interestToken = interestToken;
@@ -188,11 +176,11 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         _enablePaymentToken(address(liquidityToken));
     }
 
-    function isRegisteredPowerToken(PowerToken powerToken) external view returns (bool) {
+    function isRegisteredPowerToken(address powerToken) external view returns (bool) {
         return _registeredPowerTokens[powerToken];
     }
 
-    function getLiquidityToken() external view returns (IERC20Metadata) {
+    function getLiquidityToken() external view override returns (IERC20Metadata) {
         return _liquidityToken;
     }
 
@@ -204,16 +192,16 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         return _borrowToken;
     }
 
-    function getPaymentTokenIndex(IERC20 token) public view returns (int16) {
-        return _paymentTokensIndex[address(token)] - 1;
+    function getPaymentTokenIndex(address token) public view returns (int16) {
+        return _paymentTokensIndex[token] - 1;
     }
 
-    function getPaymentToken(uint256 index) external view returns (address) {
+    function getPaymentToken(uint256 index) external view override returns (address) {
         return _paymentTokens[index];
     }
 
-    function isSupportedPaymentToken(IERC20 token) public view returns (bool) {
-        return _paymentTokensIndex[address(token)] > 0;
+    function isSupportedPaymentToken(address token) public view override returns (bool) {
+        return _paymentTokensIndex[token] > 0;
     }
 
     function getProxyAdmin() public view returns (ProxyAdmin) {
@@ -240,11 +228,11 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         return _interestGapHalvingPeriod;
     }
 
-    function getConverter() external view returns (IConverter) {
+    function getConverter() external view override returns (IConverter) {
         return _converter;
     }
 
-    function getBaseUri() external view returns (string memory) {
+    function getBaseUri() external view override returns (string memory) {
         return _baseUri;
     }
 
@@ -282,11 +270,11 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         );
     }
 
-    function getPowerTokens() external view returns (PowerToken[] memory) {
+    function getPowerTokens() external view returns (IPowerToken[] memory) {
         return _powerTokens;
     }
 
-    function getLoanInfo(uint256 borrowTokenId) external view returns (LoanInfo memory) {
+    function getLoanInfo(uint256 borrowTokenId) external view override returns (LoanInfo memory) {
         _borrowToken.ownerOf(borrowTokenId); // will throw on non existent tokenId
         return _loanInfo[borrowTokenId];
     }
@@ -296,19 +284,19 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         return _liquidityInfo[interestTokenId];
     }
 
-    function getReserve() public view returns (uint256) {
+    function getReserve() public view override returns (uint256) {
         return _fixedReserve + _getStreamingReserve();
     }
 
-    function getUsedReserve() external view returns (uint256) {
+    function getUsedReserve() external view override returns (uint256) {
         return _usedReserve;
     }
 
-    function getAvailableReserve() public view returns (uint256) {
+    function getAvailableReserve() public view override returns (uint256) {
         return getReserve() - _usedReserve;
     }
 
-    function getBondingCurve() external view returns (uint256 pole, uint256 slope) {
+    function getBondingCurve() external view override returns (uint256 pole, uint256 slope) {
         return (_bondingPole, _bondingSlope);
     }
 
@@ -368,7 +356,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         address borrowTokenImplementation,
         address interestTokenImplementation,
         address powerTokenImplementation,
-        PowerToken[] calldata powerTokens
+        address[] calldata powerTokens
     ) external onlyOwner {
         ProxyAdmin admin = getProxyAdmin();
         if (enterpriseImplementation != address(0)) {
@@ -383,7 +371,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         if (powerTokenImplementation != address(0)) {
             for (uint256 i = 0; i < powerTokens.length; i++) {
                 require(_registeredPowerTokens[powerTokens[i]], Errors.UNREGISTERED_POWER_TOKEN);
-                admin.upgrade(TransparentUpgradeableProxy(payable(address(powerTokens[i]))), powerTokenImplementation);
+                admin.upgrade(TransparentUpgradeableProxy(payable(powerTokens[i])), powerTokenImplementation);
             }
         }
     }
@@ -393,7 +381,7 @@ abstract contract EnterpriseStorage is InitializableOwnable {
         emit GcFeePercentChanged(newGcFeePercent);
     }
 
-    function getGCFeePercent() external view returns (uint16) {
+    function getGCFeePercent() external view override returns (uint16) {
         return _gcFeePercent;
     }
 

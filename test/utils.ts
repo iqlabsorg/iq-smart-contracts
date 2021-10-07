@@ -267,7 +267,7 @@ export const getProxyImplementation = async (
 
 export const borrow = async (
   enterprise: Enterprise,
-  powerToken: IPowerToken,
+  powerToken: PowerToken,
   paymentToken: IERC20,
   amount: BigNumberish,
   duration: number,

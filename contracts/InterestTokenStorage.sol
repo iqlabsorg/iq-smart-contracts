@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
+
 pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./token/ERC721Enumerable.sol";
-import "./interfaces/IBorrowTokenStorage.sol";
-import "./interfaces/IEnterprise.sol";
 import "./EnterpriseOwnable.sol";
+import "./token/ERC721Enumerable.sol";
+import "./interfaces/IInterestTokenStorage.sol";
 
-abstract contract BorrowTokenStorage is EnterpriseOwnable, ERC721Enumerable, IBorrowTokenStorage {
+abstract contract InterestTokenStorage is EnterpriseOwnable, ERC721Enumerable, IInterestTokenStorage {
     uint256 internal _tokenIdTracker;
-    bool internal _transfersEnabled;
 
     function initialize(
         string memory name,
@@ -18,6 +16,5 @@ abstract contract BorrowTokenStorage is EnterpriseOwnable, ERC721Enumerable, IBo
     ) external override {
         EnterpriseOwnable.initialize(enterprise);
         ERC721.initialize(name, symbol);
-        _transfersEnabled = false;
     }
 }

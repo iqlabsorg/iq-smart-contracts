@@ -2,11 +2,12 @@
 pragma solidity 0.8.4;
 import "@openzeppelin/contracts/utils/StorageSlot.sol";
 import "./libs/Errors.sol";
+import "./interfaces/IInitializableOwnable.sol";
 
 /**
  * @dev Ownable contract with `initialize` function instead of constructor. Primary usage is for proxies like ERC-1167 with no constructor.
  */
-abstract contract InitializableOwnable {
+abstract contract InitializableOwnable is IInitializableOwnable {
     // This is the keccak-256 hash of "iq.protocol.owner" subtracted by 1
     bytes32 private constant _OWNER_SLOT = 0x4f471908b72bb76dae5bd24599026e7bf3ddb256497722888ffa422f83729ede;
 
@@ -25,7 +26,7 @@ abstract contract InitializableOwnable {
     /**
      * @dev Returns the address of the current owner.
      */
-    function owner() public view returns (address) {
+    function owner() public view override returns (address) {
         return StorageSlot.getAddressSlot(_OWNER_SLOT).value;
     }
 

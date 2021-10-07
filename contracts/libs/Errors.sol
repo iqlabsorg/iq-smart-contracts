@@ -78,7 +78,7 @@ library Errors {
     string internal constant E_INVALID_LOAN_TOKEN_ID = "48";
     string internal constant E_INVALID_LOAN_DURATION = "49";
     string internal constant E_FLASH_LIQUIDITY_REMOVAL = "50"; // Adding and removing liquidity in the same block is not allowed
-    string internal constant E_WRAPPING_NOT_ALLOWED = "51";
+    string internal constant E_WRAPPING_DISABLED = "51";
     string internal constant E_LOAN_TRANSFER_NOT_ALLOWED = "52";
     string internal constant E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD = "53"; // Only borrower can return within borrower grace period
     string internal constant E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD = "54"; // Only borrower or enterprise can return within enterprise grace period
@@ -100,7 +100,7 @@ library Errors {
     string internal constant ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED = "67";
     string internal constant ES_INVALID_BASE_TOKEN_ADDRESS = "68";
     string internal constant ES_INVALID_LOAN_DURATION_RANGE = "69";
-    string internal constant ES_PERPETUAL_TOKENS_ALREADY_ALLOWED = "70";
+    string internal constant ES_WRAPPING_ALREADY_ENABLED = "70";
     string internal constant ES_INVALID_PAYMENT_TOKEN_ADDRESS = "71";
     string internal constant ES_UNREGISTERED_PAYMENT_TOKEN = "72";
 
@@ -112,8 +112,8 @@ library Errors {
     string internal constant E_INVALID_LOAN_AMOUNT = "76";
     string internal constant ES_INVALID_BONDING_POLE = "77";
     string internal constant ES_INVALID_BONDING_SLOPE = "78";
-    string internal constant ES_TRANSFER_ALREADY_ALLOWED = "79";
-    string internal constant PT_TRANSFER_NOT_ALLOWED = "80";
-    string internal constant BT_TRANSFER_NOT_ALLOWED = "81";
-    string internal constant BT_TRANSFER_ALREADY_ALLOWED = "82";
+    string internal constant ES_TRANSFERS_ALREADY_ENABLED = "79";
+    string internal constant PT_TRANSFERS_DISABLED = "80";
+    string internal constant BT_TRANSFERS_DISABLED = "81";
+    string internal constant BT_TRANSFERS_ALREADY_ENABLED = "82";
 }

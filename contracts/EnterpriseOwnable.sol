@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.4;
 
-import "./Enterprise.sol";
+import "./interfaces/IEnterprise.sol";
 import "./libs/Errors.sol";
 
 /**
  * @dev Ownable contract with `initialize` function instead of constructor. Primary usage is for proxies like ERC-1167 with no constructor.
  */
 abstract contract EnterpriseOwnable {
-    Enterprise private _enterprise;
+    IEnterprise private _enterprise;
 
     /**
      * @dev Initializes the enterprise of the contract. The inheritor of this contract *MUST* ensure this method is not called twice.
      */
-    function initialize(Enterprise enterprise) public {
+    function initialize(IEnterprise enterprise) public {
         require(address(_enterprise) == address(0), Errors.ALREADY_INITIALIZED);
         require(address(enterprise) != address(0), Errors.EO_INVALID_ENTERPRISE_ADDRESS);
-        _enterprise = enterprise;
+        _enterprise = IEnterprise(enterprise);
     }
 
     /**
      * @dev Returns the address of the current enterprise.
      */
-    function getEnterprise() public view returns (Enterprise) {
+    function getEnterprise() public view returns (IEnterprise) {
         return _enterprise;
     }
 
