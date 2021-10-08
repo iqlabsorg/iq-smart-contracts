@@ -29,6 +29,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         LiquidityChangeType indexed changeType,
         uint256 amountDelta,
         uint256 amount,
+        uint256 sharesDelta,
         uint256 shares,
         uint256 totalShares,
         uint256 reserve,
@@ -354,6 +355,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
             liquidityAmount,
             liquidityAmount,
             shares,
+            shares,
             _totalShares,
             reserve + liquidityAmount,
             _usedReserve
@@ -374,9 +376,10 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         uint256 liquidityAmount = liquidityInfo.amount;
         uint256 reserve = getReserve();
         uint256 shares = _liquidityToShares(liquidityAmount, reserve);
+        uint256 sharesDelta = liquidityInfo.shares - shares;
 
         // Decrease total reserves & shares.
-        _decreaseReserveAndShares(accruedInterest, liquidityInfo.shares - shares);
+        _decreaseReserveAndShares(accruedInterest, sharesDelta);
 
         // Update interest token liquidity information.
         liquidityInfo.shares = shares;
@@ -387,6 +390,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
             LiquidityChangeType.WithdrawInterest,
             accruedInterest,
             liquidityAmount,
+            sharesDelta,
             shares,
             _totalShares,
             reserve - accruedInterest,
@@ -420,6 +424,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
             LiquidityChangeType.Remove,
             liquidityWithInterest,
             0,
+            shares,
             0,
             _totalShares,
             reserve - liquidityWithInterest,
@@ -463,6 +468,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
             LiquidityChangeType.Decrease,
             liquidityAmount,
             liquidityInfo.amount,
+            sharesDelta,
             liquidityInfo.shares,
             _totalShares,
             reserve - liquidityAmount,
@@ -499,6 +505,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
             LiquidityChangeType.Increase,
             liquidityAmount,
             amount,
+            sharesDelta,
             shares,
             _totalShares,
             reserve + liquidityAmount,

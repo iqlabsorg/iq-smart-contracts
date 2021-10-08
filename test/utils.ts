@@ -8,7 +8,6 @@ import {
   IConverter,
   IERC20,
   InterestToken,
-  IPowerToken,
   PowerToken,
   ProxyAdmin,
 } from '../typechain';

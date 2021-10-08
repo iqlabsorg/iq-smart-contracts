@@ -7,7 +7,6 @@ import {
   ERC20Mock__factory,
   IERC20Metadata,
   InterestToken,
-  IPowerToken,
   MockConverter,
   MockConverter__factory,
   PowerToken,
@@ -17,6 +16,7 @@ import {
   basePrice,
   baseRate,
   borrow,
+  currentTime,
   deployEnterprise,
   estimateLoan,
   fromTokens,
@@ -66,7 +66,7 @@ describe('Enterprise', () => {
       'TST',
       'TST',
       18,
-      ONE_TOKEN * 1_000_000n
+      ONE_TOKEN * 100_000_000_000n
     );
   });
 
@@ -177,6 +177,74 @@ describe('Enterprise', () => {
         expect(await interestToken.balanceOf(stranger.address)).to.eq(0);
       });
     });
+
+    describe('', () => {});
+
+    describe('decrease liquidity', () => {
+      const lenderTokens = ONE_TOKEN * 10000n;
+      let tokenId: BigNumber;
+      beforeEach(async () => {
+        await token.transfer(lender.address, lenderTokens);
+        await token.transfer(user.address, ONE_TOKEN * 1000n);
+        tokenId = await addLiquidity(enterprise, lenderTokens, lender);
+      });
+
+      it('should be possible to decrease liquidity to 0', async () => {
+        await enterprise
+          .connect(lender)
+          .decreaseLiquidity(tokenId, lenderTokens);
+
+        const liquidityInfo = await enterprise.getLiquidityInfo(tokenId);
+        expect(liquidityInfo.amount).to.eq(0n);
+        expect(liquidityInfo.shares).to.eq(0n);
+      });
+
+      describe('when borrowing', () => {
+        beforeEach(async () => {
+          const borrowTx = await borrow(
+            enterprise,
+            powerToken,
+            token,
+            ONE_TOKEN * 1000n,
+            ONE_DAY * 30,
+            ONE_TOKEN * 1000n,
+            user
+          );
+          const borrowId = await getBorrowTokenId(enterprise, borrowTx);
+          const now = await currentTime();
+          await setNextBlockTimestamp(now + ONE_DAY * 15);
+          await enterprise.connect(user).returnLoan(borrowId);
+        });
+
+        it('should not withdraw interest when decreasing liquidity to 0', async () => {
+          await enterprise
+            .connect(lender)
+            .decreaseLiquidity(tokenId, lenderTokens);
+
+          const liquidityInfo = await enterprise.getLiquidityInfo(tokenId);
+          expect(liquidityInfo.amount).to.eq(0n);
+          expect(liquidityInfo.shares).not.to.eq(0n);
+          expect(await enterprise.getAccruedInterest(tokenId))
+            .to.eq(await enterprise.getAvailableReserve())
+            .to.eq(await enterprise.getReserve());
+        });
+
+        it('should set shares to 0 when withdrawing interest and liqidity', async () => {
+          await enterprise
+            .connect(lender)
+            .decreaseLiquidity(tokenId, lenderTokens);
+
+          await enterprise.connect(lender).withdrawInterest(tokenId);
+
+          const liquidityInfo = await enterprise.getLiquidityInfo(tokenId);
+          expect(liquidityInfo.amount).to.eq(0n);
+          expect(liquidityInfo.shares).to.eq(0n);
+          expect(await enterprise.getReserve()).to.eq(0n);
+          expect(await enterprise.getAvailableReserve()).to.eq(0n);
+        });
+      });
+    });
+
     describe('borrow / reborrow / return', () => {
       const LIQUIDITY = ONE_TOKEN * 1000n;
       const BORROW_AMOUNT = ONE_TOKEN * 100n;
