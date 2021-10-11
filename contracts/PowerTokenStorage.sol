@@ -60,22 +60,18 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         uint32 minLoanDuration,
         uint32 maxLoanDuration,
         uint16 serviceFeePercent,
-        bool wrappingEnabled,
-        bool transersEnabled
+        bool wrappingEnabled
     ) external override {
         require(_maxLoanDuration == 0, Errors.ALREADY_INITIALIZED);
         _minLoanDuration = minLoanDuration;
         _maxLoanDuration = maxLoanDuration;
         _serviceFeePercent = serviceFeePercent;
         _wrappingEnabled = wrappingEnabled;
-        _transfersEnabled = transersEnabled;
+        _transfersEnabled = false;
         emit ServiceFeePercentChanged(serviceFeePercent);
         emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
         if (wrappingEnabled) {
             emit WrappingEnabled();
-        }
-        if (transersEnabled) {
-            emit TransfersEnabled();
         }
     }
 
@@ -164,5 +160,13 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
 
     function getState(address account) external view returns (State memory) {
         return _states[account];
+    }
+
+    function isWrappingEnabled() external view override returns (bool) {
+        return _wrappingEnabled;
+    }
+
+    function isTransfersEnabled() external view override returns (bool) {
+        return _transfersEnabled;
     }
 }

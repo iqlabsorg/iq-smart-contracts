@@ -83,7 +83,6 @@ describe('IQ Protocol E2E', () => {
         43200, // 12 hours
         86400 * 60, // 2 months
         ONE_TOKEN,
-        true,
         true
       );
 
@@ -114,7 +113,6 @@ describe('IQ Protocol E2E', () => {
         43200, // 12 hours
         86400 * 60, // 2 months
         0,
-        true,
         true
       );
       powerToken = await getPowerToken(enterprise, tx);

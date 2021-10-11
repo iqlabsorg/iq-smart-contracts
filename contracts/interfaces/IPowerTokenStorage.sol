@@ -19,11 +19,14 @@ interface IPowerTokenStorage {
         uint32 minLoanDuration,
         uint32 maxLoanDuration,
         uint16 serviceFeePercent,
-        bool wrappingEnabled,
-        bool transersEnabled
+        bool wrappingEnabled
     ) external;
 
     function isAllowedLoanDuration(uint32 duration) external view returns (bool);
 
     function getIndex() external view returns (uint16);
+
+    function isWrappingEnabled() external view returns (bool);
+
+    function isTransfersEnabled() external view returns (bool);
 }

@@ -9,8 +9,6 @@ import "./BorrowTokenStorage.sol";
 contract BorrowToken is BorrowTokenStorage, IBorrowToken {
     using SafeERC20 for IERC20;
 
-    event TransfersAllowed();
-
     function mint(address to) external override onlyEnterprise returns (uint256) {
         uint256 tokenId = getNextTokenId();
         _safeMint(to, tokenId);
@@ -27,13 +25,6 @@ contract BorrowToken is BorrowTokenStorage, IBorrowToken {
         _burn(tokenId);
     }
 
-    function enableTransfersForever() external onlyEnterpriseOwner {
-        require(!_transfersEnabled, Errors.BT_TRANSFERS_ALREADY_ENABLED);
-
-        _transfersEnabled = true;
-        emit TransfersAllowed();
-    }
-
     function getNextTokenId() public view override returns (uint256) {
         return uint256(keccak256(abi.encodePacked("b", address(this), _tokenIdTracker)));
     }
@@ -43,8 +34,6 @@ contract BorrowToken is BorrowTokenStorage, IBorrowToken {
         address to,
         uint256 tokenId
     ) internal override {
-        require(from == address(0) || to == address(0) || _transfersEnabled, Errors.BT_TRANSFERS_DISABLED);
-
         super._beforeTokenTransfer(from, to, tokenId);
         getEnterprise().loanTransfer(from, to, tokenId);
     }

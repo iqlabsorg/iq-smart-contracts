@@ -327,8 +327,7 @@ export const registerService = async (
   minLoanDuration: BigNumberish,
   maxLoanDuration: BigNumberish,
   minGCFee: BigNumberish,
-  allowsPerpetualTokens: boolean,
-  allowsTransfers = true
+  allowsWrapping: boolean
 ): Promise<PowerToken> => {
   const tx = await enterprise.registerService(
     'IQ Power Test',
@@ -340,8 +339,7 @@ export const registerService = async (
     minLoanDuration,
     maxLoanDuration,
     minGCFee,
-    allowsPerpetualTokens,
-    allowsTransfers
+    allowsWrapping
   );
 
   return getPowerToken(enterprise, tx);

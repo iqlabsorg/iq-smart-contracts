@@ -115,20 +115,26 @@ describe('Enterprise', () => {
         expect(await token.balanceOf(user.address)).to.eq(ONE_TOKEN);
       });
 
-      it('should be possible to transfer wraped power tokens', async () => {
-        await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
+      describe('when power token transfer enabled', () => {
+        beforeEach(async () => {
+          await powerToken.enableTransfersForever();
+        });
 
-        expect(await powerToken.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
-        expect(await powerToken.balanceOf(user.address)).to.eq(0);
-      });
+        it('should be possible to transfer wraped power tokens', async () => {
+          await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
 
-      it('should be possible to unwrap transferred power tokens', async () => {
-        await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
+          expect(await powerToken.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
+          expect(await powerToken.balanceOf(user.address)).to.eq(0);
+        });
 
-        await powerToken.connect(stranger).unwrap(ONE_TOKEN);
+        it('should be possible to unwrap transferred power tokens', async () => {
+          await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
 
-        expect(await token.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
-        expect(await powerToken.balanceOf(stranger.address)).to.eq(0);
+          await powerToken.connect(stranger).unwrap(ONE_TOKEN);
+
+          expect(await token.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
+          expect(await powerToken.balanceOf(stranger.address)).to.eq(0);
+        });
       });
     });
     describe('add liquidity / remove liquidity', () => {
@@ -1101,43 +1107,45 @@ describe('Enterprise', () => {
         borrowToken
           .connect(borrower)
           .transferFrom(borrower.address, stranger.address, borrowId)
-      ).to.be.revertedWith(Errors.BT_TRANSFER_NOT_ALLOWED);
+      ).to.be.revertedWith(Errors.PT_TRANSFER_NOT_ALLOWED);
     });
 
-    it('should not be possible to move borrowed PowerToken directly', async () => {
-      expect(await powerToken.balanceOf(borrower.address)).to.eq(
-        ONE_TOKEN * 100n
-      );
-      await expect(
-        powerToken
+    describe('when PowerToken transfers are enabled', () => {
+      beforeEach(async () => {
+        await powerToken.enableTransfersForever();
+      });
+
+      it('should not be possible to move borrowed PowerToken directly', async () => {
+        expect(await powerToken.balanceOf(borrower.address)).to.eq(
+          ONE_TOKEN * 100n
+        );
+        await expect(
+          powerToken
+            .connect(borrower)
+            .transfer(stranger.address, ONE_TOKEN * 100n)
+        ).to.be.revertedWith(Errors.PT_INSUFFICIENT_AVAILABLE_BALANCE);
+      });
+
+      it('should be possible to move borrowed PowerToken by moving BorrowToken', async () => {
+        await borrowToken
           .connect(borrower)
-          .transfer(stranger.address, ONE_TOKEN * 100n)
-      ).to.be.revertedWith(Errors.PT_INSUFFICIENT_AVAILABLE_BALANCE);
-    });
+          .transferFrom(borrower.address, stranger.address, borrowId);
 
-    it('should be possible to move borrowed PowerToken by moving BorrowToken', async () => {
-      await borrowToken.enableTransfersForever();
+        expect(await powerToken.balanceOf(borrower.address)).to.eq(0);
+        expect(await powerToken.balanceOf(stranger.address)).to.eq(
+          ONE_TOKEN * 100n
+        );
+      });
 
-      await borrowToken
-        .connect(borrower)
-        .transferFrom(borrower.address, stranger.address, borrowId);
+      it('should not be possible to move expired borrowed PowerToken', async () => {
+        await increaseTime(ONE_DAY * 2);
 
-      expect(await powerToken.balanceOf(borrower.address)).to.eq(0);
-      expect(await powerToken.balanceOf(stranger.address)).to.eq(
-        ONE_TOKEN * 100n
-      );
-    });
-
-    it('should not be possible to move expired borrowed PowerToken', async () => {
-      await borrowToken.enableTransfersForever();
-
-      await increaseTime(ONE_DAY * 2);
-
-      await expect(
-        borrowToken
-          .connect(borrower)
-          .transferFrom(borrower.address, stranger.address, borrowId)
-      ).to.be.revertedWith(Errors.E_LOAN_TRANSFER_NOT_ALLOWED);
+        await expect(
+          borrowToken
+            .connect(borrower)
+            .transferFrom(borrower.address, stranger.address, borrowId)
+        ).to.be.revertedWith(Errors.E_LOAN_TRANSFER_NOT_ALLOWED);
+      });
     });
   });
 });

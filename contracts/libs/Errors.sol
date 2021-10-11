@@ -114,6 +114,4 @@ library Errors {
     string internal constant ES_INVALID_BONDING_SLOPE = "78";
     string internal constant ES_TRANSFERS_ALREADY_ENABLED = "79";
     string internal constant PT_TRANSFERS_DISABLED = "80";
-    string internal constant BT_TRANSFERS_DISABLED = "81";
-    string internal constant BT_TRANSFERS_ALREADY_ENABLED = "82";
 }

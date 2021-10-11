@@ -1,8 +1,23 @@
 import {ethers, waffle} from 'hardhat';
 import {expect} from 'chai';
 import {BigNumberish, Wallet} from 'ethers';
-import {Enterprise, ERC20Mock, PowerToken} from '../typechain';
-import {baseRate, deployEnterprise, ONE_DAY, registerService} from './utils';
+import {
+  BorrowToken,
+  BorrowToken__factory,
+  Enterprise,
+  ERC20Mock,
+  PowerToken,
+} from '../typechain';
+import {
+  addLiquidity,
+  baseRate,
+  borrow,
+  deployEnterprise,
+  getBorrowTokenId,
+  ONE_DAY,
+  registerService,
+} from './utils';
+import {Errors} from './types';
 
 type EnegryTestCase = [BigNumberish, number, BigNumberish];
 
@@ -12,13 +27,15 @@ const ONE_TOKEN = 10n ** 18n;
 describe('PowerToken', function () {
   let token: ERC20Mock;
   let user: Wallet;
+  let user2: Wallet;
   let enterprise: Enterprise;
   let powerToken: PowerToken;
+  let borrowToken: BorrowToken;
 
   const GAP_HALVING_PERIOD = 100;
 
   beforeEach(async () => {
-    [user] = await waffle.provider.getWallets();
+    [user, user2] = await waffle.provider.getWallets();
     token = (await ethers.getContract('ERC20Mock')) as ERC20Mock;
     enterprise = await deployEnterprise('Testing', token.address);
 
@@ -31,8 +48,14 @@ describe('PowerToken', function () {
       0,
       ONE_DAY * 365,
       ONE_TOKEN,
-      true,
-      false
+      true
+    );
+
+    await addLiquidity(enterprise, ONE_TOKEN * 1000n, user);
+
+    borrowToken = BorrowToken__factory.connect(
+      await enterprise.getBorrowToken(),
+      user
     );
   });
 
@@ -89,5 +112,61 @@ describe('PowerToken', function () {
     });
   });
 
-  //TODO: write PowerToken transfer tests
+  describe('when transfers are disabled', () => {
+    it('should not be possible to transfer wrapped tokens', async () => {
+      await token.approve(powerToken.address, ONE_TOKEN * 100n);
+      await powerToken.wrap(ONE_TOKEN * 100n);
+
+      await expect(
+        powerToken.transfer(user2.address, ONE_TOKEN * 100n)
+      ).to.be.revertedWith(Errors.PT_TRANSFER_NOT_ALLOWED);
+    });
+
+    it('should not be possible to transfer borrowed tokens', async () => {
+      const tx = await borrow(
+        enterprise,
+        powerToken,
+        token,
+        ONE_TOKEN * 100n,
+        ONE_DAY * 30,
+        ONE_TOKEN * 100n
+      );
+      const borrowId = await getBorrowTokenId(enterprise, tx);
+
+      await expect(
+        borrowToken.transferFrom(user.address, user2.address, borrowId)
+      ).to.be.revertedWith(Errors.PT_TRANSFER_NOT_ALLOWED);
+    });
+  });
+
+  describe('when transfers are enabled', () => {
+    beforeEach(async () => {
+      await powerToken.enableTransfersForever();
+    });
+
+    it('should be possible to transfer wrapped tokens', async () => {
+      await token.approve(powerToken.address, ONE_TOKEN * 100n);
+      await powerToken.wrap(ONE_TOKEN * 100n);
+
+      await powerToken.transfer(user2.address, ONE_TOKEN * 100n);
+
+      expect(await powerToken.balanceOf(user2.address)).to.eq(ONE_TOKEN * 100n);
+    });
+
+    it('should be possible to transfer borrowed tokens', async () => {
+      const tx = await borrow(
+        enterprise,
+        powerToken,
+        token,
+        ONE_TOKEN * 100n,
+        ONE_DAY * 30,
+        ONE_TOKEN * 100n
+      );
+      const borrowId = await getBorrowTokenId(enterprise, tx);
+
+      await borrowToken.transferFrom(user.address, user2.address, borrowId);
+
+      expect(await powerToken.balanceOf(user2.address)).to.eq(ONE_TOKEN * 100n);
+    });
+  });
 });

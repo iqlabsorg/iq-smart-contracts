@@ -62,13 +62,12 @@ contract PowerToken is ERC20, PowerTokenStorage, IPowerToken {
         uint256 value,
         bool isBorrowedTokenTransfer
     ) internal override {
-        require(
-            from == address(0) || to == address(0) || isBorrowedTokenTransfer || _transfersEnabled,
-            Errors.PT_TRANSFERS_DISABLED
-        );
+        bool isMinting = (from == address(0));
+        bool isBurning = (to == address(0));
+        require(isMinting || isBurning || _transfersEnabled, Errors.PT_TRANSFERS_DISABLED);
 
         uint32 timestamp = uint32(block.timestamp);
-        if (from != address(0)) {
+        if (!isMinting) {
             State memory fromState = _states[from];
             fromState.energy = _getEnergy(fromState, from, timestamp);
             fromState.timestamp = timestamp;
@@ -80,7 +79,7 @@ contract PowerToken is ERC20, PowerTokenStorage, IPowerToken {
             _states[from] = fromState;
         }
 
-        if (to != address(0)) {
+        if (!isBurning) {
             State memory toState = _states[to];
             toState.energy = _getEnergy(toState, to, timestamp);
             toState.timestamp = timestamp;

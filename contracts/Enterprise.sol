@@ -87,8 +87,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         uint32 minLoanDuration,
         uint32 maxLoanDuration,
         uint96 minGCFee,
-        bool allowsPerpetualTokensForever,
-        bool allowsTransfersForever
+        bool allowsWrappingForever
     ) external onlyOwner notShutdown {
         require(address(baseToken) != address(0), Errors.E_INVALID_BASE_TOKEN_ADDRESS);
         require(_powerTokens.length < type(uint16).max, Errors.E_SERVICE_LIMIT_REACHED);
@@ -113,13 +112,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         }
 
         {
-            powerToken.initialize2(
-                minLoanDuration,
-                maxLoanDuration,
-                serviceFeePercent,
-                allowsPerpetualTokensForever,
-                allowsTransfersForever
-            );
+            powerToken.initialize2(minLoanDuration, maxLoanDuration, serviceFeePercent, allowsWrappingForever);
         }
 
         // Complete service registration.

@@ -95,8 +95,6 @@ export enum Errors {
   ES_INVALID_BONDING_SLOPE = '78',
   ES_TRANSFER_ALREADY_ALLOWED = '79',
   PT_TRANSFER_NOT_ALLOWED = '80',
-  BT_TRANSFER_NOT_ALLOWED = '81',
-  BT_TRANSFER_ALREADY_ALLOWED = '82',
 }
 
 export enum LiquidityChangeType {

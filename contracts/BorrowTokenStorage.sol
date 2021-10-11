@@ -9,7 +9,6 @@ import "./EnterpriseOwnable.sol";
 
 abstract contract BorrowTokenStorage is EnterpriseOwnable, ERC721Enumerable, IBorrowTokenStorage {
     uint256 internal _tokenIdTracker;
-    bool internal _transfersEnabled;
 
     function initialize(
         string memory name,
@@ -18,6 +17,5 @@ abstract contract BorrowTokenStorage is EnterpriseOwnable, ERC721Enumerable, IBo
     ) external override {
         EnterpriseOwnable.initialize(enterprise);
         ERC721.initialize(name, symbol);
-        _transfersEnabled = false;
     }
 }
