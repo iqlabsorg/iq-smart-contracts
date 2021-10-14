@@ -29,7 +29,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
     uint32 internal _maxLoanDuration;
     uint16 internal _serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
     bool internal _wrappingEnabled; // allows wrapping tokens into perpetual PowerTokens
-    bool internal _transfersEnabled; // allows transfers of wrapped liquidity tokens
+    bool internal _transfersEnabled; // allows transfers of PowerTokens
 
     mapping(address => State) internal _states;
 
