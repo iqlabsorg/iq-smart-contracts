@@ -1,6 +1,7 @@
 import {BigNumber, BigNumberish} from '@ethersproject/bignumber';
-import {Contract, ContractTransaction} from 'ethers';
+import {Contract, ContractTransaction, Signer} from 'ethers';
 import {ethers} from 'hardhat';
+import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {
   BorrowToken,
   Enterprise,
@@ -11,7 +12,6 @@ import {
   PowerToken,
   ProxyAdmin,
 } from '../typechain';
-import {Wallet} from '@ethersproject/wallet';
 
 export const ONE_DAY = 86400;
 export const ONE_HOUR = 3600;
@@ -226,7 +226,7 @@ export const estimateLoan = (
 export const addLiquidity = async (
   enterprise: Enterprise,
   amount: BigNumberish,
-  user?: Wallet
+  user?: Signer
 ): Promise<BigNumber> => {
   const ERC20 = await ethers.getContractFactory('ERC20Mock');
   const token = ERC20.attach(await enterprise.getLiquidityToken());
@@ -271,7 +271,7 @@ export const borrow = async (
   amount: BigNumberish,
   duration: number,
   maxPayment: BigNumberish,
-  user?: Wallet
+  user?: Signer
 ): Promise<ContractTransaction> => {
   if (user) {
     await paymentToken.connect(user).approve(enterprise.address, maxPayment);
@@ -301,7 +301,7 @@ export const reborrow = async (
   paymentToken: IERC20,
   duration: number,
   maxPayment: BigNumberish,
-  user?: Wallet
+  user?: Signer
 ): Promise<ContractTransaction> => {
   if (user) {
     await paymentToken.connect(user).approve(enterprise.address, maxPayment);
@@ -343,4 +343,33 @@ export const registerService = async (
   );
 
   return getPowerToken(enterprise, tx);
+};
+
+export const resetFork = async (
+  hre: HardhatRuntimeEnvironment,
+  block?: number
+): Promise<void> => {
+  await hre.network.provider.request({
+    method: 'hardhat_reset',
+    params: block
+      ? [
+          {
+            forking: {
+              jsonRpcUrl: process.env.ETH_NODE_URI_BINANCE,
+              blockNumber: block,
+            },
+          },
+        ]
+      : [],
+  });
+};
+
+export const impersonate = async (
+  hre: HardhatRuntimeEnvironment,
+  account: string
+): Promise<void> => {
+  await hre.network.provider.request({
+    method: 'hardhat_impersonateAccount',
+    params: [account],
+  });
 };

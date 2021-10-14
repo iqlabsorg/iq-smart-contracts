@@ -138,6 +138,7 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         address owner
     ) external override {
         require(bytes(_name).length == 0, Errors.ALREADY_INITIALIZED);
+        require(bytes(enterpriseName).length > 0, Errors.E_INVALID_ENTERPRISE_NAME);
         InitializableOwnable.initialize(owner);
         StorageSlot.getAddressSlot(_PROXY_ADMIN_SLOT).value = address(proxyAdmin);
         _factory = EnterpriseFactory(msg.sender);
@@ -170,6 +171,7 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         IBorrowToken borrowToken
     ) external override {
         require(address(_liquidityToken) == address(0), Errors.ALREADY_INITIALIZED);
+        require(address(liquidityToken) != address(0), Errors.INVALID_ADDRESS);
         _liquidityToken = liquidityToken;
         _interestToken = interestToken;
         _borrowToken = borrowToken;
@@ -435,5 +437,9 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         _streamingReserveTarget -= streamingReserve;
         _streamingReserveUpdated = uint32(block.timestamp);
         emit StreamingReserveChanged(_streamingReserve, _streamingReserveTarget);
+    }
+
+    function _getAvailableReserve(uint256 reserve) internal view returns (uint256) {
+        return reserve - _usedReserve;
     }
 }

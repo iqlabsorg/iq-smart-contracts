@@ -1,7 +1,7 @@
 import {expect} from 'chai';
-import {f2b, b2f} from '../scripts/utils';
 import {ethers} from 'hardhat';
-import {ExpMathMock} from '../typechain';
+import {b2f, f2b} from '../../scripts/utils';
+import {ExpMathMock} from '../../typechain';
 
 type TestCase = [bigint, number, bigint, bigint, number];
 

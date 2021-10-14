@@ -95,6 +95,8 @@ export enum Errors {
   ES_INVALID_BONDING_SLOPE = '78',
   ES_TRANSFER_ALREADY_ALLOWED = '79',
   PT_TRANSFER_NOT_ALLOWED = '80',
+  E_INVALID_ENTERPRISE_NAME = '81',
+  PT_INVALID_MAX_LOAN_DURATION = '82',
 }
 
 export enum LiquidityChangeType {

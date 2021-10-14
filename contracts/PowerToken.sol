@@ -11,7 +11,7 @@ import "./EnterpriseStorage.sol";
 import "./PowerTokenStorage.sol";
 import "./libs/Errors.sol";
 
-contract PowerToken is ERC20, PowerTokenStorage, IPowerToken {
+contract PowerToken is PowerTokenStorage, ERC20, IPowerToken {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Metadata;
 

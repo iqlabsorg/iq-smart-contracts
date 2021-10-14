@@ -1,5 +1,7 @@
-import {ethers, waffle} from 'hardhat';
+import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import chai from 'chai';
+import {BigNumber} from 'ethers';
+import {ethers, waffle} from 'hardhat';
 import {
   BorrowToken,
   Enterprise,
@@ -10,7 +12,8 @@ import {
   MockConverter,
   MockConverter__factory,
   PowerToken,
-} from '../typechain';
+} from '../../typechain';
+import {Errors} from '../types';
 import {
   addLiquidity,
   basePrice,
@@ -32,20 +35,17 @@ import {
   registerService,
   setNextBlockTimestamp,
   toTokens,
-} from './utils';
-import {Wallet} from '@ethersproject/wallet';
-import {BigNumber} from 'ethers';
-import {Errors} from './types';
+} from '../utils';
 
 chai.use(waffle.solidity);
 const {expect} = chai;
 
 describe('Enterprise', () => {
-  let deployer: Wallet;
-  let lender: Wallet;
-  let borrower: Wallet;
-  let user: Wallet;
-  let stranger: Wallet;
+  let deployer: SignerWithAddress;
+  let lender: SignerWithAddress;
+  let borrower: SignerWithAddress;
+  let user: SignerWithAddress;
+  let stranger: SignerWithAddress;
   let enterprise: Enterprise;
   let token: IERC20Metadata;
   const ONE_TOKEN = 10n ** 18n;
@@ -59,8 +59,7 @@ describe('Enterprise', () => {
   );
 
   beforeEach(async () => {
-    [deployer, lender, borrower, user, stranger] =
-      await waffle.provider.getWallets();
+    [deployer, lender, borrower, user, stranger] = await ethers.getSigners();
 
     token = await new ERC20Mock__factory(deployer).deploy(
       'TST',
@@ -68,6 +67,19 @@ describe('Enterprise', () => {
       18,
       ONE_TOKEN * 100_000_000_000n
     );
+  });
+
+  describe('deployment', () => {
+    it('should not be possible to deploy Enterprise with empty name', async () => {
+      await expect(deployEnterprise('', token.address)).to.be.revertedWith(
+        Errors.E_INVALID_ENTERPRISE_NAME
+      );
+    });
+
+    it('should not be possible to deploy Enterprise with zero token address', async () => {
+      await expect(deployEnterprise('Test', ethers.constants.AddressZero)).to.be
+        .reverted;
+    });
   });
 
   describe('simple payment token', () => {
@@ -920,8 +932,8 @@ describe('Enterprise', () => {
         BASE_RATE,
         token.address,
         0,
-        0,
-        0,
+        0, // min loan duration
+        10, // max loan duration
         0,
         true
       );

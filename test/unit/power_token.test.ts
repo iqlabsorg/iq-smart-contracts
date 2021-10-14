@@ -1,13 +1,15 @@
-import {ethers, waffle} from 'hardhat';
+import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import {expect} from 'chai';
-import {BigNumberish, Wallet} from 'ethers';
+import {BigNumberish} from 'ethers';
+import {ethers} from 'hardhat';
 import {
   BorrowToken,
   BorrowToken__factory,
   Enterprise,
   ERC20Mock,
   PowerToken,
-} from '../typechain';
+} from '../../typechain';
+import {Errors} from '../types';
 import {
   addLiquidity,
   baseRate,
@@ -16,8 +18,7 @@ import {
   getBorrowTokenId,
   ONE_DAY,
   registerService,
-} from './utils';
-import {Errors} from './types';
+} from '../utils';
 
 type EnegryTestCase = [BigNumberish, number, BigNumberish];
 
@@ -26,8 +27,8 @@ const ONE_TOKEN = 10n ** 18n;
 
 describe('PowerToken', function () {
   let token: ERC20Mock;
-  let user: Wallet;
-  let user2: Wallet;
+  let user: SignerWithAddress;
+  let user2: SignerWithAddress;
   let enterprise: Enterprise;
   let powerToken: PowerToken;
   let borrowToken: BorrowToken;
@@ -35,7 +36,7 @@ describe('PowerToken', function () {
   const GAP_HALVING_PERIOD = 100;
 
   beforeEach(async () => {
-    [user, user2] = await waffle.provider.getWallets();
+    [user, user2] = await ethers.getSigners();
     token = (await ethers.getContract('ERC20Mock')) as ERC20Mock;
     enterprise = await deployEnterprise('Testing', token.address);
 

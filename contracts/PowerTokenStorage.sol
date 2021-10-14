@@ -8,6 +8,9 @@ import "./interfaces/IPowerTokenStorage.sol";
 import "./EnterpriseOwnable.sol";
 import "./libs/Errors.sol";
 
+// This contract cannot be extended anymore. If you need to add state variables to PowerToken
+// consider creating PowerTokenStorage2 or similar contract, make PowerToken inherit it
+// and add state variables there
 abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
     uint16 internal constant MAX_SERVICE_FEE_PERCENT = 5000; // 50%
     struct State {
@@ -20,7 +23,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
     uint96 internal _minGCFee; // fee for collecting expired PowerTokens
     uint32 internal _gapHalvingPeriod; // fixed, not updatable
     uint16 internal _index; // index in _powerTokens array. Not updatable
-    // slot 2, 1 byte left
+    // slot 2, 0 bytes left
     IERC20Metadata internal _baseToken;
     uint32 internal _minLoanDuration;
     uint32 internal _maxLoanDuration;
@@ -63,11 +66,13 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         bool wrappingEnabled
     ) external override {
         require(_maxLoanDuration == 0, Errors.ALREADY_INITIALIZED);
+        require(maxLoanDuration > 0, Errors.PT_INVALID_MAX_LOAN_DURATION);
+        require(minLoanDuration <= maxLoanDuration, Errors.ES_INVALID_LOAN_DURATION_RANGE);
+
         _minLoanDuration = minLoanDuration;
         _maxLoanDuration = maxLoanDuration;
         _serviceFeePercent = serviceFeePercent;
         _wrappingEnabled = wrappingEnabled;
-        _transfersEnabled = false;
         emit ServiceFeePercentChanged(serviceFeePercent);
         emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
         if (wrappingEnabled) {
@@ -152,10 +157,6 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
 
     function getServiceFeePercent() external view returns (uint16) {
         return _serviceFeePercent;
-    }
-
-    function getAllowsPerpetual() external view returns (bool) {
-        return _wrappingEnabled;
     }
 
     function getState(address account) external view returns (State memory) {
