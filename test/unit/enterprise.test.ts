@@ -196,8 +196,6 @@ describe('Enterprise', () => {
       });
     });
 
-    describe('', () => {});
-
     describe('decrease liquidity', () => {
       const lenderTokens = ONE_TOKEN * 10000n;
       let tokenId: BigNumber;
