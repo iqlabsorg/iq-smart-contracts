@@ -238,6 +238,10 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         return _baseUri;
     }
 
+    function getFactory() external view returns (address) {
+        return address(_factory);
+    }
+
     function getInfo()
         external
         view
@@ -354,12 +358,15 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
     }
 
     function upgrade(
+        address enterpriseFactory,
         address enterpriseImplementation,
         address borrowTokenImplementation,
         address interestTokenImplementation,
         address powerTokenImplementation,
         address[] calldata powerTokens
     ) external onlyOwner {
+        require(enterpriseFactory != address(0), Errors.E_INVALID_ENTERPRISE_FACTORY_ADDRESS);
+        _factory = EnterpriseFactory(enterpriseFactory);
         ProxyAdmin admin = getProxyAdmin();
         if (enterpriseImplementation != address(0)) {
             admin.upgrade(TransparentUpgradeableProxy(payable(address(this))), enterpriseImplementation);

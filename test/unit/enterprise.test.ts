@@ -5,6 +5,7 @@ import {ethers, waffle} from 'hardhat';
 import {
   BorrowToken,
   Enterprise,
+  EnterpriseFactory,
   ERC20Mock,
   ERC20Mock__factory,
   IERC20Metadata,
@@ -901,16 +902,48 @@ describe('Enterprise', () => {
     });
   });
 
-  describe('Enterprise upgradability', () => {
+  describe.only('Enterprise upgradability', () => {
+    let enterpriseFactory: EnterpriseFactory;
     beforeEach(async () => {
+      enterpriseFactory = (await ethers.getContract(
+        'EnterpriseFactory'
+      )) as EnterpriseFactory;
       enterprise = await deployEnterprise('Test', token.address);
     });
 
-    it('should be possible upgrade Enterprise', async () => {
+    it('should not be possible to upgrade without specifying EnterpriseFactory address', async () => {
+      await expect(
+        enterprise.upgrade(
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          []
+        )
+      ).to.be.revertedWith(Errors.E_INVALID_ENTERPRISE_FACTORY_ADDRESS);
+    });
+
+    it('should be possible to upgrade EnterpriseFactory address', async () => {
+      const factory = '0x0000000000000000000000000000000000000001';
+      await enterprise.upgrade(
+        factory,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        []
+      );
+
+      expect(await enterprise.getFactory()).to.equal(factory);
+    });
+
+    it('should be possible to upgrade Enterprise', async () => {
       const Enterprise = await ethers.getContractFactory('Enterprise');
       const enterpriseImpl = await Enterprise.deploy();
 
       await enterprise.upgrade(
+        enterpriseFactory.address,
         enterpriseImpl.address,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
@@ -923,7 +956,7 @@ describe('Enterprise', () => {
       );
     });
 
-    it('should be possible upgrade PowerToken', async () => {
+    it('should be possible to upgrade PowerToken', async () => {
       const powerToken = await registerService(
         enterprise,
         GAP_HALVING_PERIOD,
@@ -940,6 +973,7 @@ describe('Enterprise', () => {
       const powerTokenImpl = await PowerToken.deploy();
 
       await enterprise.upgrade(
+        enterpriseFactory.address,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
@@ -958,6 +992,7 @@ describe('Enterprise', () => {
       const borrowTokenImpl = await BorrowToken.deploy();
 
       await enterprise.upgrade(
+        enterpriseFactory.address,
         ethers.constants.AddressZero,
         borrowTokenImpl.address,
         ethers.constants.AddressZero,
@@ -978,6 +1013,7 @@ describe('Enterprise', () => {
       const interestTokenImpl = await InterestToken.deploy();
 
       await enterprise.upgrade(
+        enterpriseFactory.address,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
         interestTokenImpl.address,

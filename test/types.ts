@@ -97,6 +97,7 @@ export enum Errors {
   PT_TRANSFER_NOT_ALLOWED = '80',
   E_INVALID_ENTERPRISE_NAME = '81',
   PT_INVALID_MAX_LOAN_DURATION = '82',
+  E_INVALID_ENTERPRISE_FACTORY_ADDRESS = '83',
 }
 
 export enum LiquidityChangeType {

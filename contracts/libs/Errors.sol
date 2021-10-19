@@ -116,4 +116,5 @@ library Errors {
     string internal constant PT_TRANSFERS_DISABLED = "80";
     string internal constant E_INVALID_ENTERPRISE_NAME = "81";
     string internal constant PT_INVALID_MAX_LOAN_DURATION = "82";
+    string internal constant E_INVALID_ENTERPRISE_FACTORY_ADDRESS = "83";
 }
