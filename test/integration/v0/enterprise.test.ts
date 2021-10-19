@@ -39,8 +39,6 @@ describe('Integration', () => {
     admin = await ethers.getSigner(owner);
   });
 
-  describe('Enterprise', () => {});
-
   describe('BorrowToken', () => {
     let borrowToken: Contract;
     let newBorrowToken: BorrowToken;
@@ -55,6 +53,9 @@ describe('Integration', () => {
 
     it('should successfully upgrade', async () => {
       const [tokenId] = await borrowToken.functions.getNextTokenId();
+      const [enterpriseAddress] = await borrowToken.functions.getEnterprise();
+      const [zeroTokenId] = await borrowToken.functions.tokenByIndex(0);
+      const [totalSupply] = await borrowToken.functions.totalSupply();
 
       await enterprise
         .connect(admin)
@@ -62,7 +63,11 @@ describe('Integration', () => {
 
       const upgraded = BorrowToken__factory.connect(borrowToken.address, user);
 
+      expect(tokenId).is.above(0);
+      expect(await upgraded.totalSupply()).to.deep.eq(totalSupply);
       expect(await upgraded.getNextTokenId()).to.deep.eq(tokenId);
+      expect(await upgraded.getEnterprise()).to.deep.eq(enterpriseAddress);
+      expect(await upgraded.tokenByIndex(0)).to.deep.eq(zeroTokenId);
     });
   });
 
@@ -85,6 +90,9 @@ describe('Integration', () => {
 
     it('should successfully upgrade', async () => {
       const [tokenId] = await interestToken.functions.getNextTokenId();
+      const [enterpriseAddress] = await interestToken.functions.getEnterprise();
+      const [zeroTokenId] = await interestToken.functions.tokenByIndex(0);
+      const [totalSupply] = await interestToken.functions.totalSupply();
 
       await enterprise
         .connect(admin)
@@ -94,8 +102,11 @@ describe('Integration', () => {
         interestToken.address,
         user
       );
-
+      expect(tokenId).is.above(0);
+      expect(await upgraded.totalSupply()).to.deep.eq(totalSupply);
       expect(await upgraded.getNextTokenId()).to.deep.eq(tokenId);
+      expect(await upgraded.getEnterprise()).to.deep.eq(enterpriseAddress);
+      expect(await upgraded.tokenByIndex(0)).to.deep.eq(zeroTokenId);
     });
   });
 
@@ -103,7 +114,7 @@ describe('Integration', () => {
     const referenceAddress = '0x979c2f8df5d6df2bcf2a6771117f7a62a7462621';
     let powerTokens: Contract[];
     let newPowerToken: PowerToken;
-    let allows: any;
+    let allows: boolean[];
     let balances: any;
     let totalSupply: any;
     let upgraded: PowerToken[];
@@ -139,8 +150,6 @@ describe('Integration', () => {
       );
     });
 
-    describe('when transfers are disabled', () => {});
-
     it('should successfully upgrade', async () => {
       expect(
         await Promise.all(upgraded.map((x) => x.isWrappingEnabled()))
@@ -154,6 +163,14 @@ describe('Integration', () => {
       expect(
         await Promise.all(upgraded.map((x) => x.isTransfersEnabled()))
       ).to.deep.eq([false, false, false, false]);
+      expect(
+        await Promise.all(upgraded.map((x) => x.getEnterprise()))
+      ).to.deep.eq([
+        enterprise.address,
+        enterprise.address,
+        enterprise.address,
+        enterprise.address,
+      ]);
     });
 
     it('should keep the same after transfers are enabled', async () => {
@@ -173,6 +190,14 @@ describe('Integration', () => {
       expect(
         await Promise.all(upgraded.map((x) => x.isTransfersEnabled()))
       ).to.deep.eq([true, true, true, true]);
+      expect(
+        await Promise.all(upgraded.map((x) => x.getEnterprise()))
+      ).to.deep.eq([
+        enterprise.address,
+        enterprise.address,
+        enterprise.address,
+        enterprise.address,
+      ]);
     });
   });
 });

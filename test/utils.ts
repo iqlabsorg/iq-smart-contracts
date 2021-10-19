@@ -69,7 +69,7 @@ export const getEnterprise = async (
     receipt.blockNumber
   );
 
-  const enterpriseAddress = events[0].args?.deployed;
+  const enterpriseAddress = events[0].args.deployed;
 
   const Enterprise = await ethers.getContractFactory('Enterprise');
 
@@ -96,7 +96,7 @@ export const getPowerToken = async (
     receipt.blockNumber
   );
 
-  const powerTokenAddress = events[0].args?.[0];
+  const powerTokenAddress = events[0].args[0];
 
   const PowerToken = await ethers.getContractFactory('PowerToken');
 
@@ -114,7 +114,7 @@ export const getBorrowTokenId = async (
     receipt.blockNumber
   );
 
-  return BigNumber.from(events[0].args?.borrowTokenId);
+  return BigNumber.from(events[0].args.borrowTokenId);
 };
 
 export const getInterestTokenId = async (
@@ -133,7 +133,7 @@ export const getInterestTokenId = async (
     receipt.blockNumber
   );
 
-  return BigNumber.from(events[0].args?.tokenId);
+  return BigNumber.from(events[0].args.tokenId);
 };
 
 export const getInterestToken = async (

@@ -6,7 +6,7 @@ import "./EnterpriseOwnable.sol";
 import "./token/ERC721Enumerable.sol";
 import "./interfaces/IInterestTokenStorage.sol";
 
-abstract contract InterestTokenStorage is EnterpriseOwnable, ERC721Enumerable, IInterestTokenStorage {
+abstract contract InterestTokenStorage is IInterestTokenStorage, EnterpriseOwnable, ERC721Enumerable {
     uint256 internal _tokenIdTracker;
 
     function initialize(
