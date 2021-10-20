@@ -15,7 +15,7 @@
     "solidity"
   ],
   "devDependencies": {
-    "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers@^0.3.0-beta.10",
+    "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers@latest",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "4.3.2",
     "@typechain/ethers-v5": "^7.1.0",
@@ -57,10 +57,12 @@
     "format:fix": "prettier --write \"**/*.{ts,js,sol}\"",
     "compile": "hardhat compile",
     "void:deploy": "hardhat deploy",
-    "test": "cross-env HARDHAT_DEPLOY_FIXTURE=true HARDHAT_COMPILE=true mocha --bail --recursive test",
-    "gas": "cross-env REPORT_GAS=true HARDHAT_DEPLOY_FIXTURE=true hardhat test",
+    "test": "yarn test:unit && yarn test:fork",
+    "test:unit": "cross-env HARDHAT_DEPLOY_FIXTURE=true HARDHAT_COMPILE=true hardhat test $(find test/unit -name '*.test.ts')",
+    "test:fork": "cross-env HARDHAT_FORK=binance HARDHAT_COMPILE=true hardhat test $(find test/integration -name '*.test.ts')",
+    "gas": "cross-env REPORT_GAS=true HARDHAT_DEPLOY_FIXTURE=true hardhat test $(find test/unit -name '*.test.ts')",
     "size": "cross-env REPORT_SIZE=true hardhat compile",
-    "coverage": "cross-env HARDHAT_DEPLOY_FIXTURE=true hardhat coverage",
+    "coverage": "cross-env HARDHAT_FORK=binance HARDHAT_COMPILE=true HARDHAT_DEPLOY_FIXTURE=true hardhat coverage",
     "dev": "hardhat node --watch --export contractsInfo.json",
     "local:dev": "hardhat --network localhost deploy --watch",
     "execute": "node ./scripts.js run",
@@ -68,7 +70,6 @@
     "export": "node ./scripts.js export",
     "fork:execute": "node ./scripts.js fork:run",
     "fork:deploy": "node ./scripts.js fork:deploy",
-    "fork:dev": "node ./scripts.js fork:dev",
-    "fork:test": "node ./scripts.js fork:test"
+    "fork:dev": "node ./scripts.js fork:dev"
   }
 }

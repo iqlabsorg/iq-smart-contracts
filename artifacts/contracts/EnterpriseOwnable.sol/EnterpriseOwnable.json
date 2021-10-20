@@ -8,7 +8,7 @@
       "name": "getEnterprise",
       "outputs": [
         {
-          "internalType": "contract Enterprise",
+          "internalType": "contract IEnterprise",
           "name": "",
           "type": "address"
         }
@@ -19,7 +19,7 @@
     {
       "inputs": [
         {
-          "internalType": "contract Enterprise",
+          "internalType": "contract IEnterprise",
           "name": "enterprise",
           "type": "address"
         }

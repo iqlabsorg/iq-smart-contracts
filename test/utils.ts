@@ -1,6 +1,7 @@
 import {BigNumber, BigNumberish} from '@ethersproject/bignumber';
-import {Contract, ContractTransaction} from 'ethers';
+import {Contract, ContractTransaction, Signer} from 'ethers';
 import {ethers} from 'hardhat';
+import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {
   BorrowToken,
   Enterprise,
@@ -8,11 +9,9 @@ import {
   IConverter,
   IERC20,
   InterestToken,
-  IPowerToken,
   PowerToken,
   ProxyAdmin,
 } from '../typechain';
-import {Wallet} from '@ethersproject/wallet';
 
 export const ONE_DAY = 86400;
 export const ONE_HOUR = 3600;
@@ -70,7 +69,7 @@ export const getEnterprise = async (
     receipt.blockNumber
   );
 
-  const enterpriseAddress = events[0].args?.deployed;
+  const enterpriseAddress = events[0].args.deployed;
 
   const Enterprise = await ethers.getContractFactory('Enterprise');
 
@@ -97,7 +96,7 @@ export const getPowerToken = async (
     receipt.blockNumber
   );
 
-  const powerTokenAddress = events[0].args?.[0];
+  const powerTokenAddress = events[0].args[0];
 
   const PowerToken = await ethers.getContractFactory('PowerToken');
 
@@ -115,7 +114,7 @@ export const getBorrowTokenId = async (
     receipt.blockNumber
   );
 
-  return BigNumber.from(events[0].args?.borrowTokenId);
+  return BigNumber.from(events[0].args.borrowTokenId);
 };
 
 export const getInterestTokenId = async (
@@ -134,7 +133,7 @@ export const getInterestTokenId = async (
     receipt.blockNumber
   );
 
-  return BigNumber.from(events[0].args?.tokenId);
+  return BigNumber.from(events[0].args.tokenId);
 };
 
 export const getInterestToken = async (
@@ -227,7 +226,7 @@ export const estimateLoan = (
 export const addLiquidity = async (
   enterprise: Enterprise,
   amount: BigNumberish,
-  user?: Wallet
+  user?: Signer
 ): Promise<BigNumber> => {
   const ERC20 = await ethers.getContractFactory('ERC20Mock');
   const token = ERC20.attach(await enterprise.getLiquidityToken());
@@ -267,12 +266,12 @@ export const getProxyImplementation = async (
 
 export const borrow = async (
   enterprise: Enterprise,
-  powerToken: IPowerToken,
+  powerToken: PowerToken,
   paymentToken: IERC20,
   amount: BigNumberish,
   duration: number,
   maxPayment: BigNumberish,
-  user?: Wallet
+  user?: Signer
 ): Promise<ContractTransaction> => {
   if (user) {
     await paymentToken.connect(user).approve(enterprise.address, maxPayment);
@@ -302,7 +301,7 @@ export const reborrow = async (
   paymentToken: IERC20,
   duration: number,
   maxPayment: BigNumberish,
-  user?: Wallet
+  user?: Signer
 ): Promise<ContractTransaction> => {
   if (user) {
     await paymentToken.connect(user).approve(enterprise.address, maxPayment);
@@ -328,9 +327,9 @@ export const registerService = async (
   minLoanDuration: BigNumberish,
   maxLoanDuration: BigNumberish,
   minGCFee: BigNumberish,
-  allowsPerpetualTokens: boolean
+  allowsWrapping: boolean
 ): Promise<PowerToken> => {
-  const txPromise = enterprise.registerService(
+  const tx = await enterprise.registerService(
     'IQ Power Test',
     'IQPT',
     halfLife,
@@ -340,8 +339,37 @@ export const registerService = async (
     minLoanDuration,
     maxLoanDuration,
     minGCFee,
-    allowsPerpetualTokens
+    allowsWrapping
   );
 
-  return getPowerToken(enterprise, await txPromise);
+  return getPowerToken(enterprise, tx);
+};
+
+export const resetFork = async (
+  hre: HardhatRuntimeEnvironment,
+  block?: number
+): Promise<void> => {
+  await hre.network.provider.request({
+    method: 'hardhat_reset',
+    params: block
+      ? [
+          {
+            forking: {
+              jsonRpcUrl: process.env.ETH_NODE_URI_BINANCE,
+              blockNumber: block,
+            },
+          },
+        ]
+      : [],
+  });
+};
+
+export const impersonate = async (
+  hre: HardhatRuntimeEnvironment,
+  account: string
+): Promise<void> => {
+  await hre.network.provider.request({
+    method: 'hardhat_impersonateAccount',
+    params: [account],
+  });
 };

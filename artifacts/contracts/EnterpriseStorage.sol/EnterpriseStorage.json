@@ -352,6 +352,19 @@
     },
     {
       "inputs": [],
+      "name": "getFactory",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "getGCFeePercent",
       "outputs": [
         {
@@ -559,7 +572,7 @@
               "type": "uint16"
             }
           ],
-          "internalType": "struct EnterpriseStorage.LoanInfo",
+          "internalType": "struct IEnterpriseStorage.LoanInfo",
           "name": "",
           "type": "tuple"
         }
@@ -589,7 +602,7 @@
     {
       "inputs": [
         {
-          "internalType": "contract IERC20",
+          "internalType": "address",
           "name": "token",
           "type": "address"
         }
@@ -610,7 +623,7 @@
       "name": "getPowerTokens",
       "outputs": [
         {
-          "internalType": "contract PowerToken[]",
+          "internalType": "contract IPowerToken[]",
           "name": "",
           "type": "address[]"
         }
@@ -734,7 +747,7 @@
     {
       "inputs": [
         {
-          "internalType": "contract PowerToken",
+          "internalType": "address",
           "name": "powerToken",
           "type": "address"
         }
@@ -753,7 +766,7 @@
     {
       "inputs": [
         {
-          "internalType": "contract IERC20",
+          "internalType": "address",
           "name": "token",
           "type": "address"
         }
@@ -921,6 +934,11 @@
       "inputs": [
         {
           "internalType": "address",
+          "name": "enterpriseFactory",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
           "name": "enterpriseImplementation",
           "type": "address"
         },
@@ -940,7 +958,7 @@
           "type": "address"
         },
         {
-          "internalType": "contract PowerToken[]",
+          "internalType": "address[]",
           "name": "powerTokens",
           "type": "address[]"
         }

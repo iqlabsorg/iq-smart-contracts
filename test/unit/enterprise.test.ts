@@ -1,22 +1,26 @@
-import {ethers, waffle} from 'hardhat';
+import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import chai from 'chai';
+import {BigNumber} from 'ethers';
+import {ethers, waffle} from 'hardhat';
 import {
   BorrowToken,
   Enterprise,
+  EnterpriseFactory,
   ERC20Mock,
   ERC20Mock__factory,
   IERC20Metadata,
   InterestToken,
-  IPowerToken,
   MockConverter,
   MockConverter__factory,
   PowerToken,
-} from '../typechain';
+} from '../../typechain';
+import {Errors} from '../types';
 import {
   addLiquidity,
   basePrice,
   baseRate,
   borrow,
+  currentTime,
   deployEnterprise,
   estimateLoan,
   fromTokens,
@@ -32,20 +36,17 @@ import {
   registerService,
   setNextBlockTimestamp,
   toTokens,
-} from './utils';
-import {Wallet} from '@ethersproject/wallet';
-import {BigNumber} from 'ethers';
-import {Errors} from './types';
+} from '../utils';
 
 chai.use(waffle.solidity);
 const {expect} = chai;
 
 describe('Enterprise', () => {
-  let deployer: Wallet;
-  let lender: Wallet;
-  let borrower: Wallet;
-  let user: Wallet;
-  let stranger: Wallet;
+  let deployer: SignerWithAddress;
+  let lender: SignerWithAddress;
+  let borrower: SignerWithAddress;
+  let user: SignerWithAddress;
+  let stranger: SignerWithAddress;
   let enterprise: Enterprise;
   let token: IERC20Metadata;
   const ONE_TOKEN = 10n ** 18n;
@@ -59,15 +60,27 @@ describe('Enterprise', () => {
   );
 
   beforeEach(async () => {
-    [deployer, lender, borrower, user, stranger] =
-      await waffle.provider.getWallets();
+    [deployer, lender, borrower, user, stranger] = await ethers.getSigners();
 
     token = await new ERC20Mock__factory(deployer).deploy(
       'TST',
       'TST',
       18,
-      ONE_TOKEN * 1_000_000n
+      ONE_TOKEN * 100_000_000_000n
     );
+  });
+
+  describe('deployment', () => {
+    it('should not be possible to deploy Enterprise with empty name', async () => {
+      await expect(deployEnterprise('', token.address)).to.be.revertedWith(
+        Errors.E_INVALID_ENTERPRISE_NAME
+      );
+    });
+
+    it('should not be possible to deploy Enterprise with zero token address', async () => {
+      await expect(deployEnterprise('Test', ethers.constants.AddressZero)).to.be
+        .reverted;
+    });
   });
 
   describe('simple payment token', () => {
@@ -115,20 +128,26 @@ describe('Enterprise', () => {
         expect(await token.balanceOf(user.address)).to.eq(ONE_TOKEN);
       });
 
-      it('should be possible to transfer wraped power tokens', async () => {
-        await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
+      describe('when power token transfer enabled', () => {
+        beforeEach(async () => {
+          await powerToken.enableTransfersForever();
+        });
 
-        expect(await powerToken.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
-        expect(await powerToken.balanceOf(user.address)).to.eq(0);
-      });
+        it('should be possible to transfer wraped power tokens', async () => {
+          await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
 
-      it('should be possible to unwrap transferred power tokens', async () => {
-        await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
+          expect(await powerToken.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
+          expect(await powerToken.balanceOf(user.address)).to.eq(0);
+        });
 
-        await powerToken.connect(stranger).unwrap(ONE_TOKEN);
+        it('should be possible to unwrap transferred power tokens', async () => {
+          await powerToken.connect(user).transfer(stranger.address, ONE_TOKEN);
 
-        expect(await token.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
-        expect(await powerToken.balanceOf(stranger.address)).to.eq(0);
+          await powerToken.connect(stranger).unwrap(ONE_TOKEN);
+
+          expect(await token.balanceOf(stranger.address)).to.eq(ONE_TOKEN);
+          expect(await powerToken.balanceOf(stranger.address)).to.eq(0);
+        });
       });
     });
     describe('add liquidity / remove liquidity', () => {
@@ -177,6 +196,72 @@ describe('Enterprise', () => {
         expect(await interestToken.balanceOf(stranger.address)).to.eq(0);
       });
     });
+
+    describe('decrease liquidity', () => {
+      const lenderTokens = ONE_TOKEN * 10000n;
+      let tokenId: BigNumber;
+      beforeEach(async () => {
+        await token.transfer(lender.address, lenderTokens);
+        await token.transfer(user.address, ONE_TOKEN * 1000n);
+        tokenId = await addLiquidity(enterprise, lenderTokens, lender);
+      });
+
+      it('should be possible to decrease liquidity to 0', async () => {
+        await enterprise
+          .connect(lender)
+          .decreaseLiquidity(tokenId, lenderTokens);
+
+        const liquidityInfo = await enterprise.getLiquidityInfo(tokenId);
+        expect(liquidityInfo.amount).to.eq(0n);
+        expect(liquidityInfo.shares).to.eq(0n);
+      });
+
+      describe('when borrowing', () => {
+        beforeEach(async () => {
+          const borrowTx = await borrow(
+            enterprise,
+            powerToken,
+            token,
+            ONE_TOKEN * 1000n,
+            ONE_DAY * 30,
+            ONE_TOKEN * 1000n,
+            user
+          );
+          const borrowId = await getBorrowTokenId(enterprise, borrowTx);
+          const now = await currentTime();
+          await setNextBlockTimestamp(now + ONE_DAY * 15);
+          await enterprise.connect(user).returnLoan(borrowId);
+        });
+
+        it('should not withdraw interest when decreasing liquidity to 0', async () => {
+          await enterprise
+            .connect(lender)
+            .decreaseLiquidity(tokenId, lenderTokens);
+
+          const liquidityInfo = await enterprise.getLiquidityInfo(tokenId);
+          expect(liquidityInfo.amount).to.eq(0n);
+          expect(liquidityInfo.shares).not.to.eq(0n);
+          expect(await enterprise.getAccruedInterest(tokenId))
+            .to.eq(await enterprise.getAvailableReserve())
+            .to.eq(await enterprise.getReserve());
+        });
+
+        it('should set shares to 0 when withdrawing interest and liqidity', async () => {
+          await enterprise
+            .connect(lender)
+            .decreaseLiquidity(tokenId, lenderTokens);
+
+          await enterprise.connect(lender).withdrawInterest(tokenId);
+
+          const liquidityInfo = await enterprise.getLiquidityInfo(tokenId);
+          expect(liquidityInfo.amount).to.eq(0n);
+          expect(liquidityInfo.shares).to.eq(0n);
+          expect(await enterprise.getReserve()).to.eq(0n);
+          expect(await enterprise.getAvailableReserve()).to.eq(0n);
+        });
+      });
+    });
+
     describe('borrow / reborrow / return', () => {
       const LIQUIDITY = ONE_TOKEN * 1000n;
       const BORROW_AMOUNT = ONE_TOKEN * 100n;
@@ -648,7 +733,7 @@ describe('Enterprise', () => {
   });
 
   describe('multi borrow scenario', () => {
-    let powerToken: IPowerToken;
+    let powerToken: PowerToken;
     let interestRateGapHalvingPeriod: number;
     beforeEach(async () => {
       enterprise = await deployEnterprise('Test', token.address);
@@ -817,16 +902,48 @@ describe('Enterprise', () => {
     });
   });
 
-  describe('Enterprise upgradability', () => {
+  describe.only('Enterprise upgradability', () => {
+    let enterpriseFactory: EnterpriseFactory;
     beforeEach(async () => {
+      enterpriseFactory = (await ethers.getContract(
+        'EnterpriseFactory'
+      )) as EnterpriseFactory;
       enterprise = await deployEnterprise('Test', token.address);
     });
 
-    it('should be possible upgrade Enterprise', async () => {
+    it('should not be possible to upgrade without specifying EnterpriseFactory address', async () => {
+      await expect(
+        enterprise.upgrade(
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          []
+        )
+      ).to.be.revertedWith(Errors.E_INVALID_ENTERPRISE_FACTORY_ADDRESS);
+    });
+
+    it('should be possible to upgrade EnterpriseFactory address', async () => {
+      const factory = '0x0000000000000000000000000000000000000001';
+      await enterprise.upgrade(
+        factory,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        []
+      );
+
+      expect(await enterprise.getFactory()).to.equal(factory);
+    });
+
+    it('should be possible to upgrade Enterprise', async () => {
       const Enterprise = await ethers.getContractFactory('Enterprise');
       const enterpriseImpl = await Enterprise.deploy();
 
       await enterprise.upgrade(
+        enterpriseFactory.address,
         enterpriseImpl.address,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
@@ -839,15 +956,15 @@ describe('Enterprise', () => {
       );
     });
 
-    it('should be possible upgrade PowerToken', async () => {
+    it('should be possible to upgrade PowerToken', async () => {
       const powerToken = await registerService(
         enterprise,
         GAP_HALVING_PERIOD,
         BASE_RATE,
         token.address,
         0,
-        0,
-        0,
+        0, // min loan duration
+        10, // max loan duration
         0,
         true
       );
@@ -856,6 +973,7 @@ describe('Enterprise', () => {
       const powerTokenImpl = await PowerToken.deploy();
 
       await enterprise.upgrade(
+        enterpriseFactory.address,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
@@ -874,6 +992,7 @@ describe('Enterprise', () => {
       const borrowTokenImpl = await BorrowToken.deploy();
 
       await enterprise.upgrade(
+        enterpriseFactory.address,
         ethers.constants.AddressZero,
         borrowTokenImpl.address,
         ethers.constants.AddressZero,
@@ -894,6 +1013,7 @@ describe('Enterprise', () => {
       const interestTokenImpl = await InterestToken.deploy();
 
       await enterprise.upgrade(
+        enterpriseFactory.address,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
         interestTokenImpl.address,
@@ -1028,30 +1148,50 @@ describe('Enterprise', () => {
       borrowId = await getBorrowTokenId(enterprise, borrowTx);
     });
 
-    it('should not be possible to move borrowed PowerToken directly', async () => {
-      await expect(powerToken.transfer(stranger.address, ONE_TOKEN * 100n)).to
-        .be.reverted;
-    });
-
-    it('should be possible to move borrowed PowerToken by moving BorrowToken', async () => {
-      await borrowToken
-        .connect(borrower)
-        .transferFrom(borrower.address, stranger.address, borrowId);
-
-      expect(await powerToken.balanceOf(borrower.address)).to.eq(0);
-      expect(await powerToken.balanceOf(stranger.address)).to.eq(
-        ONE_TOKEN * 100n
-      );
-    });
-
-    it('should not be possible to move expired borrowed PowerToken', async () => {
-      await increaseTime(ONE_DAY * 2);
-
+    it('should not be possible to move borrow tokens by default', async () => {
       await expect(
         borrowToken
           .connect(borrower)
           .transferFrom(borrower.address, stranger.address, borrowId)
-      ).to.be.reverted;
+      ).to.be.revertedWith(Errors.PT_TRANSFER_NOT_ALLOWED);
+    });
+
+    describe('when PowerToken transfers are enabled', () => {
+      beforeEach(async () => {
+        await powerToken.enableTransfersForever();
+      });
+
+      it('should not be possible to move borrowed PowerToken directly', async () => {
+        expect(await powerToken.balanceOf(borrower.address)).to.eq(
+          ONE_TOKEN * 100n
+        );
+        await expect(
+          powerToken
+            .connect(borrower)
+            .transfer(stranger.address, ONE_TOKEN * 100n)
+        ).to.be.revertedWith(Errors.PT_INSUFFICIENT_AVAILABLE_BALANCE);
+      });
+
+      it('should be possible to move borrowed PowerToken by moving BorrowToken', async () => {
+        await borrowToken
+          .connect(borrower)
+          .transferFrom(borrower.address, stranger.address, borrowId);
+
+        expect(await powerToken.balanceOf(borrower.address)).to.eq(0);
+        expect(await powerToken.balanceOf(stranger.address)).to.eq(
+          ONE_TOKEN * 100n
+        );
+      });
+
+      it('should not be possible to move expired borrowed PowerToken', async () => {
+        await increaseTime(ONE_DAY * 2);
+
+        await expect(
+          borrowToken
+            .connect(borrower)
+            .transferFrom(borrower.address, stranger.address, borrowId)
+        ).to.be.revertedWith(Errors.E_LOAN_TRANSFER_NOT_ALLOWED);
+      });
     });
   });
 });

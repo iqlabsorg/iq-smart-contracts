@@ -155,6 +155,74 @@
       "inputs": [
         {
           "internalType": "address",
+          "name": "paymentToken",
+          "type": "address"
+        },
+        {
+          "internalType": "uint112",
+          "name": "amount",
+          "type": "uint112"
+        },
+        {
+          "internalType": "uint32",
+          "name": "duration",
+          "type": "uint32"
+        }
+      ],
+      "name": "estimateLoan",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "paymentToken",
+          "type": "address"
+        },
+        {
+          "internalType": "uint112",
+          "name": "amount",
+          "type": "uint112"
+        },
+        {
+          "internalType": "uint32",
+          "name": "duration",
+          "type": "uint32"
+        }
+      ],
+      "name": "estimateLoanDetailed",
+      "outputs": [
+        {
+          "internalType": "uint112",
+          "name": "interest",
+          "type": "uint112"
+        },
+        {
+          "internalType": "uint112",
+          "name": "serviceFee",
+          "type": "uint112"
+        },
+        {
+          "internalType": "uint112",
+          "name": "gcFee",
+          "type": "uint112"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "from",
           "type": "address"
         },
@@ -178,6 +246,130 @@
         }
       ],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getIndex",
+      "outputs": [
+        {
+          "internalType": "uint16",
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IEnterprise",
+          "name": "enterprise",
+          "type": "address"
+        },
+        {
+          "internalType": "uint112",
+          "name": "baseRate",
+          "type": "uint112"
+        },
+        {
+          "internalType": "uint96",
+          "name": "minGCFee",
+          "type": "uint96"
+        },
+        {
+          "internalType": "uint32",
+          "name": "gapHalvingPeriod",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint16",
+          "name": "index",
+          "type": "uint16"
+        },
+        {
+          "internalType": "contract IERC20Metadata",
+          "name": "baseToken",
+          "type": "address"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "minLoanDuration",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "maxLoanDuration",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint16",
+          "name": "serviceFeePercent",
+          "type": "uint16"
+        },
+        {
+          "internalType": "bool",
+          "name": "wrappingEnabled",
+          "type": "bool"
+        }
+      ],
+      "name": "initialize2",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "duration",
+          "type": "uint32"
+        }
+      ],
+      "name": "isAllowedLoanDuration",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isTransfersEnabled",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isWrappingEnabled",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -209,6 +401,19 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "borrowTokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "notifyNewLoan",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

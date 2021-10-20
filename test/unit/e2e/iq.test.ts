@@ -1,8 +1,13 @@
-import {ethers, waffle} from 'hardhat';
+import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import chai from 'chai';
-chai.use(waffle.solidity);
-const {expect} = chai;
-
+import {BigNumber} from 'ethers';
+import {ethers, waffle} from 'hardhat';
+import {
+  Enterprise,
+  IERC20Metadata,
+  InterestToken,
+  PowerToken,
+} from '../../../typechain';
 import {
   addLiquidity,
   basePrice,
@@ -10,29 +15,24 @@ import {
   borrow,
   deployEnterprise,
   estimateLoan,
-  getPowerToken,
   getBorrowTokenId,
+  getPowerToken,
   increaseTime,
   ONE_DAY,
   toTokens,
-} from '../utils';
-import {
-  Enterprise,
-  IERC20Metadata,
-  InterestToken,
-  PowerToken,
-} from '../../typechain';
-import {BigNumber, Wallet} from 'ethers';
+} from '../../utils';
+chai.use(waffle.solidity);
+const {expect} = chai;
 
 describe('IQ Protocol E2E', () => {
-  let user: Wallet;
+  let user: SignerWithAddress;
   let token: IERC20Metadata;
   let enterprise: Enterprise;
 
   const ONE_TOKEN = 10n ** 18n;
 
   beforeEach(async () => {
-    [, user] = await waffle.provider.getWallets();
+    [, user] = await ethers.getSigners();
     token = (await ethers.getContract('ERC20Mock')) as IERC20Metadata;
     enterprise = await deployEnterprise('Testing', token.address);
   });
