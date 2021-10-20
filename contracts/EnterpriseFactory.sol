@@ -1,4 +1,10 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
+
+// IQ Protocol. Risk-free collateral-less utility loans
+// https://iq.space/docs/iq-yellow-paper.pdf
+// (C) Blockvis & PARSIQ
+// 🖖 Lend long and prosper!
+
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
