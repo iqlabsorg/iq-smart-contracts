@@ -902,7 +902,7 @@ describe('Enterprise', () => {
     });
   });
 
-  describe.only('Enterprise upgradability', () => {
+  describe('Enterprise upgradability', () => {
     let enterpriseFactory: EnterpriseFactory;
     beforeEach(async () => {
       enterpriseFactory = (await ethers.getContract(
