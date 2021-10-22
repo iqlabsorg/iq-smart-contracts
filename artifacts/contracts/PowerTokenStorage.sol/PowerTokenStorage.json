@@ -63,7 +63,7 @@
     {
       "anonymous": false,
       "inputs": [],
-      "name": "TransfersEnabled",
+      "name": "TransferEnabled",
       "type": "event"
     },
     {
@@ -74,7 +74,7 @@
     },
     {
       "inputs": [],
-      "name": "enableTransfersForever",
+      "name": "enableTransferForever",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -339,7 +339,7 @@
     },
     {
       "inputs": [],
-      "name": "isTransfersEnabled",
+      "name": "isTransferEnabled",
       "outputs": [
         {
           "internalType": "bool",

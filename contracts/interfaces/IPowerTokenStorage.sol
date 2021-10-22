@@ -28,5 +28,5 @@ interface IPowerTokenStorage {
 
     function isWrappingEnabled() external view returns (bool);
 
-    function isTransfersEnabled() external view returns (bool);
+    function isTransferEnabled() external view returns (bool);
 }

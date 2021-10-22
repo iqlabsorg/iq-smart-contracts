@@ -29,7 +29,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
     uint32 internal _maxLoanDuration;
     uint16 internal _serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
     bool internal _wrappingEnabled; // allows wrapping tokens into perpetual PowerTokens
-    bool internal _transfersEnabled; // allows transfers of PowerTokens
+    bool internal _transferEnabled; // allows transfers of PowerTokens
 
     mapping(address => State) internal _states;
 
@@ -37,7 +37,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
     event ServiceFeePercentChanged(uint16 percent);
     event LoanDurationLimitsChanged(uint32 minDuration, uint32 maxDuration);
     event WrappingEnabled();
-    event TransfersEnabled();
+    event TransferEnabled();
 
     function initialize(
         IEnterprise enterprise,
@@ -116,11 +116,11 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         emit WrappingEnabled();
     }
 
-    function enableTransfersForever() external onlyEnterpriseOwner {
-        require(!_transfersEnabled, Errors.ES_TRANSFERS_ALREADY_ENABLED);
+    function enableTransferForever() external onlyEnterpriseOwner {
+        require(!_transferEnabled, Errors.ES_TRANSFER_ALREADY_ENABLED);
 
-        _transfersEnabled = true;
-        emit TransfersEnabled();
+        _transferEnabled = true;
+        emit TransferEnabled();
     }
 
     function isAllowedLoanDuration(uint32 duration) public view override returns (bool) {
@@ -167,7 +167,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         return _wrappingEnabled;
     }
 
-    function isTransfersEnabled() external view override returns (bool) {
-        return _transfersEnabled;
+    function isTransferEnabled() external view override returns (bool) {
+        return _transferEnabled;
     }
 }

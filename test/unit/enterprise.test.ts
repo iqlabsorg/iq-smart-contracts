@@ -130,7 +130,7 @@ describe('Enterprise', () => {
 
       describe('when power token transfer enabled', () => {
         beforeEach(async () => {
-          await powerToken.enableTransfersForever();
+          await powerToken.enableTransferForever();
         });
 
         it('should be possible to transfer wraped power tokens', async () => {
@@ -1156,9 +1156,9 @@ describe('Enterprise', () => {
       ).to.be.revertedWith(Errors.PT_TRANSFER_NOT_ALLOWED);
     });
 
-    describe('when PowerToken transfers are enabled', () => {
+    describe('when PowerToken transfer is enabled', () => {
       beforeEach(async () => {
-        await powerToken.enableTransfersForever();
+        await powerToken.enableTransferForever();
       });
 
       it('should not be possible to move borrowed PowerToken directly', async () => {

@@ -69,7 +69,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     ) internal override {
         bool isMinting = (from == address(0));
         bool isBurning = (to == address(0));
-        require(isMinting || isBurning || _transfersEnabled, Errors.PT_TRANSFERS_DISABLED);
+        require(isMinting || isBurning || _transferEnabled, Errors.PT_TRANSFER_DISABLED);
 
         uint32 timestamp = uint32(block.timestamp);
         if (!isMinting) {
@@ -110,7 +110,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             uint32 maxLoanDuration,
             uint16 serviceFeePercent,
             bool wrappingEnabled,
-            bool transfersEnabled
+            bool transferEnabled
         )
     {
         return (
@@ -125,7 +125,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             _maxLoanDuration,
             _serviceFeePercent,
             _wrappingEnabled,
-            _transfersEnabled
+            _transferEnabled
         );
     }
 

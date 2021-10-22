@@ -112,8 +112,8 @@ library Errors {
     string internal constant E_INVALID_LOAN_AMOUNT = "76";
     string internal constant ES_INVALID_BONDING_POLE = "77";
     string internal constant ES_INVALID_BONDING_SLOPE = "78";
-    string internal constant ES_TRANSFERS_ALREADY_ENABLED = "79";
-    string internal constant PT_TRANSFERS_DISABLED = "80";
+    string internal constant ES_TRANSFER_ALREADY_ENABLED = "79";
+    string internal constant PT_TRANSFER_DISABLED = "80";
     string internal constant E_INVALID_ENTERPRISE_NAME = "81";
     string internal constant PT_INVALID_MAX_LOAN_DURATION = "82";
     string internal constant E_INVALID_ENTERPRISE_FACTORY_ADDRESS = "83";

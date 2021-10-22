@@ -113,7 +113,7 @@ describe('PowerToken', function () {
     });
   });
 
-  describe('when transfers are disabled', () => {
+  describe('when transfer is disabled', () => {
     it('should not be possible to transfer wrapped tokens', async () => {
       await token.approve(powerToken.address, ONE_TOKEN * 100n);
       await powerToken.wrap(ONE_TOKEN * 100n);
@@ -140,9 +140,9 @@ describe('PowerToken', function () {
     });
   });
 
-  describe('when transfers are enabled', () => {
+  describe('when transfer is enabled', () => {
     beforeEach(async () => {
-      await powerToken.enableTransfersForever();
+      await powerToken.enableTransferForever();
     });
 
     it('should be possible to transfer wrapped tokens', async () => {

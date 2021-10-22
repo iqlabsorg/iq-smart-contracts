@@ -103,7 +103,7 @@
     },
     {
       "inputs": [],
-      "name": "isTransfersEnabled",
+      "name": "isTransferEnabled",
       "outputs": [
         {
           "internalType": "bool",

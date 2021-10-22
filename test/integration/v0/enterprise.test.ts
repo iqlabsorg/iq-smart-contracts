@@ -161,7 +161,7 @@ describe('Integration', () => {
         await Promise.all(upgraded.map((x) => x.totalSupply()))
       ).to.deep.eq(totalSupply);
       expect(
-        await Promise.all(upgraded.map((x) => x.isTransfersEnabled()))
+        await Promise.all(upgraded.map((x) => x.isTransferEnabled()))
       ).to.deep.eq([false, false, false, false]);
       expect(
         await Promise.all(upgraded.map((x) => x.getEnterprise()))
@@ -173,9 +173,9 @@ describe('Integration', () => {
       ]);
     });
 
-    it('should keep the same after transfers are enabled', async () => {
+    it('should keep the same after transfer is enabled', async () => {
       await Promise.all(
-        upgraded.map((x) => x.connect(admin).enableTransfersForever())
+        upgraded.map((x) => x.connect(admin).enableTransferForever())
       );
 
       expect(
@@ -188,7 +188,7 @@ describe('Integration', () => {
         await Promise.all(upgraded.map((x) => x.totalSupply()))
       ).to.deep.eq(totalSupply);
       expect(
-        await Promise.all(upgraded.map((x) => x.isTransfersEnabled()))
+        await Promise.all(upgraded.map((x) => x.isTransferEnabled()))
       ).to.deep.eq([true, true, true, true]);
       expect(
         await Promise.all(upgraded.map((x) => x.getEnterprise()))
