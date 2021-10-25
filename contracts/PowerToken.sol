@@ -204,7 +204,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         internal
         view
         returns (
-            uint112 interest,
+            uint112 interest, // TODO: poolFee
             uint112 serviceFee,
             uint112 gcFee
         )

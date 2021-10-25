@@ -24,7 +24,7 @@ interface IPowerToken is IERC20Metadata, IPowerTokenStorage {
         external
         view
         returns (
-            uint112 interest,
+            uint112 interest, // TODO: poolFee
             uint112 serviceFee,
             uint112 gcFee
         );

@@ -11,6 +11,7 @@ import "./interfaces/IInterestToken.sol";
 import "./interfaces/IEnterprise.sol";
 import "./InterestTokenStorage.sol";
 
+// TODO: StakeToken
 contract InterestToken is InterestTokenStorage, IInterestToken {
     function getNextTokenId() public view override returns (uint256) {
         return uint256(keccak256(abi.encodePacked("i", address(this), _tokenIdTracker)));

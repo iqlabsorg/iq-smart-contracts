@@ -12,6 +12,7 @@ import "./interfaces/IBorrowToken.sol";
 import "./Enterprise.sol";
 import "./BorrowTokenStorage.sol";
 
+//TODO: RentalAgreementToken
 contract BorrowToken is BorrowTokenStorage, IBorrowToken {
     using SafeERC20 for IERC20;
 
@@ -32,7 +33,7 @@ contract BorrowToken is BorrowTokenStorage, IBorrowToken {
     }
 
     function getNextTokenId() public view override returns (uint256) {
-        return uint256(keccak256(abi.encodePacked("b", address(this), _tokenIdTracker)));
+        return uint256(keccak256(abi.encodePacked("b", address(this), _tokenIdTracker))); // TODO: b -> ra
     }
 
     function _beforeTokenTransfer(
@@ -46,6 +47,6 @@ contract BorrowToken is BorrowTokenStorage, IBorrowToken {
 
     function _baseURI() internal view override returns (string memory) {
         string memory baseURI = getEnterprise().getBaseUri();
-        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, "borrow/")) : "";
+        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, "borrow/")) : ""; // TODO: borrow -> rental-agreement
     }
 }

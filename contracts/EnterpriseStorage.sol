@@ -23,6 +23,7 @@ import "./libs/Errors.sol";
  */
 abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage {
     struct LiquidityInfo {
+        // TODO: Liquidity -> Stake
         uint256 amount;
         uint256 shares;
         uint256 block;
@@ -34,7 +35,7 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
     /**
      * @dev ERC20 token backed by enterprise services
      */
-    IERC20Metadata internal _liquidityToken;
+    IERC20Metadata internal _liquidityToken; //TODO: _enterpriseToken
 
     /**
      * @dev ERC721 token for liquidity providers

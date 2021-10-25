@@ -25,8 +25,8 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
     uint16 internal _index; // index in _powerTokens array. Not updatable
     // slot 2, 0 bytes left
     IERC20Metadata internal _baseToken;
-    uint32 internal _minLoanDuration;
-    uint32 internal _maxLoanDuration;
+    uint32 internal _minLoanDuration; // TODO: *rentalDuration
+    uint32 internal _maxLoanDuration; // TODO: *rentalDuration
     uint16 internal _serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
     bool internal _wrappingEnabled; // allows wrapping tokens into perpetual PowerTokens
     bool internal _transferEnabled; // allows transfers of PowerTokens
@@ -35,7 +35,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
 
     event BaseRateChanged(uint112 baseRate, address baseToken, uint96 minGCFee);
     event ServiceFeePercentChanged(uint16 percent);
-    event LoanDurationLimitsChanged(uint32 minDuration, uint32 maxDuration);
+    event LoanDurationLimitsChanged(uint32 minDuration, uint32 maxDuration); // TODO: RentalDurationLimitsChanged
     event WrappingEnabled();
     event TransferEnabled();
 

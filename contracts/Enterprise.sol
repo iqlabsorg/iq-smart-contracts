@@ -22,17 +22,18 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
     using SafeERC20 for IERC20Metadata;
 
     enum LiquidityChangeType {
-        WithdrawInterest,
+        WithdrawInterest, // TODO: WithdrawReward
         Add,
         Remove,
         Increase,
         Decrease
     }
 
+    //TODO: StakeChanged
     event LiquidityChanged(
-        uint256 indexed interestTokenId,
-        address indexed liquidityProvider,
-        LiquidityChangeType indexed changeType,
+        uint256 indexed interestTokenId, // TODO: stakeTokenId
+        address indexed liquidityProvider, // TODO: staker
+        LiquidityChangeType indexed changeType, // TODO: StakeChangeType
         uint256 amountDelta,
         uint256 amount,
         uint256 sharesDelta,
@@ -128,6 +129,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         emit ServiceRegistered(address(powerToken));
     }
 
+    // TODO: rent
     function borrow(
         address powerToken,
         address paymentToken,
@@ -148,7 +150,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         {
             // Ensure no loan payment slippage.
             // GC fee does not go to the pool but must be accounted for slippage calculation.
-            uint256 loanCost = interest + serviceFee;
+            uint256 loanCost = interest + serviceFee; // TODO: baseRentalFee
             require(loanCost + gcFee <= maxPayment, Errors.E_LOAN_COST_SLIPPAGE);
 
             // Handle loan payment transfer and distribution.
@@ -205,6 +207,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         );
     }
 
+    // TODO: extendRentalPeriod
     function reborrow(
         uint256 borrowTokenId,
         address paymentToken,
@@ -257,6 +260,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         );
     }
 
+    // TODO: handleRentalPayment
     function handleLoanPayment(
         IERC20 paymentToken,
         uint256 loanCost,
@@ -286,6 +290,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         _increaseStreamingReserveTarget(interestInLiquidityTokens);
     }
 
+    // returnRental
     function returnLoan(uint256 borrowTokenId) external {
         LoanInfo memory loan = _loanInfo[borrowTokenId];
         require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
@@ -328,6 +333,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
      * Enterprise address before calling this function
      */
     function addLiquidity(uint256 liquidityAmount) external notShutdown {
+        //TODO: stake(stakeAmount)
         // Transfer liquidity tokens to the enterprise.
         _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
 
@@ -357,6 +363,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
     }
 
     function withdrawInterest(uint256 interestTokenId) external onlyInterestTokenOwner(interestTokenId) {
+        // TODO: claimReward
         LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
 
         uint256 liquidityAmount = liquidityInfo.amount;
@@ -364,7 +371,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         uint256 reserve = getReserve();
 
         // Calculate accrued interest & check if reserves are sufficient to fulfill withdrawal request.
-        uint256 accruedInterest = _getAccruedInterest(liquidityShares, liquidityAmount, reserve);
+        uint256 accruedInterest = _getAccruedInterest(liquidityShares, liquidityAmount, reserve); // TODO: _getStakingReward
         require(accruedInterest <= _getAvailableReserve(reserve), Errors.E_INSUFFICIENT_LIQUIDITY);
 
         // Transfer liquidity tokens to the interest token owner.
@@ -394,6 +401,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         );
     }
 
+    //TODO: unstake
     function removeLiquidity(uint256 interestTokenId) external onlyInterestTokenOwner(interestTokenId) {
         LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
         require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
@@ -428,6 +436,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         );
     }
 
+    //TODO: decreateStake
     function decreaseLiquidity(uint256 interestTokenId, uint256 liquidityAmount)
         external
         onlyInterestTokenOwner(interestTokenId)
@@ -472,6 +481,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         );
     }
 
+    //TODO: increateStake
     function increaseLiquidity(uint256 interestTokenId, uint256 liquidityAmount)
         external
         notShutdown
@@ -510,6 +520,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
     }
 
     function estimateLoan(
+        // TODO: estimateRentalFee
         address powerToken,
         address paymentToken,
         uint112 amount,
@@ -543,13 +554,16 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
     }
 
     function _liquidityToShares(uint256 amount, uint256 reserve) internal view returns (uint256) {
+        // _stakeToShares
         return (_totalShares * amount) / reserve;
     }
 
     function _sharesToLiquidity(uint256 shares, uint256 reserve) internal view returns (uint256) {
+        // _sharesToStake
         return (reserve * shares) / _totalShares;
     }
 
+    // TODO: rentalAgreementTransfer
     function loanTransfer(
         address from,
         address to,

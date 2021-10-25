@@ -10,13 +10,14 @@ import "./IBorrowToken.sol";
 import "./IConverter.sol";
 
 interface IEnterpriseStorage is IInitializableOwnable {
+    // TODO: RentalAgreement
     struct LoanInfo {
         // slot 1, 0 bytes left
-        uint112 amount; // 14 bytes
+        uint112 amount; // 14 bytes // TODO: powerTokenAmount
         uint16 powerTokenIndex; // 2 bytes, index in powerToken array
-        uint32 borrowingTime; // 4 bytes
-        uint32 maturityTime; // 4 bytes
-        uint32 borrowerReturnGraceTime; // 4 bytes
+        uint32 borrowingTime; // 4 bytes // TODO: startTime
+        uint32 maturityTime; // 4 bytes  // TODO: endTime
+        uint32 borrowerReturnGraceTime; // 4 bytes // TODO: rentee
         uint32 enterpriseCollectGraceTime; // 4 bytes
         // slot 2, 16 bytes left
         uint112 gcFee; // 14 bytes, loan return reward
