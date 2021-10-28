@@ -222,12 +222,12 @@ contract ERC20 is IERC20Metadata {
         address sender,
         address recipient,
         uint256 amount,
-        bool isBorrowedTokenTransfer
+        bool isRentedTokenTransfer
     ) internal virtual {
         require(sender != address(0), Errors.ERC20_TRANSFER_FROM_THE_ZERO_ADDRESS);
         require(recipient != address(0), Errors.ERC20_TRANSFER_TO_THE_ZERO_ADDRESS);
 
-        _beforeTokenTransfer(sender, recipient, amount, isBorrowedTokenTransfer);
+        _beforeTokenTransfer(sender, recipient, amount, isRentedTokenTransfer);
 
         uint256 senderBalance = _balances[sender];
         require(senderBalance >= amount, Errors.ERC20_TRANSFER_AMOUNT_EXCEEDS_BALANCE);
@@ -249,11 +249,11 @@ contract ERC20 is IERC20Metadata {
     function _mint(
         address account,
         uint256 amount,
-        bool isBorrowedTokenTransfer
+        bool isRentedTokenTransfer
     ) internal virtual {
         require(account != address(0), Errors.ERC20_MINT_TO_THE_ZERO_ADDRESS);
 
-        _beforeTokenTransfer(address(0), account, amount, isBorrowedTokenTransfer);
+        _beforeTokenTransfer(address(0), account, amount, isRentedTokenTransfer);
 
         _totalSupply += amount;
         _balances[account] += amount;
@@ -274,11 +274,11 @@ contract ERC20 is IERC20Metadata {
     function _burn(
         address account,
         uint256 amount,
-        bool isBorrowedTokenTransfer
+        bool isRentedTokenTransfer
     ) internal virtual {
         require(account != address(0), Errors.ERC20_BURN_FROM_THE_ZERO_ADDRESS);
 
-        _beforeTokenTransfer(account, address(0), amount, isBorrowedTokenTransfer);
+        _beforeTokenTransfer(account, address(0), amount, isRentedTokenTransfer);
 
         uint256 accountBalance = _balances[account];
         require(accountBalance >= amount, Errors.ERC20_BURN_AMOUNT_EXCEEDS_BALANCE);
@@ -331,6 +331,6 @@ contract ERC20 is IERC20Metadata {
         address from,
         address to,
         uint256 amount,
-        bool updateLockedBalance
+        bool isRentedTokenTransfer
     ) internal virtual {}
 }

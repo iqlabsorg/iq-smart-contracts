@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "IInterestToken",
-  "sourceName": "contracts/interfaces/IInterestToken.sol",
+  "contractName": "RentalTokenStorage",
+  "sourceName": "contracts/RentalTokenStorage.sol",
   "abi": [
     {
       "anonymous": false,
@@ -108,24 +108,11 @@
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "balance",
+          "name": "",
           "type": "uint256"
         }
       ],
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "burn",
-      "outputs": [],
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -140,7 +127,7 @@
       "outputs": [
         {
           "internalType": "address",
-          "name": "operator",
+          "name": "",
           "type": "address"
         }
       ],
@@ -149,12 +136,12 @@
     },
     {
       "inputs": [],
-      "name": "getNextTokenId",
+      "name": "getEnterprise",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "contract IEnterprise",
           "name": "",
-          "type": "uint256"
+          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -172,6 +159,37 @@
           "name": "symbol",
           "type": "string"
         },
+        {
+          "internalType": "contract IEnterprise",
+          "name": "enterprise",
+          "type": "address"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "name_",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "symbol_",
+          "type": "string"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
         {
           "internalType": "contract IEnterprise",
           "name": "enterprise",
@@ -208,22 +226,16 @@
       "type": "function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        }
-      ],
-      "name": "mint",
+      "inputs": [],
+      "name": "name",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
-      "stateMutability": "nonpayable",
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -238,7 +250,7 @@
       "outputs": [
         {
           "internalType": "address",
-          "name": "owner",
+          "name": "",
           "type": "address"
         }
       ],
@@ -287,7 +299,7 @@
         },
         {
           "internalType": "bytes",
-          "name": "data",
+          "name": "_data",
           "type": "bytes"
         }
       ],
@@ -305,7 +317,7 @@
         },
         {
           "internalType": "bool",
-          "name": "_approved",
+          "name": "approved",
           "type": "bool"
         }
       ],
@@ -328,6 +340,19 @@
           "internalType": "bool",
           "name": "",
           "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "symbol",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -369,8 +394,27 @@
       "outputs": [
         {
           "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
           "name": "tokenId",
           "type": "uint256"
+        }
+      ],
+      "name": "tokenURI",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
         }
       ],
       "stateMutability": "view",

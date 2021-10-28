@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "IBorrowTokenStorage",
-  "sourceName": "contracts/interfaces/IBorrowTokenStorage.sol",
+  "contractName": "IRentalTokenStorage",
+  "sourceName": "contracts/interfaces/IRentalTokenStorage.sol",
   "abi": [
     {
       "inputs": [

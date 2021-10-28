@@ -10,23 +10,23 @@ interface IPowerTokenStorage {
         IEnterprise enterprise,
         uint112 baseRate,
         uint96 minGCFee,
-        uint32 gapHalvingPeriod,
+        uint32 energyGapHalvingPeriod,
         uint16 index,
         IERC20Metadata baseToken
     ) external;
 
     function initialize2(
-        uint32 minLoanDuration,
-        uint32 maxLoanDuration,
+        uint32 minRentalPeriod,
+        uint32 maxRentalPeriod,
         uint16 serviceFeePercent,
-        bool wrappingEnabled
+        bool swappingEnabled
     ) external;
 
-    function isAllowedLoanDuration(uint32 duration) external view returns (bool);
+    function isAllowedRentalPeriod(uint32 period) external view returns (bool);
 
     function getIndex() external view returns (uint16);
 
-    function isWrappingEnabled() external view returns (bool);
+    function isSwappingEnabled() external view returns (bool);
 
     function isTransferEnabled() external view returns (bool);
 }

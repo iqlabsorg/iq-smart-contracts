@@ -4,9 +4,9 @@ pragma solidity 0.8.4;
 
 import "./EnterpriseOwnable.sol";
 import "./token/ERC721Enumerable.sol";
-import "./interfaces/IInterestTokenStorage.sol";
+import "./interfaces/IStakeTokenStorage.sol";
 
-abstract contract InterestTokenStorage is IInterestTokenStorage, EnterpriseOwnable, ERC721Enumerable {
+abstract contract StakeTokenStorage is IStakeTokenStorage, EnterpriseOwnable, ERC721Enumerable {
     uint256 internal _tokenIdTracker;
 
     function initialize(

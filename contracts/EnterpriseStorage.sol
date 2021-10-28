@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/utils/StorageSlot.sol";
 import "./interfaces/IPowerToken.sol";
-import "./interfaces/IInterestToken.sol";
-import "./interfaces/IBorrowToken.sol";
+import "./interfaces/IStakeToken.sol";
+import "./interfaces/IRentalToken.sol";
 import "./interfaces/IConverter.sol";
 import "./interfaces/IEnterpriseStorage.sol";
 import "./InitializableOwnable.sol";
@@ -22,8 +22,7 @@ import "./libs/Errors.sol";
  * be used as an `owner` of this contract
  */
 abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage {
-    struct LiquidityInfo {
-        // TODO: Liquidity -> Stake
+    struct Stake {
         uint256 amount;
         uint256 shares;
         uint256 block;
@@ -35,83 +34,96 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
     /**
      * @dev ERC20 token backed by enterprise services
      */
-    IERC20Metadata internal _liquidityToken; //TODO: _enterpriseToken
+    IERC20Metadata internal _enterpriseToken;
 
     /**
-     * @dev ERC721 token for liquidity providers
+     * @dev ERC721 stake bearing token
      */
-    IInterestToken internal _interestToken;
+    IStakeToken internal _stakeToken;
 
     /**
-     * @dev ERC721 token for borrowers
+     * @dev ERC721 rental agreement bearing token
      */
-    IBorrowToken internal _borrowToken;
+    IRentalToken internal _rentalToken;
+
+    /**
+     * @dev Enterprise factory address
+     */
     EnterpriseFactory internal _factory;
-    uint32 internal _interestGapHalvingPeriod;
+
+    /**
+     * @dev This is a time period after which the half of the received pool fee will be streamed to the renting pool.
+     */
+    uint32 internal _streamingReserveHalvingPeriod;
+
     bool internal _enterpriseShutdown;
 
+    /**
+     * @dev Token conversion service address
+     */
     IConverter internal _converter;
 
     /**
-     * @dev address which have rights to collect expired PowerTokens
+     * @dev Account which have rights to collect power tokens after rental agreement expiration
      */
     address internal _enterpriseCollector;
 
     /**
-     * @dev address where collected service fee goes
+     * @dev Enterprise wallet address
      */
-    address internal _enterpriseVault;
+    address internal _enterpriseWallet;
 
-    uint32 internal _borrowerLoanReturnGracePeriod;
-    uint32 internal _enterpriseLoanCollectGracePeriod;
+    uint32 internal _renterOnlyReturnPeriod;
+    uint32 internal _enterpriseOnlyCollectionPeriod;
     uint16 internal _gcFeePercent; // 100 is 1%, 10_000 is 100%
 
     mapping(address => int16) internal _paymentTokensIndex;
     address[] internal _paymentTokens;
 
     /**
-     * @dev Amount of fixed `_liquidityToken`
+     * @dev Fixed amount of enterprise tokens currently present in the renting pool
      */
     uint256 internal _fixedReserve;
 
     /**
-     * @dev Borrowed reserves of `_liquidityToken`
+     * @dev Total amount of used enterprise tokens
      */
     uint256 internal _usedReserve;
 
     /**
-     * @dev Reserves which are streamed from borrower to the pool
+     * @dev Outstanding amount of enterprise tokens (rental payments) which is being continuously streamed to the renting pool
      */
     uint112 internal _streamingReserve;
     uint112 internal _streamingReserveTarget;
     uint32 internal _streamingReserveUpdated;
 
     /**
-     * Total shares given to liquidity providers
+     * @dev Total number of renting pool shares issued to the stakers
      */
     uint256 internal _totalShares;
 
+    // Bonding factor calculation parameters
     uint256 internal _bondingSlope;
     uint256 internal _bondingPole;
 
     string internal _name;
     string internal _baseUri;
-    mapping(uint256 => LoanInfo) internal _loanInfo;
-    mapping(uint256 => LiquidityInfo) internal _liquidityInfo;
+    mapping(uint256 => RentalAgreement) internal _rentalAgreements;
+    mapping(uint256 => Stake) internal _stakes;
     mapping(address => bool) internal _registeredPowerTokens;
     IPowerToken[] internal _powerTokens;
 
-    event EnterpriseLoanCollectGracePeriodChanged(uint32 period);
-    event BorrowerLoanReturnGracePeriodChanged(uint32 period);
+    event EnterpriseOnlyCollectionPeriodChanged(uint32 period);
+    event RenterOnlyReturnPeriodChanged(uint32 period);
     event BondingChanged(uint256 pole, uint256 slope);
     event ConverterChanged(address converter);
-    event InterestGapHalvingPeriodChanged(uint32 period);
+    event StreamingReserveHalvingPeriodChanged(uint32 period);
     event GcFeePercentChanged(uint16 percent);
     event EnterpriseShutdown();
     event FixedReserveChanged(uint256 fixedReserve);
     event StreamingReserveChanged(uint112 streamingReserve, uint112 streamingReserveTarget);
     event PaymentTokenChange(address paymentToken, bool enabled);
-    event EnterpriseVaultChanged(address vault);
+    event EnterpriseWalletChanged(address wallet);
     event EnterpriseCollectorChanged(address collector);
     event BaseUriChanged(string baseUri);
 
@@ -120,13 +132,13 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         _;
     }
 
-    modifier onlyBorrowToken() {
-        require(msg.sender == address(_borrowToken), Errors.E_CALLER_NOT_BORROW_TOKEN);
+    modifier onlyRentalToken() {
+        require(msg.sender == address(_rentalToken), Errors.E_CALLER_NOT_RENTAL_TOKEN);
         _;
     }
 
-    modifier onlyInterestTokenOwner(uint256 interestTokenId) {
-        require(_interestToken.ownerOf(interestTokenId) == msg.sender, Errors.CALLER_NOT_OWNER);
+    modifier onlyStakeTokenOwner(uint256 stakeTokenId) {
+        require(_stakeToken.ownerOf(stakeTokenId) == msg.sender, Errors.CALLER_NOT_OWNER);
         _;
     }
 
@@ -147,52 +159,53 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         _baseUri = baseUri;
         _gcFeePercent = gcFeePercent;
         _converter = converter;
-        _enterpriseVault = owner;
+        _enterpriseWallet = owner;
         _enterpriseCollector = owner;
-        _interestGapHalvingPeriod = 7 days;
-        _borrowerLoanReturnGracePeriod = 12 hours;
-        _enterpriseLoanCollectGracePeriod = 1 days;
+        _streamingReserveHalvingPeriod = 7 days;
+        _renterOnlyReturnPeriod = 12 hours;
+        _enterpriseOnlyCollectionPeriod = 1 days;
         _bondingPole = uint256(5 << 64) / 100; // 5%
         _bondingSlope = uint256(3 << 64) / 10; // 0.3
 
         emit BaseUriChanged(baseUri);
         emit GcFeePercentChanged(_gcFeePercent);
         emit ConverterChanged(address(_converter));
-        emit EnterpriseVaultChanged(_enterpriseVault);
+        emit EnterpriseWalletChanged(_enterpriseWallet);
         emit EnterpriseCollectorChanged(_enterpriseCollector);
-        emit InterestGapHalvingPeriodChanged(_interestGapHalvingPeriod);
-        emit BorrowerLoanReturnGracePeriodChanged(_borrowerLoanReturnGracePeriod);
-        emit EnterpriseLoanCollectGracePeriodChanged(_enterpriseLoanCollectGracePeriod);
+        emit StreamingReserveHalvingPeriodChanged(_streamingReserveHalvingPeriod);
+        emit RenterOnlyReturnPeriodChanged(_renterOnlyReturnPeriod);
+        emit EnterpriseOnlyCollectionPeriodChanged(_enterpriseOnlyCollectionPeriod);
         emit BondingChanged(_bondingPole, _bondingSlope);
     }
 
     function initializeTokens(
-        IERC20Metadata liquidityToken,
-        IInterestToken interestToken,
-        IBorrowToken borrowToken
+        IERC20Metadata enterpriseToken,
+        IStakeToken stakeToken,
+        IRentalToken rentalToken
     ) external override {
-        require(address(_liquidityToken) == address(0), Errors.ALREADY_INITIALIZED);
-        require(address(liquidityToken) != address(0), Errors.INVALID_ADDRESS);
-        _liquidityToken = liquidityToken;
-        _interestToken = interestToken;
-        _borrowToken = borrowToken;
-        _enablePaymentToken(address(liquidityToken));
+        require(address(_enterpriseToken) == address(0), Errors.ALREADY_INITIALIZED);
+        require(address(enterpriseToken) != address(0), Errors.INVALID_ADDRESS);
+        _enterpriseToken = enterpriseToken;
+        _stakeToken = stakeToken;
+        _rentalToken = rentalToken;
+        // Initially the enterprise token is the only accepted payment token.
+        _enablePaymentToken(address(enterpriseToken));
     }
 
     function isRegisteredPowerToken(address powerToken) external view returns (bool) {
         return _registeredPowerTokens[powerToken];
     }
 
-    function getLiquidityToken() external view override returns (IERC20Metadata) {
-        return _liquidityToken;
+    function getEnterpriseToken() external view override returns (IERC20Metadata) {
+        return _enterpriseToken;
     }
 
-    function getInterestToken() external view returns (IInterestToken) {
-        return _interestToken;
+    function getStakeToken() external view returns (IStakeToken) {
+        return _stakeToken;
     }
 
-    function getBorrowToken() external view returns (IBorrowToken) {
-        return _borrowToken;
+    function getRentalToken() external view returns (IRentalToken) {
+        return _rentalToken;
     }
 
     function getPaymentTokenIndex(address token) public view returns (int16) {
@@ -215,20 +228,20 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         return _enterpriseCollector;
     }
 
-    function getEnterpriseVault() external view returns (address) {
-        return _enterpriseVault;
+    function getEnterpriseWallet() external view returns (address) {
+        return _enterpriseWallet;
     }
 
-    function getBorrowerLoanReturnGracePeriod() external view returns (uint32) {
-        return _borrowerLoanReturnGracePeriod;
+    function getRenterOnlyReturnPeriod() external view returns (uint32) {
+        return _renterOnlyReturnPeriod;
     }
 
-    function getEnterpriseLoanCollectGracePeriod() external view returns (uint32) {
-        return _enterpriseLoanCollectGracePeriod;
+    function getEnterpriseOnlyCollectionPeriod() external view returns (uint32) {
+        return _enterpriseOnlyCollectionPeriod;
     }
 
-    function getInterestGapHalvingPeriod() external view returns (uint32) {
-        return _interestGapHalvingPeriod;
+    function getStreamingReserveHalvingPeriod() external view returns (uint32) {
+        return _streamingReserveHalvingPeriod;
     }
 
     function getConverter() external view override returns (IConverter) {
@@ -250,9 +263,9 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
             string memory name,
             string memory baseUri,
             uint256 totalShares,
-            uint32 interestGapHalvingPeriod,
-            uint32 borrowerLoanReturnGracePeriod,
-            uint32 enterpriseLoanCollectGracePeriod,
+            uint32 streamingReserveHalvingPeriod,
+            uint32 renterOnlyReturnPeriod,
+            uint32 enterpriseOnlyCollectionPeriod,
             uint16 gcFeePercent,
             uint256 fixedReserve,
             uint256 usedReserve,
@@ -265,9 +278,9 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
             _name,
             _baseUri,
             _totalShares,
-            _interestGapHalvingPeriod,
-            _borrowerLoanReturnGracePeriod,
-            _enterpriseLoanCollectGracePeriod,
+            _streamingReserveHalvingPeriod,
+            _renterOnlyReturnPeriod,
+            _enterpriseOnlyCollectionPeriod,
             _gcFeePercent,
             _fixedReserve,
             _usedReserve,
@@ -281,14 +294,14 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         return _powerTokens;
     }
 
-    function getLoanInfo(uint256 borrowTokenId) external view override returns (LoanInfo memory) {
-        _borrowToken.ownerOf(borrowTokenId); // will throw on non existent tokenId
-        return _loanInfo[borrowTokenId];
+    function getRentalAgreement(uint256 rentalTokenId) external view override returns (RentalAgreement memory) {
+        _rentalToken.ownerOf(rentalTokenId); // will throw on non existent tokenId
+        return _rentalAgreements[rentalTokenId];
     }
 
-    function getLiquidityInfo(uint256 interestTokenId) external view returns (LiquidityInfo memory) {
-        _interestToken.ownerOf(interestTokenId); // will throw on non existent tokenId
-        return _liquidityInfo[interestTokenId];
+    function getStake(uint256 stakeTokenId) external view returns (Stake memory) {
+        _stakeToken.ownerOf(stakeTokenId); // will throw on non existent tokenId
+        return _stakes[stakeTokenId];
     }
 
     function getReserve() public view override returns (uint256) {
@@ -313,10 +326,10 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         emit EnterpriseCollectorChanged(newCollector);
     }
 
-    function setEnterpriseVault(address newVault) external onlyOwner {
-        require(newVault != address(0), Errors.ES_INVALID_VAULT_ADDRESS);
-        _enterpriseVault = newVault;
-        emit EnterpriseVaultChanged(newVault);
+    function setEnterpriseWallet(address newWallet) external onlyOwner {
+        require(newWallet != address(0), Errors.ES_INVALID_WALLET_ADDRESS);
+        _enterpriseWallet = newWallet;
+        emit EnterpriseWalletChanged(newWallet);
     }
 
     function setConverter(IConverter newConverter) external onlyOwner {
@@ -333,18 +346,18 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         emit BondingChanged(_bondingPole, _bondingSlope);
     }
 
-    function setBorrowerLoanReturnGracePeriod(uint32 newPeriod) external onlyOwner {
-        require(newPeriod <= _enterpriseLoanCollectGracePeriod, Errors.ES_INVALID_BORROWER_LOAN_RETURN_GRACE_PERIOD);
+    function setRenterOnlyReturnPeriod(uint32 newPeriod) external onlyOwner {
+        require(newPeriod <= _enterpriseOnlyCollectionPeriod, Errors.ES_INVALID_RENTER_ONLY_RETURN_PERIOD);
 
-        _borrowerLoanReturnGracePeriod = newPeriod;
-        emit BorrowerLoanReturnGracePeriodChanged(newPeriod);
+        _renterOnlyReturnPeriod = newPeriod;
+        emit RenterOnlyReturnPeriodChanged(newPeriod);
     }
 
-    function setEnterpriseLoanCollectGracePeriod(uint32 newPeriod) external onlyOwner {
-        require(_borrowerLoanReturnGracePeriod <= newPeriod, Errors.ES_INVALID_ENTERPRISE_LOAN_COLLECT_GRACE_PERIOD);
+    function setEnterpriseOnlyCollectionPeriod(uint32 newPeriod) external onlyOwner {
+        require(_renterOnlyReturnPeriod <= newPeriod, Errors.ES_INVALID_ENTERPRISE_ONLY_COLLECTION_PERIOD);
 
-        _enterpriseLoanCollectGracePeriod = newPeriod;
-        emit EnterpriseLoanCollectGracePeriodChanged(newPeriod);
+        _enterpriseOnlyCollectionPeriod = newPeriod;
+        emit EnterpriseOnlyCollectionPeriodChanged(newPeriod);
     }
 
     function setBaseUri(string calldata baseUri) external onlyOwner {
@@ -352,17 +365,17 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         emit BaseUriChanged(baseUri);
     }
 
-    function setInterestGapHalvingPeriod(uint32 interestGapHalvingPeriod) external onlyOwner {
-        require(interestGapHalvingPeriod > 0, Errors.ES_INTEREST_GAP_HALVING_PERIOD_NOT_GT_0);
-        _interestGapHalvingPeriod = interestGapHalvingPeriod;
-        emit InterestGapHalvingPeriodChanged(interestGapHalvingPeriod);
+    function setStreamingReserveHalvingPeriod(uint32 streamingReserveHalvingPeriod) external onlyOwner {
+        require(streamingReserveHalvingPeriod > 0, Errors.ES_STREAMING_RESERVE_HALVING_PERIOD_NOT_GT_0);
+        _streamingReserveHalvingPeriod = streamingReserveHalvingPeriod;
+        emit StreamingReserveHalvingPeriodChanged(streamingReserveHalvingPeriod);
     }
 
     function upgrade(
         address enterpriseFactory,
         address enterpriseImplementation,
-        address borrowTokenImplementation,
-        address interestTokenImplementation,
+        address rentalTokenImplementation,
+        address stakeTokenImplementation,
         address powerTokenImplementation,
         address[] calldata powerTokens
     ) external onlyOwner {
@@ -372,11 +385,11 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         if (enterpriseImplementation != address(0)) {
             admin.upgrade(TransparentUpgradeableProxy(payable(address(this))), enterpriseImplementation);
         }
-        if (borrowTokenImplementation != address(0)) {
-            admin.upgrade(TransparentUpgradeableProxy(payable(address(_borrowToken))), borrowTokenImplementation);
+        if (rentalTokenImplementation != address(0)) {
+            admin.upgrade(TransparentUpgradeableProxy(payable(address(_rentalToken))), rentalTokenImplementation);
         }
-        if (interestTokenImplementation != address(0)) {
-            admin.upgrade(TransparentUpgradeableProxy(payable(address(_interestToken))), interestTokenImplementation);
+        if (stakeTokenImplementation != address(0)) {
+            admin.upgrade(TransparentUpgradeableProxy(payable(address(_stakeToken))), stakeTokenImplementation);
         }
         if (powerTokenImplementation != address(0)) {
             for (uint256 i = 0; i < powerTokens.length; i++) {
@@ -426,7 +439,7 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
             ExpMath.halfLife(
                 _streamingReserveUpdated,
                 _streamingReserveTarget - _streamingReserve,
-                _interestGapHalvingPeriod,
+                _streamingReserveHalvingPeriod,
                 uint32(block.timestamp)
             );
     }

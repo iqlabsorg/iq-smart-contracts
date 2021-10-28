@@ -66,41 +66,41 @@ library Errors {
     string internal constant DE_INVALID_ENTERPRISE_ADDRESS = "37";
     string internal constant DE_LABMDA_NOT_GT_0 = "38";
 
-    string internal constant E_CALLER_NOT_BORROW_TOKEN = "39";
+    string internal constant E_CALLER_NOT_RENTAL_TOKEN = "39";
     string internal constant E_INVALID_BASE_TOKEN_ADDRESS = "40";
     string internal constant E_SERVICE_LIMIT_REACHED = "41";
-    string internal constant E_INVALID_LOAN_DURATION_RANGE = "42";
-    string internal constant E_SERVICE_GAP_HALVING_PERIOD_NOT_GT_0 = "43";
-    string internal constant E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN = "44"; // Interest payment token is disabled or not supported
-    string internal constant E_LOAN_DURATION_OUT_OF_RANGE = "45"; // Loan duration is out of allowed range
+    string internal constant E_INVALID_RENTAL_PERIOD_RANGE = "42";
+    string internal constant E_SERVICE_ENERGY_GAP_HALVING_PERIOD_NOT_GT_0 = "43";
+    string internal constant E_UNSUPPORTED_PAYMENT_TOKEN = "44"; // Payment token is disabled or not supported
+    string internal constant E_RENTAL_PERIOD_OUT_OF_RANGE = "45"; // Rental period is out of allowed range
     string internal constant E_INSUFFICIENT_LIQUIDITY = "46";
-    string internal constant E_LOAN_COST_SLIPPAGE = "47"; // Effective loan cost exceeds max payment limit set by borrower
-    string internal constant E_INVALID_LOAN_TOKEN_ID = "48";
-    string internal constant E_INVALID_LOAN_DURATION = "49";
+    string internal constant E_RENTAL_PAYMENT_SLIPPAGE = "47"; // Effective rental payment exceeds max payment limit set by renter
+    string internal constant E_INVALID_RENTAL_TOKEN_ID = "48";
+    string internal constant E_INVALID_RENTAL_PERIOD = "49";
     string internal constant E_FLASH_LIQUIDITY_REMOVAL = "50"; // Adding and removing liquidity in the same block is not allowed
-    string internal constant E_WRAPPING_DISABLED = "51";
-    string internal constant E_LOAN_TRANSFER_NOT_ALLOWED = "52";
-    string internal constant E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD = "53"; // Only borrower can return within borrower grace period
-    string internal constant E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD = "54"; // Only borrower or enterprise can return within enterprise grace period
+    string internal constant E_SWAPPING_DISABLED = "51";
+    string internal constant E_RENTAL_TRANSFER_NOT_ALLOWED = "52";
+    string internal constant E_INVALID_CALLER_WITHIN_RENTER_ONLY_RETURN_PERIOD = "53"; // Only renter can return within renter grace period
+    string internal constant E_INVALID_CALLER_WITHIN_ENTERPRISE_ONLY_COLLECTION_PERIOD = "54"; // Only renter or enterprise can return within enterprise grace period
 
     string internal constant EF_INVALID_ENTERPRISE_IMPLEMENTATION_ADDRESS = "55";
     string internal constant EF_INVALID_POWER_TOKEN_IMPLEMENTATION_ADDRESS = "56";
-    string internal constant EF_INVALID_INTEREST_TOKEN_IMPLEMENTATION_ADDRESS = "57";
-    string internal constant EF_INVALID_BORROW_TOKEN_IMPLEMENTATION_ADDRESS = "58";
+    string internal constant EF_INVALID_STAKE_TOKEN_IMPLEMENTATION_ADDRESS = "57";
+    string internal constant EF_INVALID_RENTAL_TOKEN_IMPLEMENTATION_ADDRESS = "58";
 
     string internal constant EO_INVALID_ENTERPRISE_ADDRESS = "59";
 
     string internal constant ES_INVALID_ESTIMATOR_ADDRESS = "60";
     string internal constant ES_INVALID_COLLECTOR_ADDRESS = "61";
-    string internal constant ES_INVALID_VAULT_ADDRESS = "62";
+    string internal constant ES_INVALID_WALLET_ADDRESS = "62";
     string internal constant ES_INVALID_CONVERTER_ADDRESS = "63";
-    string internal constant ES_INVALID_BORROWER_LOAN_RETURN_GRACE_PERIOD = "64";
-    string internal constant ES_INVALID_ENTERPRISE_LOAN_COLLECT_GRACE_PERIOD = "65";
-    string internal constant ES_INTEREST_GAP_HALVING_PERIOD_NOT_GT_0 = "66";
+    string internal constant ES_INVALID_RENTER_ONLY_RETURN_PERIOD = "64";
+    string internal constant ES_INVALID_ENTERPRISE_ONLY_COLLECTION_PERIOD = "65";
+    string internal constant ES_STREAMING_RESERVE_HALVING_PERIOD_NOT_GT_0 = "66";
     string internal constant ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED = "67";
     string internal constant ES_INVALID_BASE_TOKEN_ADDRESS = "68";
-    string internal constant ES_INVALID_LOAN_DURATION_RANGE = "69";
-    string internal constant ES_WRAPPING_ALREADY_ENABLED = "70";
+    string internal constant ES_INVALID_RENTAL_PERIOD_RANGE = "69";
+    string internal constant ES_SWAPPING_ALREADY_ENABLED = "70";
     string internal constant ES_INVALID_PAYMENT_TOKEN_ADDRESS = "71";
     string internal constant ES_UNREGISTERED_PAYMENT_TOKEN = "72";
 
@@ -109,12 +109,12 @@ library Errors {
     string internal constant PT_INSUFFICIENT_AVAILABLE_BALANCE = "74";
 
     string internal constant E_ENTERPRISE_SHUTDOWN = "75";
-    string internal constant E_INVALID_LOAN_AMOUNT = "76";
+    string internal constant E_INVALID_RENTAL_AMOUNT = "76";
     string internal constant ES_INVALID_BONDING_POLE = "77";
     string internal constant ES_INVALID_BONDING_SLOPE = "78";
     string internal constant ES_TRANSFER_ALREADY_ENABLED = "79";
     string internal constant PT_TRANSFER_DISABLED = "80";
     string internal constant E_INVALID_ENTERPRISE_NAME = "81";
-    string internal constant PT_INVALID_MAX_LOAN_DURATION = "82";
+    string internal constant PT_INVALID_MAX_RENTAL_PERIOD = "82";
     string internal constant E_INVALID_ENTERPRISE_FACTORY_ADDRESS = "83";
 }

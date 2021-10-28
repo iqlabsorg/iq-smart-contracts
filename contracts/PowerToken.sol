@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-// IQ Protocol. Risk-free collateral-less utility loans
+// IQ Protocol. Risk-free collateral-less utility renting
 // https://iq.space/docs/iq-yellow-paper.pdf
 // (C) Blockvis & PARSIQ
-// 🖖 Lend long and prosper!
+// 🖖 Stake strong!
 
 pragma solidity 0.8.4;
 
@@ -46,9 +46,11 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     ) internal view returns (uint112) {
         uint112 balance = uint112(balanceOf(who));
         if (balance > state.energy) {
-            return balance - ExpMath.halfLife(state.timestamp, balance - state.energy, _gapHalvingPeriod, timestamp);
+            return
+                balance - ExpMath.halfLife(state.timestamp, balance - state.energy, _energyGapHalvingPeriod, timestamp);
         } else {
-            return balance + ExpMath.halfLife(state.timestamp, state.energy - balance, _gapHalvingPeriod, timestamp);
+            return
+                balance + ExpMath.halfLife(state.timestamp, state.energy - balance, _energyGapHalvingPeriod, timestamp);
         }
     }
 
@@ -65,7 +67,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         address from,
         address to,
         uint256 value,
-        bool isBorrowedTokenTransfer
+        bool isRentedTokenTransfer
     ) internal override {
         bool isMinting = (from == address(0));
         bool isBurning = (to == address(0));
@@ -76,7 +78,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             State memory fromState = _states[from];
             fromState.energy = _getEnergy(fromState, from, timestamp);
             fromState.timestamp = timestamp;
-            if (!isBorrowedTokenTransfer) {
+            if (!isRentedTokenTransfer) {
                 require(balanceOf(from) - value >= fromState.lockedBalance, Errors.PT_INSUFFICIENT_AVAILABLE_BALANCE);
             } else {
                 fromState.lockedBalance -= uint112(value);
@@ -88,7 +90,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             State memory toState = _states[to];
             toState.energy = _getEnergy(toState, to, timestamp);
             toState.timestamp = timestamp;
-            if (isBorrowedTokenTransfer) {
+            if (isRentedTokenTransfer) {
                 toState.lockedBalance += uint112(value);
             }
             _states[to] = toState;
@@ -103,13 +105,13 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             string memory symbol,
             uint112 baseRate,
             uint96 minGCFee,
-            uint32 gapHalvingPeriod,
+            uint32 energyGapHalvingPeriod,
             uint16 index,
             IERC20Metadata baseToken,
-            uint32 minLoanDuration,
-            uint32 maxLoanDuration,
+            uint32 minRentalPeriod,
+            uint32 maxRentalPeriod,
             uint16 serviceFeePercent,
-            bool wrappingEnabled,
+            bool swappingEnabled,
             bool transferEnabled
         )
     {
@@ -118,110 +120,67 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
             this.symbol(),
             _baseRate,
             _minGCFee,
-            _gapHalvingPeriod,
+            _energyGapHalvingPeriod,
             _index,
             _baseToken,
-            _minLoanDuration,
-            _maxLoanDuration,
+            _minRentalPeriod,
+            _maxRentalPeriod,
             _serviceFeePercent,
-            _wrappingEnabled,
+            _swappingEnabled,
             _transferEnabled
         );
     }
 
     /**
-     * @dev Wraps liquidity tokens to perpetual PowerTokens
+     * @dev Swaps enterprise tokens to power tokens
      *
-     * One must approve sufficient amount of liquidity tokens to
+     * One must approve sufficient amount of enterprise tokens to
      * corresponding PowerToken address before calling this function
      */
-    function wrap(uint256 amount) external returns (bool) {
-        return _wrapTo(msg.sender, amount);
-    }
+    function swapIn(uint256 amount) external returns (bool) {
+        require(_swappingEnabled, Errors.E_SWAPPING_DISABLED);
 
-    /**
-     * @dev Wraps liquidity tokens to perpetual PowerTokens
-     *
-     * One must approve sufficient amount of liquidity tokens to
-     * corresponding PowerToken address before calling this function
-     */
-    function wrapTo(address to, uint256 amount) external returns (bool) {
-        return _wrapTo(to, amount);
-    }
-
-    function _wrapTo(address to, uint256 amount) internal returns (bool) {
-        require(_wrappingEnabled, Errors.E_WRAPPING_DISABLED);
-
-        getEnterprise().getLiquidityToken().safeTransferFrom(msg.sender, address(this), amount);
-        _mint(to, amount, false);
+        getEnterprise().getEnterpriseToken().safeTransferFrom(msg.sender, address(this), amount);
+        _mint(msg.sender, amount, false);
         return true;
     }
 
-    function unwrap(uint256 amount) external returns (bool) {
+    /**
+     * @dev Swaps power tokens back to enterprise tokens
+     */
+    function swapOut(uint256 amount) external returns (bool) {
         _burn(msg.sender, amount, false);
-        getEnterprise().getLiquidityToken().safeTransfer(msg.sender, amount);
+        getEnterprise().getEnterpriseToken().safeTransfer(msg.sender, amount);
         return true;
     }
 
-    function estimateLoan(
+    function estimateRentalFee(
         address paymentToken,
-        uint112 amount,
-        uint32 duration
-    ) external view override returns (uint256) {
-        (uint112 interest, uint112 serviceFee, uint112 gcFee) = _estimateLoanDetailed(paymentToken, amount, duration);
-
-        return interest + serviceFee + gcFee;
-    }
-
-    /**
-     * @dev Estimates loan cost divided into 3 parts:
-     *  1) Pool interest
-     *  2) Service operational fee
-     *  3) Loan return lien
-     */
-    function estimateLoanDetailed(
-        address paymentToken,
-        uint112 amount,
-        uint32 duration
+        uint112 rentalAmount,
+        uint32 rentalPeriod
     )
         external
         view
         override
         returns (
-            uint112 interest,
+            uint112 poolFee,
             uint112 serviceFee,
             uint112 gcFee
         )
     {
-        return _estimateLoanDetailed(paymentToken, amount, duration);
-    }
+        require(getEnterprise().isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_PAYMENT_TOKEN);
+        require(isAllowedRentalPeriod(rentalPeriod), Errors.E_RENTAL_PERIOD_OUT_OF_RANGE);
 
-    function _estimateLoanDetailed(
-        address paymentToken,
-        uint112 amount,
-        uint32 duration
-    )
-        internal
-        view
-        returns (
-            uint112 interest, // TODO: poolFee
-            uint112 serviceFee,
-            uint112 gcFee
-        )
-    {
-        require(getEnterprise().isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_INTEREST_PAYMENT_TOKEN);
-        require(isAllowedLoanDuration(duration), Errors.E_LOAN_DURATION_OUT_OF_RANGE);
-
-        uint112 loanBaseCost = estimateCost(amount, duration);
-        uint256 loanCost = getEnterprise().getConverter().estimateConvert(
+        uint112 rentalBaseFeeInBaseTokens = estimateFee(rentalAmount, rentalPeriod);
+        uint256 rentalBaseFee = getEnterprise().getConverter().estimateConvert(
             _baseToken,
-            loanBaseCost,
+            rentalBaseFeeInBaseTokens,
             IERC20(paymentToken)
         );
 
-        serviceFee = uint112((loanCost * _serviceFeePercent) / 10_000);
-        interest = uint112(loanCost - serviceFee);
-        gcFee = _estimateGCFee(paymentToken, loanCost);
+        serviceFee = uint112((rentalBaseFee * _serviceFeePercent) / 10_000);
+        poolFee = uint112(rentalBaseFee - serviceFee);
+        gcFee = _estimateGCFee(paymentToken, rentalBaseFee);
     }
 
     function _estimateGCFee(address paymentToken, uint256 amount) internal view returns (uint112) {
@@ -232,7 +191,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         return gcFeeAmount < minGcFee ? minGcFee : gcFeeAmount;
     }
 
-    function notifyNewLoan(uint256 borrowTokenId) external override {}
+    function notifyNewRental(uint256 rentalTokenId) external override {}
 
     /**
      * @dev
@@ -240,15 +199,15 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
      * h(x) = x * f((T - x) / T)
      * g(x) = h(U + x) - h(U)
      */
-    function estimateCost(uint112 amount, uint32 duration) internal view returns (uint112) {
+    function estimateFee(uint112 amount, uint32 period) internal view returns (uint112) {
         uint256 availableReserve = getEnterprise().getAvailableReserve();
         if (availableReserve <= amount) return type(uint112).max;
 
-        int8 decimalsDiff = int8(getEnterprise().getLiquidityToken().decimals()) - int8(_baseToken.decimals());
+        int8 decimalsDiff = int8(getEnterprise().getEnterpriseToken().decimals()) - int8(_baseToken.decimals());
 
         (uint256 pole, uint256 slope) = getEnterprise().getBondingCurve();
 
-        uint256 basePrice = g(amount, pole, slope) * duration;
+        uint256 basePrice = g(amount, pole, slope) * period;
 
         if (decimalsDiff > 0) {
             basePrice = ((basePrice * _baseRate) / 10**uint8(decimalsDiff)) >> 64;

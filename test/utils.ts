@@ -3,12 +3,12 @@ import {Contract, ContractTransaction, Signer} from 'ethers';
 import {ethers} from 'hardhat';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {
-  BorrowToken,
+  RentalToken,
   Enterprise,
   EnterpriseFactory,
   IConverter,
   IERC20,
-  InterestToken,
+  StakeToken,
   PowerToken,
   ProxyAdmin,
 } from '../typechain';
@@ -76,13 +76,13 @@ export const getEnterprise = async (
   return Enterprise.attach(enterpriseAddress) as Enterprise;
 };
 
-export const getBorrowToken = async (
+export const getRentalToken = async (
   enterprise: Enterprise
-): Promise<BorrowToken> => {
-  const borrowTokenAddress = await enterprise.getBorrowToken();
-  const BorrowToken = await ethers.getContractFactory('BorrowToken');
+): Promise<RentalToken> => {
+  const rentalTokenAddress = await enterprise.getRentalToken();
+  const RentalToken = await ethers.getContractFactory('RentalToken');
 
-  return BorrowToken.attach(borrowTokenAddress) as BorrowToken;
+  return RentalToken.attach(rentalTokenAddress) as RentalToken;
 };
 
 export const getPowerToken = async (
@@ -103,47 +103,47 @@ export const getPowerToken = async (
   return PowerToken.attach(powerTokenAddress) as PowerToken;
 };
 
-export const getBorrowTokenId = async (
+export const getRentalTokenId = async (
   enterprise: Enterprise,
-  borrowTx: ContractTransaction
+  rentingTx: ContractTransaction
 ): Promise<BigNumber> => {
-  const receipt = await borrowTx.wait(1);
+  const receipt = await rentingTx.wait(1);
 
   const events = await enterprise.queryFilter(
-    enterprise.filters.Borrowed(),
+    enterprise.filters.Rented(),
     receipt.blockNumber
   );
 
-  return BigNumber.from(events[0].args.borrowTokenId);
+  return BigNumber.from(events[0].args.rentalTokenId);
 };
 
-export const getInterestTokenId = async (
+export const getStakeTokenId = async (
   enterprise: Enterprise,
-  liquidityTx: ContractTransaction
+  stakeTx: ContractTransaction
 ): Promise<BigNumber> => {
-  const receipt = await liquidityTx.wait();
-  const InterestToken = await ethers.getContractFactory('InterestToken');
+  const receipt = await stakeTx.wait();
+  const StakeToken = await ethers.getContractFactory('StakeToken');
 
-  const interestToken = InterestToken.attach(
-    await enterprise.getInterestToken()
-  ) as InterestToken;
+  const stakeToken = StakeToken.attach(
+    await enterprise.getStakeToken()
+  ) as StakeToken;
 
-  const events = await interestToken.queryFilter(
-    interestToken.filters.Transfer(),
+  const events = await stakeToken.queryFilter(
+    stakeToken.filters.Transfer(),
     receipt.blockNumber
   );
 
   return BigNumber.from(events[0].args.tokenId);
 };
 
-export const getInterestToken = async (
+export const getStakeToken = async (
   enterprise: Enterprise
-): Promise<InterestToken> => {
-  const iTokenAddress = await enterprise.getInterestToken();
+): Promise<StakeToken> => {
+  const iTokenAddress = await enterprise.getStakeToken();
 
-  const iToken = await ethers.getContractFactory('InterestToken');
+  const iToken = await ethers.getContractFactory('StakeToken');
 
-  return iToken.attach(iTokenAddress) as InterestToken;
+  return iToken.attach(iTokenAddress) as StakeToken;
 };
 
 export const toTokens = (
@@ -199,7 +199,7 @@ export const basePrice = (
   return price / (tokens * period);
 };
 
-export const estimateLoan = (
+export const estimateRentalFee = (
   basePrice: number,
   reserves: number,
   usedReserves: number,
@@ -223,26 +223,23 @@ export const estimateLoan = (
   }
 };
 
-export const addLiquidity = async (
+export const stake = async (
   enterprise: Enterprise,
   amount: BigNumberish,
   user?: Signer
 ): Promise<BigNumber> => {
   const ERC20 = await ethers.getContractFactory('ERC20Mock');
-  const token = ERC20.attach(await enterprise.getLiquidityToken());
+  const token = ERC20.attach(await enterprise.getEnterpriseToken());
 
   if (user) {
     await token.connect(user).approve(enterprise.address, amount);
-    return getInterestTokenId(
+    return getStakeTokenId(
       enterprise,
-      await enterprise.connect(user).addLiquidity(amount)
+      await enterprise.connect(user).stake(amount)
     );
   } else {
     await token.approve(enterprise.address, amount);
-    return getInterestTokenId(
-      enterprise,
-      await enterprise.addLiquidity(amount)
-    );
+    return getStakeTokenId(enterprise, await enterprise.stake(amount));
   }
 };
 
@@ -264,12 +261,12 @@ export const getProxyImplementation = async (
   );
 };
 
-export const borrow = async (
+export const rent = async (
   enterprise: Enterprise,
   powerToken: PowerToken,
   paymentToken: IERC20,
-  amount: BigNumberish,
-  duration: number,
+  rentalAmount: BigNumberish,
+  rentalPeriod: number,
   maxPayment: BigNumberish,
   user?: Signer
 ): Promise<ContractTransaction> => {
@@ -277,29 +274,29 @@ export const borrow = async (
     await paymentToken.connect(user).approve(enterprise.address, maxPayment);
     return enterprise
       .connect(user)
-      .borrow(
+      .rent(
         powerToken.address,
         paymentToken.address,
-        amount,
-        duration,
+        rentalAmount,
+        rentalPeriod,
         maxPayment
       );
   }
   await paymentToken.approve(enterprise.address, maxPayment);
-  return enterprise.borrow(
+  return enterprise.rent(
     powerToken.address,
     paymentToken.address,
-    amount,
-    duration,
+    rentalAmount,
+    rentalPeriod,
     maxPayment
   );
 };
 
-export const reborrow = async (
+export const extendRentalPeriod = async (
   enterprise: Enterprise,
-  borrowTokenId: BigNumberish,
+  rentalTokenId: BigNumberish,
   paymentToken: IERC20,
-  duration: number,
+  rentalPeriod: number,
   maxPayment: BigNumberish,
   user?: Signer
 ): Promise<ContractTransaction> => {
@@ -307,39 +304,44 @@ export const reborrow = async (
     await paymentToken.connect(user).approve(enterprise.address, maxPayment);
     return enterprise
       .connect(user)
-      .reborrow(borrowTokenId, paymentToken.address, duration, maxPayment);
+      .extendRentalPeriod(
+        rentalTokenId,
+        paymentToken.address,
+        rentalPeriod,
+        maxPayment
+      );
   }
   await paymentToken.approve(enterprise.address, maxPayment);
-  return enterprise.reborrow(
-    borrowTokenId,
+  return enterprise.extendRentalPeriod(
+    rentalTokenId,
     paymentToken.address,
-    duration,
+    rentalPeriod,
     maxPayment
   );
 };
 
 export const registerService = async (
   enterprise: Enterprise,
-  halfLife: BigNumberish,
+  energyGapHalvingPeriod: BigNumberish,
   baseRate: BigNumberish,
   baseToken: string,
-  serviceFee: BigNumberish,
-  minLoanDuration: BigNumberish,
-  maxLoanDuration: BigNumberish,
+  serviceFeePercent: BigNumberish,
+  minRentalPeriod: BigNumberish,
+  maxRentalPeriod: BigNumberish,
   minGCFee: BigNumberish,
-  allowsWrapping: boolean
+  swappingEnabledForever: boolean
 ): Promise<PowerToken> => {
   const tx = await enterprise.registerService(
     'IQ Power Test',
     'IQPT',
-    halfLife,
+    energyGapHalvingPeriod,
     baseRate,
     baseToken,
-    serviceFee,
-    minLoanDuration,
-    maxLoanDuration,
+    serviceFeePercent,
+    minRentalPeriod,
+    maxRentalPeriod,
     minGCFee,
-    allowsWrapping
+    swappingEnabledForever
   );
 
   return getPowerToken(enterprise, tx);

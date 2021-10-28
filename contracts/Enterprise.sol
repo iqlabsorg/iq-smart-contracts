@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-// IQ Protocol. Risk-free collateral-less utility loans
+// IQ Protocol. Risk-free collateral-less utility renting
 // https://iq.space/docs/iq-yellow-paper.pdf
 // (C) Blockvis & PARSIQ
-// 🖖 Lend long and prosper!
+// 🖖 Stake strong!
 
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./token/ERC20.sol";
-import "./interfaces/IInterestToken.sol";
-import "./interfaces/IBorrowToken.sol";
+import "./interfaces/IStakeToken.sol";
+import "./interfaces/IRentalToken.sol";
 import "./interfaces/IConverter.sol";
 import "./interfaces/IPowerToken.sol";
 import "./interfaces/IEnterprise.sol";
@@ -21,80 +21,79 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC20Metadata;
 
-    enum LiquidityChangeType {
-        WithdrawInterest, // TODO: WithdrawReward
-        Add,
-        Remove,
+    enum StakeOperation {
+        Reward,
+        Stake,
+        Unstake,
         Increase,
         Decrease
     }
 
-    //TODO: StakeChanged
-    event LiquidityChanged(
-        uint256 indexed interestTokenId, // TODO: stakeTokenId
-        address indexed liquidityProvider, // TODO: staker
-        LiquidityChangeType indexed changeType, // TODO: StakeChangeType
+    event StakeChanged(
+        uint256 indexed stakeTokenId,
+        address indexed staker,
+        StakeOperation indexed operation,
         uint256 amountDelta,
         uint256 amount,
         uint256 sharesDelta,
         uint256 shares,
         uint256 totalShares,
-        uint256 reserve,
-        uint256 usedReserve
+        uint256 totalReserve,
+        uint256 totalUsedReserve
     );
 
     event ServiceRegistered(address indexed powerToken);
 
-    event Borrowed(
-        uint256 indexed borrowTokenId,
-        address indexed borrower,
+    event Rented(
+        uint256 indexed rentalTokenId,
+        address indexed renter,
         address indexed powerToken,
         address paymentToken,
-        uint112 amount,
-        uint112 interest,
+        uint112 rentalAmount,
+        uint112 poolFee,
         uint112 serviceFee,
         uint112 gcFee,
-        uint32 borrowingTime,
-        uint32 maturityTime,
-        uint32 borrowerReturnGraceTime,
-        uint32 enterpriseCollectGraceTime,
-        uint256 reserve,
-        uint256 usedReserve
+        uint32 startTime,
+        uint32 endTime,
+        uint32 renterOnlyReturnTime,
+        uint32 enterpriseOnlyCollectionTime,
+        uint256 totalReserve,
+        uint256 totalUsedReserve
     );
 
-    event LoanExtended(
-        uint256 indexed borrowTokenId,
-        address indexed borrower,
+    event RentalPeriodExtended(
+        uint256 indexed rentalTokenId,
+        address indexed renter,
         address paymentToken,
-        uint112 interest,
+        uint112 poolFee,
         uint112 serviceFee,
-        uint32 maturityTime,
-        uint32 borrowerReturnGraceTime,
-        uint32 enterpriseCollectGraceTime
+        uint32 endTime,
+        uint32 renterOnlyReturnTime,
+        uint32 enterpriseOnlyCollectionTime
     );
 
-    event LoanReturned(
-        uint256 indexed borrowTokenId,
+    event RentalReturned(
+        uint256 indexed rentalTokenId,
         address indexed returner,
         address indexed powerToken,
-        uint112 amount,
-        uint112 gcFee,
-        address gcFeeToken,
-        uint256 reserve,
-        uint256 usedReserve
+        uint112 rentalAmount,
+        uint112 gcReward,
+        address gcRewardToken,
+        uint256 totalReserve,
+        uint256 totalUsedReserve
     );
 
     function registerService(
         string memory serviceName,
-        string memory symbol,
-        uint32 gapHalvingPeriod,
+        string memory serviceSymbol,
+        uint32 energyGapHalvingPeriod,
         uint112 baseRate,
         address baseToken,
         uint16 serviceFeePercent,
-        uint32 minLoanDuration,
-        uint32 maxLoanDuration,
+        uint32 minRentalPeriod,
+        uint32 maxRentalPeriod,
         uint96 minGCFee,
-        bool allowsWrappingForever
+        bool swappingEnabledForever
     ) external onlyOwner notShutdown {
         require(address(baseToken) != address(0), Errors.E_INVALID_BASE_TOKEN_ADDRESS);
         require(_powerTokens.length < type(uint16).max, Errors.E_SERVICE_LIMIT_REACHED);
@@ -102,9 +101,9 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         // Deploy new power token.
         IPowerToken powerToken = _factory.deployService(getProxyAdmin());
         {
-            string memory tokenSymbol = _liquidityToken.symbol();
-            string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", symbol));
-            ERC20(address(powerToken)).initialize(serviceName, powerTokenSymbol, _liquidityToken.decimals());
+            string memory tokenSymbol = _enterpriseToken.symbol();
+            string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", serviceSymbol));
+            ERC20(address(powerToken)).initialize(serviceName, powerTokenSymbol, _enterpriseToken.decimals());
         }
         {
             // Configure service parameters.
@@ -112,14 +111,14 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
                 this,
                 baseRate,
                 minGCFee,
-                gapHalvingPeriod,
+                energyGapHalvingPeriod,
                 uint16(_powerTokens.length),
                 IERC20Metadata(baseToken)
             );
         }
 
         {
-            powerToken.initialize2(minLoanDuration, maxLoanDuration, serviceFeePercent, allowsWrappingForever);
+            powerToken.initialize2(minRentalPeriod, maxRentalPeriod, serviceFeePercent, swappingEnabledForever);
         }
 
         // Complete service registration.
@@ -129,406 +128,407 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         emit ServiceRegistered(address(powerToken));
     }
 
-    // TODO: rent
-    function borrow(
+    function rent(
         address powerToken,
         address paymentToken,
-        uint112 loanAmount,
-        uint32 duration,
+        uint112 rentalAmount,
+        uint32 rentalPeriod,
         uint256 maxPayment
     ) external notShutdown {
-        require(loanAmount > 0, Errors.E_INVALID_LOAN_AMOUNT);
+        require(rentalAmount > 0, Errors.E_INVALID_RENTAL_AMOUNT);
         require(_registeredPowerTokens[powerToken], Errors.UNREGISTERED_POWER_TOKEN);
-        require(loanAmount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
+        require(rentalAmount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
 
-        // Estimate loan cost.
-        (uint112 interest, uint112 serviceFee, uint112 gcFee) = IPowerToken(powerToken).estimateLoanDetailed(
+        // Estimate rental fee.
+        (uint112 poolFee, uint112 serviceFee, uint112 gcFee) = IPowerToken(powerToken).estimateRentalFee(
             paymentToken,
-            loanAmount,
-            duration
+            rentalAmount,
+            rentalPeriod
         );
         {
-            // Ensure no loan payment slippage.
+            // Ensure no rental fee payment slippage.
             // GC fee does not go to the pool but must be accounted for slippage calculation.
-            uint256 loanCost = interest + serviceFee; // TODO: baseRentalFee
-            require(loanCost + gcFee <= maxPayment, Errors.E_LOAN_COST_SLIPPAGE);
+            uint256 baseRentalFee = poolFee + serviceFee;
+            require(baseRentalFee + gcFee <= maxPayment, Errors.E_RENTAL_PAYMENT_SLIPPAGE);
 
-            // Handle loan payment transfer and distribution.
-            handleLoanPayment(IERC20(paymentToken), loanCost, serviceFee, interest);
+            // Handle rental fee transfer and distribution.
+            handleRentalPayment(IERC20(paymentToken), baseRentalFee, serviceFee, poolFee);
 
-            // Transfer GC fee to the borrow token contract.
-            IERC20(paymentToken).safeTransferFrom(msg.sender, address(_borrowToken), gcFee);
+            // Transfer GC fee to the rental token contract.
+            IERC20(paymentToken).safeTransferFrom(msg.sender, address(_rentalToken), gcFee);
 
             // Update used reserve.
-            _usedReserve += loanAmount;
+            _usedReserve += rentalAmount;
         }
 
-        // Calculate loan timestamps.
-        uint32 maturityTime = uint32(block.timestamp) + duration;
-        uint32 borrowerReturnGraceTime = maturityTime + _borrowerLoanReturnGracePeriod;
-        uint32 enterpriseCollectGraceTime = maturityTime + _enterpriseLoanCollectGracePeriod;
+        // Calculate rental agreement timestamps.
+        uint32 endTime = uint32(block.timestamp) + rentalPeriod;
+        uint32 renterOnlyReturnTime = endTime + _renterOnlyReturnPeriod;
+        uint32 enterpriseOnlyCollectionTime = endTime + _enterpriseOnlyCollectionPeriod;
 
-        // Precalculate borrow token ID to associate loan information.
-        uint256 borrowTokenId = _borrowToken.getNextTokenId();
+        // Precalculate rental token ID to associate rental agreement.
+        uint256 rentalTokenId = _rentalToken.getNextTokenId();
 
-        _loanInfo[borrowTokenId] = LoanInfo(
-            loanAmount,
+        _rentalAgreements[rentalTokenId] = RentalAgreement(
+            rentalAmount,
             IPowerToken(powerToken).getIndex(),
             uint32(block.timestamp),
-            maturityTime,
-            borrowerReturnGraceTime,
-            enterpriseCollectGraceTime,
+            endTime,
+            renterOnlyReturnTime,
+            enterpriseOnlyCollectionTime,
             gcFee,
             uint16(getPaymentTokenIndex(paymentToken))
         );
 
-        // Mint borrow token to the borrower address.
+        // Mint rental token to the renter address.
         // This also mints corresponding amount of PowerTokens.
-        assert(_borrowToken.mint(msg.sender) == borrowTokenId);
+        assert(_rentalToken.mint(msg.sender) == rentalTokenId);
 
-        // Notify power token contract about new loan.
-        IPowerToken(powerToken).notifyNewLoan(borrowTokenId);
+        // Notify power token contract about new rental.
+        IPowerToken(powerToken).notifyNewRental(rentalTokenId);
 
-        emit Borrowed(
-            borrowTokenId,
+        emit Rented(
+            rentalTokenId,
             msg.sender,
             powerToken,
             paymentToken,
-            loanAmount,
-            interest,
+            rentalAmount,
+            poolFee,
             serviceFee,
             gcFee,
             uint32(block.timestamp),
-            maturityTime,
-            borrowerReturnGraceTime,
-            enterpriseCollectGraceTime,
+            endTime,
+            renterOnlyReturnTime,
+            enterpriseOnlyCollectionTime,
             getReserve(),
             _usedReserve
         );
     }
 
-    // TODO: extendRentalPeriod
-    function reborrow(
-        uint256 borrowTokenId,
+    function extendRentalPeriod(
+        uint256 rentalTokenId,
         address paymentToken,
-        uint32 duration,
+        uint32 rentalPeriod,
         uint256 maxPayment
     ) external notShutdown {
-        LoanInfo storage loan = _loanInfo[borrowTokenId];
-        require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
-        IPowerToken powerToken = _powerTokens[loan.powerTokenIndex];
-        require(loan.maturityTime + duration >= block.timestamp, Errors.E_INVALID_LOAN_DURATION);
+        RentalAgreement storage rentalAgreement = _rentalAgreements[rentalTokenId];
+        require(rentalAgreement.rentalAmount > 0, Errors.E_INVALID_RENTAL_TOKEN_ID);
+        IPowerToken powerToken = _powerTokens[rentalAgreement.powerTokenIndex];
+        require(rentalAgreement.endTime + rentalPeriod >= block.timestamp, Errors.E_INVALID_RENTAL_PERIOD);
 
-        // Emulate loan return to ensure correct reserves during new loan estimation.
+        // Simulate rental return to ensure correct reserves during new rental fee calculation.
         uint256 usedReserve = _usedReserve;
-        _usedReserve = usedReserve - loan.amount;
-        // Estimate new loan cost.
-        (uint112 interest, uint112 serviceFee, ) = powerToken.estimateLoanDetailed(paymentToken, loan.amount, duration);
+        _usedReserve = usedReserve - rentalAgreement.rentalAmount;
+        // Estimate new rental fee.
+        (uint112 poolFee, uint112 serviceFee, ) = powerToken.estimateRentalFee(
+            paymentToken,
+            rentalAgreement.rentalAmount,
+            rentalPeriod
+        );
 
-        // Emulate borrowing.
+        // Emulate renting.
         _usedReserve = usedReserve;
 
-        // Ensure no loan payment slippage.
-        uint256 loanCost = interest + serviceFee;
-        require(loanCost <= maxPayment, Errors.E_LOAN_COST_SLIPPAGE);
+        // Ensure no rental fee payment slippage.
+        uint256 baseRentalFee = poolFee + serviceFee;
+        require(baseRentalFee <= maxPayment, Errors.E_RENTAL_PAYMENT_SLIPPAGE);
 
-        // Handle loan payment transfer and distribution.
-        handleLoanPayment(IERC20(paymentToken), loanCost, serviceFee, interest);
+        // Handle rental payment transfer and distribution.
+        handleRentalPayment(IERC20(paymentToken), baseRentalFee, serviceFee, poolFee);
 
-        // Calculate new loan timestamps.
-        uint32 newMaturityTime = loan.maturityTime + duration;
-        uint32 newBorrowerReturnGraceTime = newMaturityTime + _borrowerLoanReturnGracePeriod;
-        uint32 newEnterpriseCollectGraceTime = newMaturityTime + _enterpriseLoanCollectGracePeriod;
+        // Calculate new rental agreement timestamps.
+        uint32 newEndTime = rentalAgreement.endTime + rentalPeriod;
+        uint32 newRenterOnlyReturnTime = newEndTime + _renterOnlyReturnPeriod;
+        uint32 newEnterpriseOnlyCollectionTime = newEndTime + _enterpriseOnlyCollectionPeriod;
 
-        // Update loan details.
-        loan.maturityTime = newMaturityTime;
-        loan.borrowerReturnGraceTime = newBorrowerReturnGraceTime;
-        loan.enterpriseCollectGraceTime = newEnterpriseCollectGraceTime;
+        // Update rental agreement.
+        rentalAgreement.endTime = newEndTime;
+        rentalAgreement.renterOnlyReturnTime = newRenterOnlyReturnTime;
+        rentalAgreement.enterpriseOnlyCollectionTime = newEnterpriseOnlyCollectionTime;
 
-        // Notify power token contract about new loan.
-        powerToken.notifyNewLoan(borrowTokenId);
+        // Notify power token contract about new rental.
+        powerToken.notifyNewRental(rentalTokenId);
 
-        emit LoanExtended(
-            borrowTokenId,
+        emit RentalPeriodExtended(
+            rentalTokenId,
             msg.sender,
             paymentToken,
-            interest,
+            poolFee,
             serviceFee,
-            newMaturityTime,
-            newBorrowerReturnGraceTime,
-            newEnterpriseCollectGraceTime
+            newEndTime,
+            newRenterOnlyReturnTime,
+            newEnterpriseOnlyCollectionTime
         );
     }
 
-    // TODO: handleRentalPayment
-    function handleLoanPayment(
+    function handleRentalPayment(
         IERC20 paymentToken,
-        uint256 loanCost,
+        uint256 rentalFee,
         uint256 serviceFee,
-        uint112 interest
+        uint112 poolFee
     ) internal {
-        // Transfer loan payment to the enterprise.
-        paymentToken.safeTransferFrom(msg.sender, address(this), loanCost);
-        IERC20 liquidityToken = _liquidityToken;
+        // Transfer base rental fee to the enterprise.
+        paymentToken.safeTransferFrom(msg.sender, address(this), rentalFee);
+        IERC20 enterpriseToken = _enterpriseToken;
 
-        // Initially assume loan cost payment is made in liquidity tokens.
-        uint256 serviceFeeInLiquidityTokens = serviceFee;
-        uint112 interestInLiquidityTokens = interest;
+        // Initially assume rental fee payment is made in enterprise tokens.
+        uint256 serviceFeeInEnterpriseTokens = serviceFee;
+        uint112 poolFeeInEnterpriseTokens = poolFee;
 
-        // Should the loan cost payment be made in tokens other than liquidity tokens,
-        // the payment amount gets converted to liquidity tokens automatically.
-        if (address(paymentToken) != address(liquidityToken)) {
-            paymentToken.approve(address(_converter), loanCost);
-            uint256 loanCostInLiquidityTokens = _converter.convert(paymentToken, loanCost, liquidityToken);
-            serviceFeeInLiquidityTokens = (serviceFee * loanCostInLiquidityTokens) / loanCost;
-            interestInLiquidityTokens = uint112(loanCostInLiquidityTokens - serviceFeeInLiquidityTokens);
+        // Should the rental fee payment be made in tokens other than enterprise tokens,
+        // the payment amount gets converted to enterprise tokens automatically.
+        if (address(paymentToken) != address(enterpriseToken)) {
+            paymentToken.approve(address(_converter), rentalFee);
+            uint256 rentalFeeInEnterpriseTokens = _converter.convert(paymentToken, rentalFee, enterpriseToken);
+            serviceFeeInEnterpriseTokens = (serviceFee * rentalFeeInEnterpriseTokens) / rentalFee;
+            poolFeeInEnterpriseTokens = uint112(rentalFeeInEnterpriseTokens - serviceFeeInEnterpriseTokens);
         }
 
-        // Transfer service fee (liquidity tokens) to the enterprise vault.
-        liquidityToken.safeTransfer(_enterpriseVault, serviceFeeInLiquidityTokens);
+        // Transfer service fee (enterprise tokens) to the enterprise wallet.
+        enterpriseToken.safeTransfer(_enterpriseWallet, serviceFeeInEnterpriseTokens);
         // Update streaming target.
-        _increaseStreamingReserveTarget(interestInLiquidityTokens);
+        _increaseStreamingReserveTarget(poolFeeInEnterpriseTokens);
     }
 
-    // returnRental
-    function returnLoan(uint256 borrowTokenId) external {
-        LoanInfo memory loan = _loanInfo[borrowTokenId];
-        require(loan.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
-        address borrower = _borrowToken.ownerOf(borrowTokenId);
+    function returnRental(uint256 rentalTokenId) external {
+        RentalAgreement memory rentalAgreement = _rentalAgreements[rentalTokenId];
+        require(rentalAgreement.rentalAmount > 0, Errors.E_INVALID_RENTAL_TOKEN_ID);
+
+        address renter = _rentalToken.ownerOf(rentalTokenId);
         uint32 timestamp = uint32(block.timestamp);
 
         require(
-            loan.borrowerReturnGraceTime < timestamp || msg.sender == borrower,
-            Errors.E_INVALID_CALLER_WITHIN_BORROWER_GRACE_PERIOD
+            rentalAgreement.renterOnlyReturnTime < timestamp || msg.sender == renter,
+            Errors.E_INVALID_CALLER_WITHIN_RENTER_ONLY_RETURN_PERIOD
         );
         require(
-            loan.enterpriseCollectGraceTime < timestamp || msg.sender == borrower || msg.sender == _enterpriseCollector,
-            Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_GRACE_PERIOD
+            rentalAgreement.enterpriseOnlyCollectionTime < timestamp ||
+                msg.sender == renter ||
+                msg.sender == _enterpriseCollector,
+            Errors.E_INVALID_CALLER_WITHIN_ENTERPRISE_ONLY_COLLECTION_PERIOD
         );
 
         if (!_enterpriseShutdown) {
             // When enterprise is shut down, usedReserve equals zero.
-            _usedReserve -= loan.amount;
+            _usedReserve -= rentalAgreement.rentalAmount;
         }
 
-        emit LoanReturned(
-            borrowTokenId,
+        emit RentalReturned(
+            rentalTokenId,
             msg.sender,
-            address(_powerTokens[loan.powerTokenIndex]),
-            loan.amount,
-            loan.gcFee,
-            _paymentTokens[loan.gcFeeTokenIndex],
+            address(_powerTokens[rentalAgreement.powerTokenIndex]),
+            rentalAgreement.rentalAmount,
+            rentalAgreement.gcRewardAmount,
+            _paymentTokens[rentalAgreement.gcRewardTokenIndex],
             getReserve(),
             _usedReserve
         );
 
-        // Burn borrow token and delete associated loan information.
+        // Burn rental token and delete associated rental agreement.
         // This also burns corresponding amount of PowerTokens and transfers GC fee to the transaction sender address.
-        _borrowToken.burn(borrowTokenId, msg.sender);
-        delete _loanInfo[borrowTokenId];
+        _rentalToken.burn(rentalTokenId, msg.sender);
+        delete _rentalAgreements[rentalTokenId];
     }
 
     /**
-     * One must approve sufficient amount of liquidity tokens to
+     * One must approve sufficient amount of enterprise tokens to
      * Enterprise address before calling this function
      */
-    function addLiquidity(uint256 liquidityAmount) external notShutdown {
-        //TODO: stake(stakeAmount)
-        // Transfer liquidity tokens to the enterprise.
-        _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
+    function stake(uint256 stakeAmount) external notShutdown {
+        // Transfer enterprise tokens to the enterprise.
+        _enterpriseToken.safeTransferFrom(msg.sender, address(this), stakeAmount);
 
         // Calculate number of new shares to be issued.
         uint256 reserve = getReserve();
-        uint256 shares = (_totalShares == 0 ? liquidityAmount : _liquidityToShares(liquidityAmount, reserve));
+        uint256 stakeShares = (_totalShares == 0 ? stakeAmount : _liquidityToShares(stakeAmount, reserve));
 
         // Increase total reserves & shares.
-        _increaseReserveAndShares(liquidityAmount, shares);
+        _increaseReserveAndShares(stakeAmount, stakeShares);
 
-        // Mint new interest token and associate liquidity information.
-        uint256 interestTokenId = _interestToken.mint(msg.sender);
-        _liquidityInfo[interestTokenId] = LiquidityInfo(liquidityAmount, shares, block.number);
+        // Mint new stake token and associate stake information.
+        uint256 stakeTokenId = _stakeToken.mint(msg.sender);
+        _stakes[stakeTokenId] = Stake(stakeAmount, stakeShares, block.number);
 
-        emit LiquidityChanged(
-            interestTokenId,
+        emit StakeChanged(
+            stakeTokenId,
             msg.sender,
-            LiquidityChangeType.Add,
-            liquidityAmount,
-            liquidityAmount,
-            shares,
-            shares,
+            StakeOperation.Stake,
+            stakeAmount,
+            stakeAmount,
+            stakeShares,
+            stakeShares,
             _totalShares,
-            reserve + liquidityAmount,
+            reserve + stakeAmount,
             _usedReserve
         );
     }
 
-    function withdrawInterest(uint256 interestTokenId) external onlyInterestTokenOwner(interestTokenId) {
-        // TODO: claimReward
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
+    function claimStakingReward(uint256 stakeTokenId) external onlyStakeTokenOwner(stakeTokenId) {
+        Stake storage stakeInfo = _stakes[stakeTokenId];
 
-        uint256 liquidityAmount = liquidityInfo.amount;
-        uint256 liquidityShares = liquidityInfo.shares;
+        uint256 stakeAmount = stakeInfo.amount;
+        uint256 stakeShares = stakeInfo.shares;
         uint256 reserve = getReserve();
 
-        // Calculate accrued interest & check if reserves are sufficient to fulfill withdrawal request.
-        uint256 accruedInterest = _getAccruedInterest(liquidityShares, liquidityAmount, reserve); // TODO: _getStakingReward
-        require(accruedInterest <= _getAvailableReserve(reserve), Errors.E_INSUFFICIENT_LIQUIDITY);
+        // Calculate reward & check if reserves are sufficient to fulfill withdrawal request.
+        uint256 rewardAmount = _calculateStakingReward(stakeShares, stakeAmount, reserve);
+        require(rewardAmount <= _getAvailableReserve(reserve), Errors.E_INSUFFICIENT_LIQUIDITY);
 
-        // Transfer liquidity tokens to the interest token owner.
-        _liquidityToken.safeTransfer(msg.sender, accruedInterest);
+        // Transfer reward to the stake token owner.
+        _enterpriseToken.safeTransfer(msg.sender, rewardAmount);
 
-        // Recalculate the remaining number of shares after interest withdrawal.
-        uint256 shares = _liquidityToShares(liquidityAmount, reserve);
-        uint256 sharesDelta = liquidityShares - shares;
+        // Recalculate the remaining number of shares after reward withdrawal.
+        uint256 remainingStakeShares = _liquidityToShares(stakeAmount, reserve);
+        uint256 stakeSharesDelta = stakeShares - remainingStakeShares;
 
         // Decrease total reserves & shares.
-        _decreaseReserveAndShares(accruedInterest, sharesDelta);
+        _decreaseReserveAndShares(rewardAmount, stakeSharesDelta);
 
-        // Update interest token liquidity information.
-        liquidityInfo.shares = shares;
+        // Update stake information.
+        stakeInfo.shares = remainingStakeShares;
 
-        emit LiquidityChanged(
-            interestTokenId,
+        emit StakeChanged(
+            stakeTokenId,
             msg.sender,
-            LiquidityChangeType.WithdrawInterest,
-            accruedInterest,
-            liquidityAmount,
-            sharesDelta,
-            shares,
+            StakeOperation.Reward,
+            rewardAmount,
+            stakeAmount,
+            stakeSharesDelta,
+            remainingStakeShares,
             _totalShares,
-            reserve - accruedInterest,
+            reserve - rewardAmount,
             _usedReserve
         );
     }
 
-    //TODO: unstake
-    function removeLiquidity(uint256 interestTokenId) external onlyInterestTokenOwner(interestTokenId) {
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
-        require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
+    function unstake(uint256 stakeTokenId) external onlyStakeTokenOwner(stakeTokenId) {
+        Stake storage stakeInfo = _stakes[stakeTokenId];
+        require(stakeInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
 
-        // Calculate owing liquidity amount including accrued interest.
-        uint256 shares = liquidityInfo.shares;
+        // Calculate owing enterprise token amount including accrued reward.
+        uint256 stakeShares = stakeInfo.shares;
         uint256 reserve = getReserve();
-        uint256 liquidityWithInterest = _sharesToLiquidity(shares, reserve);
-        require(liquidityWithInterest <= _getAvailableReserve(reserve), Errors.E_INSUFFICIENT_LIQUIDITY);
+        uint256 stakeAmountWithReward = _sharesToLiquidity(stakeShares, reserve);
+        require(stakeAmountWithReward <= _getAvailableReserve(reserve), Errors.E_INSUFFICIENT_LIQUIDITY);
 
-        // Transfer liquidity tokens to the interest token owner.
-        _liquidityToken.safeTransfer(msg.sender, liquidityWithInterest);
+        // Transfer enterprise tokens to the stake token owner.
+        _enterpriseToken.safeTransfer(msg.sender, stakeAmountWithReward);
 
         // Decrease total reserves & shares.
-        _decreaseReserveAndShares(liquidityWithInterest, shares);
+        _decreaseReserveAndShares(stakeAmountWithReward, stakeShares);
 
-        // Burn interest token and delete associated liquidity information.
-        _interestToken.burn(interestTokenId);
-        delete _liquidityInfo[interestTokenId];
+        // Burn stake token and delete associated stake information.
+        _stakeToken.burn(stakeTokenId);
+        delete _stakes[stakeTokenId];
 
-        emit LiquidityChanged(
-            interestTokenId,
+        emit StakeChanged(
+            stakeTokenId,
             msg.sender,
-            LiquidityChangeType.Remove,
-            liquidityWithInterest,
+            StakeOperation.Unstake,
+            stakeAmountWithReward,
             0,
-            shares,
+            stakeShares,
             0,
             _totalShares,
-            reserve - liquidityWithInterest,
+            reserve - stakeAmountWithReward,
             _usedReserve
         );
     }
 
-    //TODO: decreateStake
-    function decreaseLiquidity(uint256 interestTokenId, uint256 liquidityAmount)
-        external
-        onlyInterestTokenOwner(interestTokenId)
-    {
-        LiquidityInfo memory liquidityInfo = _liquidityInfo[interestTokenId];
-        require(liquidityInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
-        require(liquidityInfo.amount >= liquidityAmount, Errors.E_INSUFFICIENT_LIQUIDITY);
+    function decreaseStake(uint256 stakeTokenId, uint256 stakeAmountDelta) external onlyStakeTokenOwner(stakeTokenId) {
+        Stake memory stakeInfo = _stakes[stakeTokenId];
+        require(stakeInfo.block < block.number, Errors.E_FLASH_LIQUIDITY_REMOVAL);
+        require(stakeInfo.amount >= stakeAmountDelta, Errors.E_INSUFFICIENT_LIQUIDITY);
         uint256 reserve = getReserve();
-        require(liquidityAmount <= _getAvailableReserve(reserve), Errors.E_INSUFFICIENT_LIQUIDITY);
+        require(stakeAmountDelta <= _getAvailableReserve(reserve), Errors.E_INSUFFICIENT_LIQUIDITY);
 
-        // Transfer liquidity tokens to the interest token owner.
-        _liquidityToken.safeTransfer(msg.sender, liquidityAmount);
+        // Transfer enterprise tokens to the stake token owner.
+        _enterpriseToken.safeTransfer(msg.sender, stakeAmountDelta);
 
         // Calculate number of shares to be destroyed.
-        uint256 sharesDelta = _liquidityToShares(liquidityAmount, reserve);
-        if (sharesDelta > liquidityInfo.shares) {
-            sharesDelta = liquidityInfo.shares;
+        uint256 stakeSharesDelta = _liquidityToShares(stakeAmountDelta, reserve);
+        if (stakeSharesDelta > stakeInfo.shares) {
+            stakeSharesDelta = stakeInfo.shares;
         }
 
         // Decrease total reserves & shares.
-        _decreaseReserveAndShares(liquidityAmount, sharesDelta);
+        _decreaseReserveAndShares(stakeAmountDelta, stakeSharesDelta);
 
-        // Update interest token liquidity information.
+        // Update stake information.
         unchecked {
-            liquidityInfo.shares -= sharesDelta;
-            liquidityInfo.amount -= liquidityAmount;
+            stakeInfo.shares -= stakeSharesDelta;
+            stakeInfo.amount -= stakeAmountDelta;
         }
-        _liquidityInfo[interestTokenId].shares = liquidityInfo.shares;
-        _liquidityInfo[interestTokenId].amount = liquidityInfo.amount;
+        _stakes[stakeTokenId].shares = stakeInfo.shares;
+        _stakes[stakeTokenId].amount = stakeInfo.amount;
 
-        emit LiquidityChanged(
-            interestTokenId,
+        emit StakeChanged(
+            stakeTokenId,
             msg.sender,
-            LiquidityChangeType.Decrease,
-            liquidityAmount,
-            liquidityInfo.amount,
-            sharesDelta,
-            liquidityInfo.shares,
+            StakeOperation.Decrease,
+            stakeAmountDelta,
+            stakeInfo.amount,
+            stakeSharesDelta,
+            stakeInfo.shares,
             _totalShares,
-            reserve - liquidityAmount,
+            reserve - stakeAmountDelta,
             _usedReserve
         );
     }
 
-    //TODO: increateStake
-    function increaseLiquidity(uint256 interestTokenId, uint256 liquidityAmount)
+    function increaseStake(uint256 stakeTokenId, uint256 stakeAmountDelta)
         external
         notShutdown
-        onlyInterestTokenOwner(interestTokenId)
+        onlyStakeTokenOwner(stakeTokenId)
     {
-        // Transfer liquidity tokens to the enterprise.
-        _liquidityToken.safeTransferFrom(msg.sender, address(this), liquidityAmount);
+        // Transfer enterprise tokens to the enterprise.
+        _enterpriseToken.safeTransferFrom(msg.sender, address(this), stakeAmountDelta);
 
         // Calculate number of new shares to be issued.
         uint256 reserve = getReserve();
-        uint256 sharesDelta = (_totalShares == 0 ? liquidityAmount : _liquidityToShares(liquidityAmount, reserve));
+        uint256 stakeSharesDelta = (
+            _totalShares == 0 ? stakeAmountDelta : _liquidityToShares(stakeAmountDelta, reserve)
+        );
 
         // Increase total reserves & shares.
-        _increaseReserveAndShares(liquidityAmount, sharesDelta);
+        _increaseReserveAndShares(stakeAmountDelta, stakeSharesDelta);
 
-        // Update interest token liquidity information.
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
-        uint256 amount = liquidityInfo.amount + liquidityAmount;
-        uint256 shares = liquidityInfo.shares + sharesDelta;
-        liquidityInfo.amount = amount;
-        liquidityInfo.shares = shares;
-        liquidityInfo.block = block.number;
+        // Update stake information.
+        Stake storage stakeInfo = _stakes[stakeTokenId];
+        uint256 stakeAmount = stakeInfo.amount + stakeAmountDelta;
+        uint256 stakeShares = stakeInfo.shares + stakeSharesDelta;
+        stakeInfo.amount = stakeAmount;
+        stakeInfo.shares = stakeShares;
+        stakeInfo.block = block.number;
 
-        emit LiquidityChanged(
-            interestTokenId,
+        emit StakeChanged(
+            stakeTokenId,
             msg.sender,
-            LiquidityChangeType.Increase,
-            liquidityAmount,
-            amount,
-            sharesDelta,
-            shares,
+            StakeOperation.Increase,
+            stakeAmountDelta,
+            stakeAmount,
+            stakeSharesDelta,
+            stakeShares,
             _totalShares,
-            reserve + liquidityAmount,
+            reserve + stakeAmountDelta,
             _usedReserve
         );
     }
 
-    function estimateLoan(
-        // TODO: estimateRentalFee
+    function estimateRentalFee(
         address powerToken,
         address paymentToken,
-        uint112 amount,
-        uint32 duration
+        uint112 rentalAmount,
+        uint32 rentalPeriod
     ) external view notShutdown returns (uint256) {
         require(_registeredPowerTokens[powerToken], Errors.UNREGISTERED_POWER_TOKEN);
+        (uint112 poolFee, uint112 serviceFee, uint112 gcFee) = IPowerToken(powerToken).estimateRentalFee(
+            paymentToken,
+            rentalAmount,
+            rentalPeriod
+        );
 
-        return IPowerToken(powerToken).estimateLoan(paymentToken, amount, duration);
+        return poolFee + serviceFee + gcFee;
     }
 
     function _increaseReserveAndShares(uint256 reserveDelta, uint256 sharesDelta) internal {
@@ -553,64 +553,60 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         emit FixedReserveChanged(fixedReserve);
     }
 
-    function _liquidityToShares(uint256 amount, uint256 reserve) internal view returns (uint256) {
-        // _stakeToShares
-        return (_totalShares * amount) / reserve;
+    function _liquidityToShares(uint256 liquidityAmount, uint256 reserve) internal view returns (uint256) {
+        return (_totalShares * liquidityAmount) / reserve;
     }
 
     function _sharesToLiquidity(uint256 shares, uint256 reserve) internal view returns (uint256) {
-        // _sharesToStake
         return (reserve * shares) / _totalShares;
     }
 
-    // TODO: rentalAgreementTransfer
-    function loanTransfer(
+    function transferRental(
         address from,
         address to,
-        uint256 borrowTokenId
-    ) external override onlyBorrowToken {
-        LoanInfo memory loanInfo = _loanInfo[borrowTokenId];
+        uint256 rentalTokenId
+    ) external override onlyRentalToken {
+        RentalAgreement memory rentalAgreement = _rentalAgreements[rentalTokenId];
 
-        require(loanInfo.amount > 0, Errors.E_INVALID_LOAN_TOKEN_ID);
+        require(rentalAgreement.rentalAmount > 0, Errors.E_INVALID_RENTAL_TOKEN_ID);
 
-        bool isExpiredBorrow = (block.timestamp > loanInfo.maturityTime);
+        bool isExpiredRentalAgreement = (block.timestamp > rentalAgreement.endTime);
         bool isMinting = (from == address(0));
         bool isBurning = (to == address(0));
-        IPowerToken powerToken = _powerTokens[loanInfo.powerTokenIndex];
+        IPowerToken powerToken = _powerTokens[rentalAgreement.powerTokenIndex];
 
         if (isBurning) {
-            powerToken.burnFrom(from, loanInfo.amount);
+            powerToken.burnFrom(from, rentalAgreement.rentalAmount);
         } else if (isMinting) {
-            powerToken.mint(to, loanInfo.amount);
-        } else if (!isExpiredBorrow) {
-            powerToken.forceTransfer(from, to, loanInfo.amount);
+            powerToken.mint(to, rentalAgreement.rentalAmount);
+        } else if (!isExpiredRentalAgreement) {
+            powerToken.forceTransfer(from, to, rentalAgreement.rentalAmount);
         } else {
-            revert(Errors.E_LOAN_TRANSFER_NOT_ALLOWED);
+            revert(Errors.E_RENTAL_TRANSFER_NOT_ALLOWED);
         }
     }
 
-    function getAccruedInterest(uint256 interestTokenId) public view returns (uint256) {
-        LiquidityInfo storage liquidityInfo = _liquidityInfo[interestTokenId];
-        return _getAccruedInterest(liquidityInfo.shares, liquidityInfo.amount, getReserve());
+    function getStakingReward(uint256 stakeTokenId) public view returns (uint256) {
+        Stake storage stakeInfo = _stakes[stakeTokenId];
+        return _calculateStakingReward(stakeInfo.shares, stakeInfo.amount, getReserve());
     }
 
-    function _getAccruedInterest(
-        uint256 shares,
-        uint256 amount,
+    function _calculateStakingReward(
+        uint256 stakeShares,
+        uint256 stakeAmount,
         uint256 reserve
     ) internal view returns (uint256) {
-        uint256 liquidity = _sharesToLiquidity(shares, reserve);
-        // Due to rounding errors calculated liquidity could be insignificantly
-        // less than provided liquidity
-        return liquidity <= amount ? 0 : liquidity - amount;
+        uint256 liquidity = _sharesToLiquidity(stakeShares, reserve);
+        // Due to rounding errors calculated liquidity could be insignificantly less than provided liquidity
+        return liquidity <= stakeAmount ? 0 : liquidity - stakeAmount;
     }
 
     /**
      * @dev Shuts down Enterprise.
-     *  * Unlocks all reserves, LPs can withdraw their tokens
-     *  * Disables adding liquidity
-     *  * Disables borrowing
-     *  * Disables wrapping
+     *  * Unlocks all reserves, stakers can withdraw their tokens
+     *  * Disables staking
+     *  * Disables renting
+     *  * Disables swapping
      *
      * !!! Cannot be undone !!!
      */
