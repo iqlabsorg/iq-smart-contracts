@@ -71,17 +71,17 @@ library Errors {
     string internal constant E_SERVICE_LIMIT_REACHED = "41";
     string internal constant E_INVALID_RENTAL_PERIOD_RANGE = "42";
     string internal constant E_SERVICE_ENERGY_GAP_HALVING_PERIOD_NOT_GT_0 = "43";
-    string internal constant E_UNSUPPORTED_PAYMENT_TOKEN = "44"; // Payment token is disabled or not supported
-    string internal constant E_RENTAL_PERIOD_OUT_OF_RANGE = "45"; // Rental period is out of allowed range
+    string internal constant E_UNSUPPORTED_PAYMENT_TOKEN = "44";
+    string internal constant E_RENTAL_PERIOD_OUT_OF_RANGE = "45";
     string internal constant E_INSUFFICIENT_LIQUIDITY = "46";
-    string internal constant E_RENTAL_PAYMENT_SLIPPAGE = "47"; // Effective rental payment exceeds max payment limit set by renter
+    string internal constant E_RENTAL_PAYMENT_SLIPPAGE = "47";
     string internal constant E_INVALID_RENTAL_TOKEN_ID = "48";
     string internal constant E_INVALID_RENTAL_PERIOD = "49";
-    string internal constant E_FLASH_LIQUIDITY_REMOVAL = "50"; // Adding and removing liquidity in the same block is not allowed
+    string internal constant E_FLASH_LIQUIDITY_REMOVAL = "50";
     string internal constant E_SWAPPING_DISABLED = "51";
     string internal constant E_RENTAL_TRANSFER_NOT_ALLOWED = "52";
-    string internal constant E_INVALID_CALLER_WITHIN_RENTER_ONLY_RETURN_PERIOD = "53"; // Only renter can return within renter grace period
-    string internal constant E_INVALID_CALLER_WITHIN_ENTERPRISE_ONLY_COLLECTION_PERIOD = "54"; // Only renter or enterprise can return within enterprise grace period
+    string internal constant E_INVALID_CALLER_WITHIN_RENTER_ONLY_RETURN_PERIOD = "53";
+    string internal constant E_INVALID_CALLER_WITHIN_ENTERPRISE_ONLY_COLLECTION_PERIOD = "54";
 
     string internal constant EF_INVALID_ENTERPRISE_IMPLEMENTATION_ADDRESS = "55";
     string internal constant EF_INVALID_POWER_TOKEN_IMPLEMENTATION_ADDRESS = "56";

@@ -1,4 +1,4 @@
-import {Contract} from '@ethersproject/contracts';
+import { Contract } from '@ethersproject/contracts';
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -9,9 +9,7 @@ export enum FacetCutAction {
 }
 
 export function getSelectors(contract: Contract): string[] {
-  return Object.keys(contract.interface.functions).map((x) =>
-    contract.interface.getSighash(x)
-  );
+  return Object.keys(contract.interface.functions).map((x) => contract.interface.getSighash(x));
 }
 
 export const BASE = 60n;

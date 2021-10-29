@@ -1,13 +1,8 @@
-import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/dist/src/signers';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import chai from 'chai';
-import {BigNumber} from 'ethers';
-import {ethers, waffle} from 'hardhat';
-import {
-  Enterprise,
-  IERC20Metadata,
-  StakeToken,
-  PowerToken,
-} from '../../../typechain';
+import { BigNumber } from 'ethers';
+import { ethers, waffle } from 'hardhat';
+import { Enterprise, IERC20Metadata, StakeToken, PowerToken } from '../../../typechain';
 import {
   stake,
   basePrice,
@@ -22,7 +17,7 @@ import {
   toTokens,
 } from '../../utils';
 chai.use(waffle.solidity);
-const {expect} = chai;
+const { expect } = chai;
 
 describe('IQ Protocol E2E', () => {
   let user: SignerWithAddress;
@@ -42,9 +37,7 @@ describe('IQ Protocol E2E', () => {
       expect(await enterprise.getEnterpriseToken()).to.equal(token.address);
     });
     it('should deploy stake token', async () => {
-      expect(await enterprise.getStakeToken()).not.to.equal(
-        ethers.constants.AddressZero
-      );
+      expect(await enterprise.getStakeToken()).not.to.equal(ethers.constants.AddressZero);
     });
 
     describe('StakeToken', async () => {
@@ -86,9 +79,7 @@ describe('IQ Protocol E2E', () => {
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
       const powerToken = await getPowerToken(enterprise, await txPromise);
-      expect(await powerToken.getGapHalvingPeriod()).to.equal(
-        GAP_HALVING_PERIOD
-      );
+      expect(await powerToken.getGapHalvingPeriod()).to.equal(GAP_HALVING_PERIOD);
     });
   });
 
@@ -124,26 +115,11 @@ describe('IQ Protocol E2E', () => {
     it('should rent-return-unstake', async () => {
       console.log(
         'Estimate:',
-        (
-          await enterprise.estimateRentalFee(
-            powerToken.address,
-            token.address,
-            RENTAL_AMOUNT,
-            ONE_DAY
-          )
-        ).toString()
+        (await enterprise.estimateRentalFee(powerToken.address, token.address, RENTAL_AMOUNT, ONE_DAY)).toString()
       );
 
       // 4. Rent
-      const rentingTx = await rent(
-        enterprise,
-        powerToken,
-        token,
-        RENTAL_AMOUNT,
-        ONE_DAY,
-        MAX_PAYMENT_AMOUNT,
-        user
-      );
+      const rentingTx = await rent(enterprise, powerToken, token, RENTAL_AMOUNT, ONE_DAY, MAX_PAYMENT_AMOUNT, user);
       await expect(rentingTx).to.emit(enterprise, 'Rented');
       await increaseTime(86400);
 
@@ -155,34 +131,12 @@ describe('IQ Protocol E2E', () => {
     });
 
     it('2 sequential rentals approximately costs the same as 1 for accumulated amount for the same period (additivity)', async () => {
-      const SINGLE_RENTAL_FEE = estimateRentalFee(
-        basePrice(100.0, 86400.0, 3.0),
-        1000000.0,
-        0.0,
-        500000.0,
-        86400.0
-      );
+      const SINGLE_RENTAL_FEE = estimateRentalFee(basePrice(100.0, 86400.0, 3.0), 1000000.0, 0.0, 500000.0, 86400.0);
 
       const balanceBefore = await token.balanceOf(user.address);
 
-      await rent(
-        enterprise,
-        powerToken,
-        token,
-        ONE_TOKEN * 300000n,
-        ONE_DAY,
-        MAX_PAYMENT_AMOUNT,
-        user
-      );
-      await rent(
-        enterprise,
-        powerToken,
-        token,
-        ONE_TOKEN * 200000n,
-        ONE_DAY,
-        MAX_PAYMENT_AMOUNT,
-        user
-      );
+      await rent(enterprise, powerToken, token, ONE_TOKEN * 300000n, ONE_DAY, MAX_PAYMENT_AMOUNT, user);
+      await rent(enterprise, powerToken, token, ONE_TOKEN * 200000n, ONE_DAY, MAX_PAYMENT_AMOUNT, user);
 
       const balanceAfter = await token.balanceOf(user.address);
       const diff = balanceBefore.toBigInt() - balanceAfter.toBigInt();

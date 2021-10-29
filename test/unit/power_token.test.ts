@@ -1,24 +1,10 @@
-import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/dist/src/signers';
-import {expect} from 'chai';
-import {BigNumberish} from 'ethers';
-import {ethers} from 'hardhat';
-import {
-  RentalToken,
-  RentalToken__factory,
-  Enterprise,
-  ERC20Mock,
-  PowerToken,
-} from '../../typechain';
-import {Errors} from '../types';
-import {
-  stake,
-  baseRate,
-  rent,
-  deployEnterprise,
-  getRentalTokenId,
-  ONE_DAY,
-  registerService,
-} from '../utils';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
+import { expect } from 'chai';
+import { BigNumberish } from 'ethers';
+import { ethers } from 'hardhat';
+import { RentalToken, RentalToken__factory, Enterprise, ERC20Mock, PowerToken } from '../../typechain';
+import { Errors } from '../types';
+import { stake, baseRate, rent, deployEnterprise, getRentalTokenId, ONE_DAY, registerService } from '../utils';
 
 type EnegryTestCase = [BigNumberish, number, BigNumberish];
 
@@ -54,37 +40,23 @@ describe('PowerToken', function () {
 
     await stake(enterprise, ONE_TOKEN * 1000n, user);
 
-    rentalToken = RentalToken__factory.connect(
-      await enterprise.getRentalToken(),
-      user
-    );
+    rentalToken = RentalToken__factory.connect(await enterprise.getRentalToken(), user);
   });
 
   describe('energy', () => {
     (
       [
         [ONE_ETHER * 1000n, GAP_HALVING_PERIOD, ONE_ETHER * 500n],
-        [
-          ONE_ETHER * 9999n,
-          GAP_HALVING_PERIOD,
-          ethers.utils.parseEther('4999.5'),
-        ],
+        [ONE_ETHER * 9999n, GAP_HALVING_PERIOD, ethers.utils.parseEther('4999.5')],
       ] as EnegryTestCase[]
     ).forEach(([amount, period, expected], idx) => {
       it(`should calculate energy: ${idx}`, async () => {
         await token.approve(powerToken.address, amount);
         const tx = await powerToken.swapIn(amount);
 
-        const block = await ethers.provider.getBlock(
-          (
-            await tx.wait()
-          ).blockNumber
-        );
+        const block = await ethers.provider.getBlock((await tx.wait()).blockNumber);
 
-        const result = await powerToken.energyAt(
-          user.address,
-          block.timestamp + period
-        );
+        const result = await powerToken.energyAt(user.address, block.timestamp + period);
 
         expect(result).to.equal(expected);
       });
@@ -118,25 +90,18 @@ describe('PowerToken', function () {
       await token.approve(powerToken.address, ONE_TOKEN * 100n);
       await powerToken.swapIn(ONE_TOKEN * 100n);
 
-      await expect(
-        powerToken.transfer(user2.address, ONE_TOKEN * 100n)
-      ).to.be.revertedWith(Errors.PT_TRANSFER_DISABLED);
+      await expect(powerToken.transfer(user2.address, ONE_TOKEN * 100n)).to.be.revertedWith(
+        Errors.PT_TRANSFER_DISABLED
+      );
     });
 
     it('should not be possible to transfer rented tokens', async () => {
-      const tx = await rent(
-        enterprise,
-        powerToken,
-        token,
-        ONE_TOKEN * 100n,
-        ONE_DAY * 30,
-        ONE_TOKEN * 100n
-      );
+      const tx = await rent(enterprise, powerToken, token, ONE_TOKEN * 100n, ONE_DAY * 30, ONE_TOKEN * 100n);
       const rentalTokenId = await getRentalTokenId(enterprise, tx);
 
-      await expect(
-        rentalToken.transferFrom(user.address, user2.address, rentalTokenId)
-      ).to.be.revertedWith(Errors.PT_TRANSFER_DISABLED);
+      await expect(rentalToken.transferFrom(user.address, user2.address, rentalTokenId)).to.be.revertedWith(
+        Errors.PT_TRANSFER_DISABLED
+      );
     });
   });
 
@@ -155,21 +120,10 @@ describe('PowerToken', function () {
     });
 
     it('should be possible to transfer rented tokens', async () => {
-      const tx = await rent(
-        enterprise,
-        powerToken,
-        token,
-        ONE_TOKEN * 100n,
-        ONE_DAY * 30,
-        ONE_TOKEN * 100n
-      );
+      const tx = await rent(enterprise, powerToken, token, ONE_TOKEN * 100n, ONE_DAY * 30, ONE_TOKEN * 100n);
       const rentalTokenId = await getRentalTokenId(enterprise, tx);
 
-      await rentalToken.transferFrom(
-        user.address,
-        user2.address,
-        rentalTokenId
-      );
+      await rentalToken.transferFrom(user.address, user2.address, rentalTokenId);
 
       expect(await powerToken.balanceOf(user2.address)).to.eq(ONE_TOKEN * 100n);
     });

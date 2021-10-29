@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-import {Contract} from '@ethersproject/contracts';
-import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/dist/src/signers';
-import {expect} from 'chai';
-import hre, {ethers} from 'hardhat';
+import { Contract } from '@ethersproject/contracts';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
+import { expect } from 'chai';
+import hre, { ethers } from 'hardhat';
 import {
   RentalToken,
   RentalToken__factory,
@@ -10,18 +10,19 @@ import {
   StakeToken__factory,
   PowerToken,
   PowerToken__factory,
-} from '../../../typechain';
-import {impersonate, resetFork} from '../../utils';
-import {PARSIQ_ENTERPRISE_ADDRESS} from '../addresses';
+} from '../../typechain';
+import { impersonate, resetFork } from '../utils';
+import { PARSIQ_ENTERPRISE_ADDRESS } from './addresses';
+import { BigNumber } from '@ethersproject/bignumber';
 
 // prettier-ignore
-const ENTERPRISE_ABI = require('../../../deployments/binance/Enterprise.json').abi;
+const ENTERPRISE_ABI = require('../../deployments/binance/Enterprise.json').abi;
 // prettier-ignore
-const RENTAL_TOKEN_ABI = require('../../../deployments/binance/BorrowToken.json').abi;
+const RENTAL_TOKEN_ABI = require('../../deployments/binance/BorrowToken.json').abi;
 // prettier-ignore
-const STAKE_TOKEN_ABI = require('../../../deployments/binance/InterestToken.json').abi;
+const STAKE_TOKEN_ABI = require('../../deployments/binance/InterestToken.json').abi;
 // prettier-ignore
-const POWER_TOKEN_ABI = require('../../../deployments/binance/PowerToken.json').abi;
+const POWER_TOKEN_ABI = require('../../deployments/binance/PowerToken.json').abi;
 
 describe('Integration', () => {
   let user: SignerWithAddress;
@@ -70,7 +71,6 @@ describe('Integration', () => {
           []
         );
 
-
       const upgraded = RentalToken__factory.connect(rentalToken.address, user);
 
       // TODO: uncomment after renaming patch is deployed
@@ -82,7 +82,7 @@ describe('Integration', () => {
     });
   });
 
-  describe('Stake token', () => {
+  describe('StakeToken', () => {
     let stakeToken: Contract;
     let newStakeToken: StakeToken;
 
@@ -122,32 +122,30 @@ describe('Integration', () => {
     });
   });
 
-  describe('Power Token', () => {
+  describe('PowerToken', () => {
     const referenceAddress = '0x979c2f8df5d6df2bcf2a6771117f7a62a7462621';
     let powerTokens: Contract[];
     let newPowerToken: PowerToken;
     let swappingEnabled: boolean[];
-    let balances: any;
-    let totalSupply: any;
+    let balances: BigNumber[];
+    let totalSupply: BigNumber[];
     let upgraded: PowerToken[];
 
     beforeEach(async () => {
       const [tokens] = await enterprise.functions.getPowerTokens();
 
-      powerTokens = tokens.map(
-        (x: string) => new Contract(x, POWER_TOKEN_ABI, user)
-      );
+      powerTokens = tokens.map((x: string) => new Contract(x, POWER_TOKEN_ABI, user));
 
       newPowerToken = await new PowerToken__factory(user).deploy();
-      swappingEnabled = await Promise.all(
-        powerTokens.map((x) => x.functions.isWrappingEnabled())
-      ).then((x) => x.map((y) => y[0]));
-      balances = await Promise.all(
-        powerTokens.map((x) => x.functions.balanceOf(referenceAddress))
-      ).then((x) => x.map((y) => y[0]));
-      totalSupply = await Promise.all(
-        powerTokens.map((x) => x.functions.totalSupply())
-      ).then((x) => x.map((y) => y[0]));
+      swappingEnabled = await Promise.all(powerTokens.map((x) => x.functions.isWrappingEnabled())).then((x) =>
+        x.map((y) => y[0])
+      );
+      balances = await Promise.all(powerTokens.map((x) => x.functions.balanceOf(referenceAddress))).then((x) =>
+        x.map((y) => y[0])
+      );
+      totalSupply = await Promise.all(powerTokens.map((x) => x.functions.totalSupply())).then((x) =>
+        x.map((y) => y[0])
+      );
 
       await enterprise
         .connect(admin)
@@ -160,27 +158,15 @@ describe('Integration', () => {
           tokens
         );
 
-      upgraded = powerTokens.map((x) =>
-        PowerToken__factory.connect(x.address, user)
-      );
+      upgraded = powerTokens.map((x) => PowerToken__factory.connect(x.address, user));
     });
 
     it('should successfully upgrade', async () => {
-      expect(
-        await Promise.all(upgraded.map((x) => x.isSwappingEnabled()))
-      ).to.deep.eq(swappingEnabled);
-      expect(
-        await Promise.all(upgraded.map((x) => x.balanceOf(referenceAddress)))
-      ).to.deep.eq(balances);
-      expect(
-        await Promise.all(upgraded.map((x) => x.totalSupply()))
-      ).to.deep.eq(totalSupply);
-      expect(
-        await Promise.all(upgraded.map((x) => x.isTransferEnabled()))
-      ).to.deep.eq([false, false, false, false]);
-      expect(
-        await Promise.all(upgraded.map((x) => x.getEnterprise()))
-      ).to.deep.eq([
+      expect(await Promise.all(upgraded.map((x) => x.isSwappingEnabled()))).to.deep.eq(swappingEnabled);
+      expect(await Promise.all(upgraded.map((x) => x.balanceOf(referenceAddress)))).to.deep.eq(balances);
+      expect(await Promise.all(upgraded.map((x) => x.totalSupply()))).to.deep.eq(totalSupply);
+      expect(await Promise.all(upgraded.map((x) => x.isTransferEnabled()))).to.deep.eq([false, false, false, false]);
+      expect(await Promise.all(upgraded.map((x) => x.getEnterprise()))).to.deep.eq([
         enterprise.address,
         enterprise.address,
         enterprise.address,
@@ -189,25 +175,13 @@ describe('Integration', () => {
     });
 
     it('should keep the same after transfer is enabled', async () => {
-      await Promise.all(
-        upgraded.map((x) => x.connect(admin).enableTransferForever())
-      );
+      await Promise.all(upgraded.map((x) => x.connect(admin).enableTransferForever()));
 
-      expect(
-        await Promise.all(upgraded.map((x) => x.isSwappingEnabled()))
-      ).to.deep.eq(swappingEnabled);
-      expect(
-        await Promise.all(upgraded.map((x) => x.balanceOf(referenceAddress)))
-      ).to.deep.eq(balances);
-      expect(
-        await Promise.all(upgraded.map((x) => x.totalSupply()))
-      ).to.deep.eq(totalSupply);
-      expect(
-        await Promise.all(upgraded.map((x) => x.isTransferEnabled()))
-      ).to.deep.eq([true, true, true, true]);
-      expect(
-        await Promise.all(upgraded.map((x) => x.getEnterprise()))
-      ).to.deep.eq([
+      expect(await Promise.all(upgraded.map((x) => x.isSwappingEnabled()))).to.deep.eq(swappingEnabled);
+      expect(await Promise.all(upgraded.map((x) => x.balanceOf(referenceAddress)))).to.deep.eq(balances);
+      expect(await Promise.all(upgraded.map((x) => x.totalSupply()))).to.deep.eq(totalSupply);
+      expect(await Promise.all(upgraded.map((x) => x.isTransferEnabled()))).to.deep.eq([true, true, true, true]);
+      expect(await Promise.all(upgraded.map((x) => x.getEnterprise()))).to.deep.eq([
         enterprise.address,
         enterprise.address,
         enterprise.address,

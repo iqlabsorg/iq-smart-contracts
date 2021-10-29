@@ -1,7 +1,7 @@
-import {expect} from 'chai';
-import {ethers} from 'hardhat';
-import {b2f, f2b} from '../../scripts/utils';
-import {ExpMathMock} from '../../typechain';
+import { expect } from 'chai';
+import { ethers } from 'hardhat';
+import { b2f, f2b } from '../../scripts/utils';
+import { ExpMathMock } from '../../typechain';
 
 type TestCase = [bigint, number, bigint, bigint, number];
 
@@ -19,13 +19,7 @@ describe('ExpMath', function () {
       [100n, 1000, 20n, 140n, 250],
       [100n, 1000, 20n, 110n, Math.sqrt(1000 * 500)],
       [100n, 1997.25, 20n, 110n, Math.sqrt(1997.25 * (1997.25 / 2.0))],
-      [
-        0n,
-        1997.25,
-        75n ** 5n,
-        75n ** 5n - 1n,
-        1997.25 * Math.pow(0.5, (75 ** 5 - 1) / 75 ** 5),
-      ],
+      [0n, 1997.25, 75n ** 5n, 75n ** 5n - 1n, 1997.25 * Math.pow(0.5, (75 ** 5 - 1) / 75 ** 5)],
       // [0n, 199700000000.45, 75n ** 5n, 75n ** 5n - 1n, 199700000000.45 * Math.pow(0.5, (75 ** 5 - 1) / 75 ** 5)], //TODO: fails
       [
         0n,
@@ -39,8 +33,7 @@ describe('ExpMath', function () {
         Number.MAX_SAFE_INTEGER / 2.0,
         75n ** 5n,
         75n ** 5n - 1n,
-        (Number.MAX_SAFE_INTEGER / 2.0) *
-          Math.pow(0.5, (75 ** 5 - 1) / 75 ** 5),
+        (Number.MAX_SAFE_INTEGER / 2.0) * Math.pow(0.5, (75 ** 5 - 1) / 75 ** 5),
       ],
     ] as TestCase[]
   ).forEach(([t0, c0, t12, t, expected], idx: number) => {

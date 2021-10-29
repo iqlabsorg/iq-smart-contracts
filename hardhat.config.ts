@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import {HardhatUserConfig} from 'hardhat/types';
+import { HardhatUserConfig } from 'hardhat/types';
 import 'hardhat-deploy';
 import '@nomiclabs/hardhat-ethers';
 import 'hardhat-gas-reporter';
@@ -7,7 +7,7 @@ import '@nomiclabs/hardhat-waffle';
 import '@typechain/hardhat';
 import 'solidity-coverage';
 import 'hardhat-contract-sizer';
-import {node_url, accounts, privateKey} from './utils/network';
+import { node_url, accounts, privateKey } from './utils/network';
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -37,9 +37,7 @@ const config: HardhatUserConfig = {
       forking: process.env.HARDHAT_FORK
         ? {
             url: node_url(process.env.HARDHAT_FORK),
-            blockNumber: process.env.HARDHAT_FORK_NUMBER
-              ? parseInt(process.env.HARDHAT_FORK_NUMBER)
-              : undefined,
+            blockNumber: process.env.HARDHAT_FORK_NUMBER ? parseInt(process.env.HARDHAT_FORK_NUMBER) : undefined,
           }
         : undefined,
       allowUnlimitedContractSize: true,

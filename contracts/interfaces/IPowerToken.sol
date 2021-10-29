@@ -16,6 +16,8 @@ interface IPowerToken is IERC20Metadata, IPowerTokenStorage {
 
     function burnFrom(address account, uint256 amount) external;
 
+    function notifyNewRental(uint256 rentalTokenId) external;
+
     function estimateRentalFee(
         address paymentToken,
         uint112 rentalAmount,
@@ -28,6 +30,4 @@ interface IPowerToken is IERC20Metadata, IPowerTokenStorage {
             uint112 serviceFee,
             uint112 gcFee
         );
-
-    function notifyNewRental(uint256 rentalTokenId) external;
 }

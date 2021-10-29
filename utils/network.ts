@@ -21,9 +21,7 @@ export function node_url(networkName: string): string {
     return '';
   }
   if (uri.indexOf('{{') >= 0) {
-    throw new Error(
-      `invalid uri or network not supported by node provider : ${uri}`
-    );
+    throw new Error(`invalid uri or network not supported by node provider : ${uri}`);
   }
   return uri;
 }
@@ -43,8 +41,8 @@ export function getMnemonic(networkName?: string): string {
   return mnemonic;
 }
 
-export function accounts(networkName?: string): {mnemonic: string} {
-  return {mnemonic: getMnemonic(networkName)};
+export function accounts(networkName?: string): { mnemonic: string } {
+  return { mnemonic: getMnemonic(networkName) };
 }
 
 export function getPrivateKey(networkName?: string): string {
