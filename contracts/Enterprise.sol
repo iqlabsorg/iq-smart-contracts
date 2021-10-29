@@ -77,7 +77,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         address indexed returner,
         address indexed powerToken,
         uint112 rentalAmount,
-        uint112 gcReward,
+        uint112 gcRewardAmount,
         address gcRewardToken,
         uint256 totalReserve,
         uint256 totalUsedReserve
@@ -94,7 +94,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         uint32 maxRentalPeriod,
         uint96 minGCFee,
         bool swappingEnabledForever
-    ) external onlyOwner notShutdown {
+    ) external onlyOwner whenNotShutdown {
         require(address(baseToken) != address(0), Errors.E_INVALID_BASE_TOKEN_ADDRESS);
         require(_powerTokens.length < type(uint16).max, Errors.E_SERVICE_LIMIT_REACHED);
 
@@ -105,21 +105,20 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
             string memory powerTokenSymbol = string(abi.encodePacked(tokenSymbol, " ", serviceSymbol));
             ERC20(address(powerToken)).initialize(serviceName, powerTokenSymbol, _enterpriseToken.decimals());
         }
-        {
-            // Configure service parameters.
-            powerToken.initialize(
-                this,
-                baseRate,
-                minGCFee,
-                energyGapHalvingPeriod,
-                uint16(_powerTokens.length),
-                IERC20Metadata(baseToken)
-            );
-        }
 
-        {
-            powerToken.initialize2(minRentalPeriod, maxRentalPeriod, serviceFeePercent, swappingEnabledForever);
-        }
+        // Configure service parameters.
+        powerToken.initialize(
+            this,
+            IERC20Metadata(baseToken),
+            baseRate,
+            minGCFee,
+            serviceFeePercent,
+            energyGapHalvingPeriod,
+            uint16(_powerTokens.length),
+            minRentalPeriod,
+            maxRentalPeriod,
+            swappingEnabledForever
+        );
 
         // Complete service registration.
         _powerTokens.push(powerToken);
@@ -134,7 +133,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         uint112 rentalAmount,
         uint32 rentalPeriod,
         uint256 maxPayment
-    ) external notShutdown {
+    ) external whenNotShutdown {
         require(rentalAmount > 0, Errors.E_INVALID_RENTAL_AMOUNT);
         require(_registeredPowerTokens[powerToken], Errors.UNREGISTERED_POWER_TOKEN);
         require(rentalAmount <= getAvailableReserve(), Errors.E_INSUFFICIENT_LIQUIDITY);
@@ -148,11 +147,10 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         {
             // Ensure no rental fee payment slippage.
             // GC fee does not go to the pool but must be accounted for slippage calculation.
-            uint256 baseRentalFee = poolFee + serviceFee;
-            require(baseRentalFee + gcFee <= maxPayment, Errors.E_RENTAL_PAYMENT_SLIPPAGE);
+            require(poolFee + serviceFee + gcFee <= maxPayment, Errors.E_RENTAL_PAYMENT_SLIPPAGE);
 
             // Handle rental fee transfer and distribution.
-            handleRentalPayment(IERC20(paymentToken), baseRentalFee, serviceFee, poolFee);
+            handleRentalPayment(IERC20(paymentToken), serviceFee, poolFee);
 
             // Transfer GC fee to the rental token contract.
             IERC20(paymentToken).safeTransferFrom(msg.sender, address(_rentalToken), gcFee);
@@ -210,7 +208,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         address paymentToken,
         uint32 rentalPeriod,
         uint256 maxPayment
-    ) external notShutdown {
+    ) external whenNotShutdown {
         RentalAgreement storage rentalAgreement = _rentalAgreements[rentalTokenId];
         require(rentalAgreement.rentalAmount > 0, Errors.E_INVALID_RENTAL_TOKEN_ID);
         IPowerToken powerToken = _powerTokens[rentalAgreement.powerTokenIndex];
@@ -226,15 +224,14 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
             rentalPeriod
         );
 
-        // Emulate renting.
+        // Simulate renting.
         _usedReserve = usedReserve;
 
         // Ensure no rental fee payment slippage.
-        uint256 baseRentalFee = poolFee + serviceFee;
-        require(baseRentalFee <= maxPayment, Errors.E_RENTAL_PAYMENT_SLIPPAGE);
+        require(poolFee + serviceFee <= maxPayment, Errors.E_RENTAL_PAYMENT_SLIPPAGE);
 
         // Handle rental payment transfer and distribution.
-        handleRentalPayment(IERC20(paymentToken), baseRentalFee, serviceFee, poolFee);
+        handleRentalPayment(IERC20(paymentToken), serviceFee, poolFee);
 
         // Calculate new rental agreement timestamps.
         uint32 newEndTime = rentalAgreement.endTime + rentalPeriod;
@@ -263,10 +260,13 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
 
     function handleRentalPayment(
         IERC20 paymentToken,
-        uint256 rentalFee,
         uint256 serviceFee,
         uint112 poolFee
     ) internal {
+        uint256 rentalFee;
+        unchecked {
+            rentalFee = serviceFee + poolFee;
+        }
         // Transfer base rental fee to the enterprise.
         paymentToken.safeTransferFrom(msg.sender, address(this), rentalFee);
         IERC20 enterpriseToken = _enterpriseToken;
@@ -334,7 +334,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
      * One must approve sufficient amount of enterprise tokens to
      * Enterprise address before calling this function
      */
-    function stake(uint256 stakeAmount) external notShutdown {
+    function stake(uint256 stakeAmount) external whenNotShutdown {
         // Transfer enterprise tokens to the enterprise.
         _enterpriseToken.safeTransferFrom(msg.sender, address(this), stakeAmount);
 
@@ -478,7 +478,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
 
     function increaseStake(uint256 stakeTokenId, uint256 stakeAmountDelta)
         external
-        notShutdown
+        whenNotShutdown
         onlyStakeTokenOwner(stakeTokenId)
     {
         // Transfer enterprise tokens to the enterprise.
@@ -520,7 +520,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
         address paymentToken,
         uint112 rentalAmount,
         uint32 rentalPeriod
-    ) external view notShutdown returns (uint256) {
+    ) external view whenNotShutdown returns (uint256) {
         require(_registeredPowerTokens[powerToken], Errors.UNREGISTERED_POWER_TOKEN);
         (uint112 poolFee, uint112 serviceFee, uint112 gcFee) = IPowerToken(powerToken).estimateRentalFee(
             paymentToken,
@@ -610,7 +610,7 @@ contract Enterprise is EnterpriseStorage, IEnterprise {
      *
      * !!! Cannot be undone !!!
      */
-    function shutdownEnterpriseForever() external notShutdown onlyOwner {
+    function shutdownEnterpriseForever() external whenNotShutdown onlyOwner {
         _enterpriseShutdown = true;
         _usedReserve = 0;
         _streamingReserve = _streamingReserveTarget;

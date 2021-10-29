@@ -102,7 +102,9 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
      */
     uint256 internal _totalShares;
 
-    // Bonding factor calculation parameters
+    /**
+     * @dev Bonding factor calculation parameters
+     */
     uint256 internal _bondingSlope;
     uint256 internal _bondingPole;
 
@@ -127,7 +129,7 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
     event EnterpriseCollectorChanged(address collector);
     event BaseUriChanged(string baseUri);
 
-    modifier notShutdown() {
+    modifier whenNotShutdown() {
         require(!_enterpriseShutdown, Errors.E_ENTERPRISE_SHUTDOWN);
         _;
     }
@@ -262,11 +264,11 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         returns (
             string memory name,
             string memory baseUri,
-            uint256 totalShares,
             uint32 streamingReserveHalvingPeriod,
             uint32 renterOnlyReturnPeriod,
             uint32 enterpriseOnlyCollectionPeriod,
             uint16 gcFeePercent,
+            uint256 totalShares,
             uint256 fixedReserve,
             uint256 usedReserve,
             uint112 streamingReserve,
@@ -277,11 +279,11 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         return (
             _name,
             _baseUri,
-            _totalShares,
             _streamingReserveHalvingPeriod,
             _renterOnlyReturnPeriod,
             _enterpriseOnlyCollectionPeriod,
             _gcFeePercent,
+            _totalShares,
             _fixedReserve,
             _usedReserve,
             _streamingReserve,
@@ -313,7 +315,7 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
     }
 
     function getAvailableReserve() public view override returns (uint256) {
-        return getReserve() - _usedReserve;
+        return _getAvailableReserve(getReserve());
     }
 
     function getBondingCurve() external view override returns (uint256 pole, uint256 slope) {

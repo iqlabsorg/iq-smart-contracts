@@ -8,17 +8,14 @@ import "./IEnterprise.sol";
 interface IPowerTokenStorage {
     function initialize(
         IEnterprise enterprise,
+        IERC20Metadata baseToken,
         uint112 baseRate,
         uint96 minGCFee,
+        uint16 serviceFeePercent,
         uint32 energyGapHalvingPeriod,
         uint16 index,
-        IERC20Metadata baseToken
-    ) external;
-
-    function initialize2(
         uint32 minRentalPeriod,
         uint32 maxRentalPeriod,
-        uint16 serviceFeePercent,
         bool swappingEnabled
     ) external;
 

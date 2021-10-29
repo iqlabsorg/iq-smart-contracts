@@ -41,38 +41,33 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
 
     function initialize(
         IEnterprise enterprise,
+        IERC20Metadata baseToken,
         uint112 baseRate,
         uint96 minGCFee,
+        uint16 serviceFeePercent,
         uint32 energyGapHalvingPeriod,
         uint16 index,
-        IERC20Metadata baseToken
+        uint32 minRentalPeriod,
+        uint32 maxRentalPeriod,
+        bool swappingEnabled
     ) external override {
         require(_energyGapHalvingPeriod == 0, Errors.ALREADY_INITIALIZED);
         require(energyGapHalvingPeriod > 0, Errors.E_SERVICE_ENERGY_GAP_HALVING_PERIOD_NOT_GT_0);
-
-        EnterpriseOwnable.initialize(enterprise);
-        _baseRate = baseRate;
-        _minGCFee = minGCFee;
-        _energyGapHalvingPeriod = energyGapHalvingPeriod;
-        _index = index;
-        _baseToken = baseToken;
-        emit BaseRateChanged(baseRate, address(baseToken), minGCFee);
-    }
-
-    function initialize2(
-        uint32 minRentalPeriod,
-        uint32 maxRentalPeriod,
-        uint16 serviceFeePercent,
-        bool swappingEnabled
-    ) external override {
-        require(_maxRentalPeriod == 0, Errors.ALREADY_INITIALIZED);
         require(maxRentalPeriod > 0, Errors.PT_INVALID_MAX_RENTAL_PERIOD);
         require(minRentalPeriod <= maxRentalPeriod, Errors.ES_INVALID_RENTAL_PERIOD_RANGE);
 
+        EnterpriseOwnable.initialize(enterprise);
+        _baseToken = baseToken;
+        _baseRate = baseRate;
+        _minGCFee = minGCFee;
+        _serviceFeePercent = serviceFeePercent;
+        _energyGapHalvingPeriod = energyGapHalvingPeriod;
+        _index = index;
         _minRentalPeriod = minRentalPeriod;
         _maxRentalPeriod = maxRentalPeriod;
-        _serviceFeePercent = serviceFeePercent;
         _swappingEnabled = swappingEnabled;
+
+        emit BaseRateChanged(baseRate, address(baseToken), minGCFee);
         emit ServiceFeePercentChanged(serviceFeePercent);
         emit RentalPeriodLimitsChanged(minRentalPeriod, maxRentalPeriod);
         if (swappingEnabled) {

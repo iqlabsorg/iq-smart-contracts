@@ -24,6 +24,11 @@
           "type": "address"
         },
         {
+          "internalType": "contract IERC20Metadata",
+          "name": "baseToken",
+          "type": "address"
+        },
+        {
           "internalType": "uint112",
           "name": "baseRate",
           "type": "uint112"
@@ -32,6 +37,11 @@
           "internalType": "uint96",
           "name": "minGCFee",
           "type": "uint96"
+        },
+        {
+          "internalType": "uint16",
+          "name": "serviceFeePercent",
+          "type": "uint16"
         },
         {
           "internalType": "uint32",
@@ -44,19 +54,6 @@
           "type": "uint16"
         },
         {
-          "internalType": "contract IERC20Metadata",
-          "name": "baseToken",
-          "type": "address"
-        }
-      ],
-      "name": "initialize",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "uint32",
           "name": "minRentalPeriod",
           "type": "uint32"
@@ -67,17 +64,12 @@
           "type": "uint32"
         },
         {
-          "internalType": "uint16",
-          "name": "serviceFeePercent",
-          "type": "uint16"
-        },
-        {
           "internalType": "bool",
           "name": "swappingEnabled",
           "type": "bool"
         }
       ],
-      "name": "initialize2",
+      "name": "initialize",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

@@ -103,14 +103,14 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         returns (
             string memory name,
             string memory symbol,
+            IERC20Metadata baseToken,
             uint112 baseRate,
             uint96 minGCFee,
+            uint16 serviceFeePercent,
             uint32 energyGapHalvingPeriod,
             uint16 index,
-            IERC20Metadata baseToken,
             uint32 minRentalPeriod,
             uint32 maxRentalPeriod,
-            uint16 serviceFeePercent,
             bool swappingEnabled,
             bool transferEnabled
         )
@@ -118,14 +118,14 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         return (
             this.name(),
             this.symbol(),
+            _baseToken,
             _baseRate,
             _minGCFee,
+            _serviceFeePercent,
             _energyGapHalvingPeriod,
             _index,
-            _baseToken,
             _minRentalPeriod,
             _maxRentalPeriod,
-            _serviceFeePercent,
             _swappingEnabled,
             _transferEnabled
         );
@@ -200,14 +200,17 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
      * g(x) = h(U + x) - h(U)
      */
     function estimateFee(uint112 amount, uint32 period) internal view returns (uint112) {
-        uint256 availableReserve = getEnterprise().getAvailableReserve();
+        IEnterprise enterprise = getEnterprise();
+        uint256 reserve = enterprise.getReserve();
+        uint256 usedReserve = enterprise.getUsedReserve();
+        uint256 availableReserve = reserve - usedReserve;
         if (availableReserve <= amount) return type(uint112).max;
 
-        int8 decimalsDiff = int8(getEnterprise().getEnterpriseToken().decimals()) - int8(_baseToken.decimals());
+        int8 decimalsDiff = int8(enterprise.getEnterpriseToken().decimals()) - int8(_baseToken.decimals());
 
-        (uint256 pole, uint256 slope) = getEnterprise().getBondingCurve();
+        (uint256 pole, uint256 slope) = enterprise.getBondingCurve();
 
-        uint256 basePrice = g(amount, pole, slope) * period;
+        uint256 basePrice = g(amount, pole, slope, reserve, usedReserve) * period;
 
         if (decimalsDiff > 0) {
             basePrice = ((basePrice * _baseRate) / 10**uint8(decimalsDiff)) >> 64;
@@ -222,11 +225,10 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
     function g(
         uint128 x,
         uint256 pole,
-        uint256 slope
-    ) internal view returns (uint256) {
-        uint256 usedReserve = getEnterprise().getUsedReserve();
-        uint256 reserve = getEnterprise().getReserve();
-
+        uint256 slope,
+        uint256 reserve,
+        uint256 usedReserve
+    ) internal pure returns (uint256) {
         return h(usedReserve + x, pole, slope, reserve) - h(usedReserve, pole, slope, reserve);
     }
 

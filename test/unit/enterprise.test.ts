@@ -519,7 +519,7 @@ describe('Enterprise', () => {
       );
       await rent(enterprise, powerToken, enterpriseToken, ONE_TOKEN * 1_000n, ONE_DAY * 15, ONE_TOKEN * 1_000n, renter);
       await increaseTime(ONE_DAY * 365);
-      const [, , totalSharesBefore] = await enterprise.getInfo();
+      const { totalShares: totalSharesBefore } = await enterprise.getInfo();
       const stakeInfoBefore = await enterprise.getStake(tokenId);
       const balanceBefore = await enterpriseToken.balanceOf(staker.address);
       const reservesBefore = await enterprise.getReserve();
