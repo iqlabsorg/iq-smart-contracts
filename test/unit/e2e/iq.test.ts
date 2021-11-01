@@ -79,7 +79,7 @@ describe('IQ Protocol E2E', () => {
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
       const powerToken = await getPowerToken(enterprise, await txPromise);
-      expect(await powerToken.getGapHalvingPeriod()).to.equal(GAP_HALVING_PERIOD);
+      expect(await powerToken.getEnergyGapHalvingPeriod()).to.equal(GAP_HALVING_PERIOD);
     });
   });
 

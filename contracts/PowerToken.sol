@@ -171,7 +171,7 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
         require(getEnterprise().isSupportedPaymentToken(paymentToken), Errors.E_UNSUPPORTED_PAYMENT_TOKEN);
         require(isAllowedRentalPeriod(rentalPeriod), Errors.E_RENTAL_PERIOD_OUT_OF_RANGE);
 
-        uint112 rentalBaseFeeInBaseTokens = estimateFee(rentalAmount, rentalPeriod);
+        uint112 rentalBaseFeeInBaseTokens = estimateRentalBaseFee(rentalAmount, rentalPeriod);
         uint256 rentalBaseFee = getEnterprise().getConverter().estimateConvert(
             _baseToken,
             rentalBaseFeeInBaseTokens,
@@ -199,27 +199,27 @@ contract PowerToken is IPowerToken, PowerTokenStorage, ERC20 {
      * h(x) = x * f((T - x) / T)
      * g(x) = h(U + x) - h(U)
      */
-    function estimateFee(uint112 amount, uint32 period) internal view returns (uint112) {
+    function estimateRentalBaseFee(uint112 rentalAmount, uint32 rentalPeriod) internal view returns (uint112) {
         IEnterprise enterprise = getEnterprise();
         uint256 reserve = enterprise.getReserve();
         uint256 usedReserve = enterprise.getUsedReserve();
         uint256 availableReserve = reserve - usedReserve;
-        if (availableReserve <= amount) return type(uint112).max;
+        if (availableReserve <= rentalAmount) return type(uint112).max;
 
         int8 decimalsDiff = int8(enterprise.getEnterpriseToken().decimals()) - int8(_baseToken.decimals());
 
         (uint256 pole, uint256 slope) = enterprise.getBondingCurve();
 
-        uint256 basePrice = g(amount, pole, slope, reserve, usedReserve) * period;
+        uint256 baseFee = g(rentalAmount, pole, slope, reserve, usedReserve) * rentalPeriod;
 
         if (decimalsDiff > 0) {
-            basePrice = ((basePrice * _baseRate) / 10**uint8(decimalsDiff)) >> 64;
+            baseFee = ((baseFee * _baseRate) / 10**uint8(decimalsDiff)) >> 64;
         } else if (decimalsDiff < 0) {
-            basePrice = ((basePrice * _baseRate) * 10**(uint8(-decimalsDiff))) >> 64;
+            baseFee = ((baseFee * _baseRate) * 10**(uint8(-decimalsDiff))) >> 64;
         } else {
-            basePrice = (basePrice * _baseRate) >> 64;
+            baseFee = (baseFee * _baseRate) >> 64;
         }
-        return uint112(basePrice);
+        return uint112(baseFee);
     }
 
     function g(

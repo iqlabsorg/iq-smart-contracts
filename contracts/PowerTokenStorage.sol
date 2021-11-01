@@ -130,7 +130,7 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         return _minGCFee;
     }
 
-    function getGapHalvingPeriod() external view returns (uint32) {
+    function getEnergyGapHalvingPeriod() external view returns (uint32) {
         return _energyGapHalvingPeriod;
     }
 

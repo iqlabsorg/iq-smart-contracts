@@ -114,12 +114,12 @@
     },
     {
       "inputs": [],
-      "name": "getEnterprise",
+      "name": "getEnergyGapHalvingPeriod",
       "outputs": [
         {
-          "internalType": "contract IEnterprise",
+          "internalType": "uint32",
           "name": "",
-          "type": "address"
+          "type": "uint32"
         }
       ],
       "stateMutability": "view",
@@ -127,12 +127,12 @@
     },
     {
       "inputs": [],
-      "name": "getGapHalvingPeriod",
+      "name": "getEnterprise",
       "outputs": [
         {
-          "internalType": "uint32",
+          "internalType": "contract IEnterprise",
           "name": "",
-          "type": "uint32"
+          "type": "address"
         }
       ],
       "stateMutability": "view",
