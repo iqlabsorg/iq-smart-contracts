@@ -78,6 +78,10 @@ const config: HardhatUserConfig = {
       url: 'https://data-seed-prebsc-1-s1.binance.org:8545/',
       accounts: privateKey('binanceTestnet'),
     },
+    polygonTestnet: {
+      url: 'https://matic-testnet-archive-rpc.bwarelabs.com',
+      accounts: privateKey('polygonTestnet'),
+    },
   },
   paths: {
     sources: 'contracts',

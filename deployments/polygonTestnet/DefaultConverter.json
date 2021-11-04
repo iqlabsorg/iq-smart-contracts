@@ -1,0 +1,123 @@
+{
+  "address": "0x93Dc01F4C24698EaAF7777F391Cc75F8FcbbF5C5",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "source",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "contract IERC20",
+          "name": "target",
+          "type": "address"
+        }
+      ],
+      "name": "convert",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "source",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "contract IERC20",
+          "name": "target",
+          "type": "address"
+        }
+      ],
+      "name": "estimateConvert",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x3e52e2a8c83007b03006db72c7f73616f73cca105533b5f11f2a393621c62e22",
+  "receipt": {
+    "to": null,
+    "from": "0xd79d751251040Ff7736b50Ac97123A421B90e42e",
+    "contractAddress": "0x93Dc01F4C24698EaAF7777F391Cc75F8FcbbF5C5",
+    "transactionIndex": 1,
+    "gasUsed": "143575",
+    "logsBloom": "0x00000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000018020000000000000000000000000020000000000000000000000000000840000000000000000000100000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000024000000000000000000001000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000100000",
+    "blockHash": "0xf9512bbb0315c139ff13956fbd07b60f51db56766bb6bf6e5550ce0ae2eb52ee",
+    "transactionHash": "0x3e52e2a8c83007b03006db72c7f73616f73cca105533b5f11f2a393621c62e22",
+    "logs": [
+      {
+        "transactionIndex": 1,
+        "blockNumber": 21036825,
+        "transactionHash": "0x3e52e2a8c83007b03006db72c7f73616f73cca105533b5f11f2a393621c62e22",
+        "address": "0x0000000000000000000000000000000000001010",
+        "topics": [
+          "0x4dfe1bbbcf077ddc3e01291eea2d5c70c2b422b415d95645b9adcfd678cb1d63",
+          "0x0000000000000000000000000000000000000000000000000000000000001010",
+          "0x000000000000000000000000d79d751251040ff7736b50ac97123a421b90e42e",
+          "0x000000000000000000000000e4b8e9222704401ad16d4d826732953daf07c7e2"
+        ],
+        "data": "0x0000000000000000000000000000000000000000000000000001052951bf4c000000000000000000000000000000000000000000000000000d8c09ea7f94a40000000000000000000000000000000000000000000000000001440419521e8c910000000000000000000000000000000000000000000000000d8b04c12dd5580000000000000000000000000000000000000000000000000001450942a3ddd891",
+        "logIndex": 2,
+        "blockHash": "0xf9512bbb0315c139ff13956fbd07b60f51db56766bb6bf6e5550ce0ae2eb52ee"
+      }
+    ],
+    "blockNumber": 21036825,
+    "cumulativeGasUsed": "180028",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [],
+  "solcInputHash": "52eae5ff4d3912a1c8dd4ea7d11d5b34",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.4+commit.c7e474f2\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"source\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"contract IERC20\",\"name\":\"target\",\"type\":\"address\"}],\"name\":\"convert\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"source\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"contract IERC20\",\"name\":\"target\",\"type\":\"address\"}],\"name\":\"estimateConvert\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"convert(address,uint256,address)\":{\"details\":\"Converts `source` tokens to `target` tokens. Converted tokens must be on `msg.sender` address after exiting this function\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"estimateConvert(address,uint256,address)\":{\"notice\":\"Estimates conversion of `source` currency into `target` currency\"}},\"notice\":\"Noop converter\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/DefaultConverter.sol\":\"DefaultConverter\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":1},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity ^0.8.0;\\n\\n/**\\n * @dev Interface of the ERC20 standard as defined in the EIP.\\n */\\ninterface IERC20 {\\n    /**\\n     * @dev Returns the amount of tokens in existence.\\n     */\\n    function totalSupply() external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the amount of tokens owned by `account`.\\n     */\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /**\\n     * @dev Moves `amount` tokens from the caller's account to `recipient`.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transfer(address recipient, uint256 amount) external returns (bool);\\n\\n    /**\\n     * @dev Returns the remaining number of tokens that `spender` will be\\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\\n     * zero by default.\\n     *\\n     * This value changes when {approve} or {transferFrom} are called.\\n     */\\n    function allowance(address owner, address spender) external view returns (uint256);\\n\\n    /**\\n     * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\\n     * that someone may use both the old and the new allowance by unfortunate\\n     * transaction ordering. One possible solution to mitigate this race\\n     * condition is to first reduce the spender's allowance to 0 and set the\\n     * desired value afterwards:\\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\\n     *\\n     * Emits an {Approval} event.\\n     */\\n    function approve(address spender, uint256 amount) external returns (bool);\\n\\n    /**\\n     * @dev Moves `amount` tokens from `sender` to `recipient` using the\\n     * allowance mechanism. `amount` is then deducted from the caller's\\n     * allowance.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transferFrom(\\n        address sender,\\n        address recipient,\\n        uint256 amount\\n    ) external returns (bool);\\n\\n    /**\\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\\n     * another (`to`).\\n     *\\n     * Note that `value` may be zero.\\n     */\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\n\\n    /**\\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\\n     * a call to {approve}. `value` is the new allowance.\\n     */\\n    event Approval(address indexed owner, address indexed spender, uint256 value);\\n}\\n\",\"keccak256\":\"0x027b891937d20ccf213fdb9c31531574256de774bda99d3a70ecef6e1913ed2a\",\"license\":\"MIT\"},\"contracts/DefaultConverter.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity 0.8.4;\\nimport \\\"@openzeppelin/contracts/token/ERC20/IERC20.sol\\\";\\nimport \\\"./interfaces/IConverter.sol\\\";\\nimport \\\"./libs/Errors.sol\\\";\\n\\n/**\\n * Noop converter\\n */\\ncontract DefaultConverter is IConverter {\\n    function estimateConvert(\\n        IERC20 source,\\n        uint256 amount,\\n        IERC20 target\\n    ) external pure override returns (uint256) {\\n        require(address(source) == address(target), Errors.DC_UNSUPPORTED_PAIR);\\n\\n        return amount;\\n    }\\n\\n    /**\\n     * @dev Converts `source` tokens to `target` tokens.\\n     * Converted tokens must be on `msg.sender` address after exiting this function\\n     */\\n    function convert(\\n        IERC20 source,\\n        uint256 amount,\\n        IERC20 target\\n    ) external pure override returns (uint256) {\\n        require(address(source) == address(target), Errors.DC_UNSUPPORTED_PAIR);\\n        return amount;\\n    }\\n}\\n\",\"keccak256\":\"0x71589f8c83329f787a43c59b281b046bfb7896b92e37bf6e8a48f8d086ee3411\",\"license\":\"MIT\"},\"contracts/interfaces/IConverter.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity 0.8.4;\\n\\nimport \\\"@openzeppelin/contracts/token/ERC20/IERC20.sol\\\";\\n\\n/**\\n * Currency converter interface.\\n */\\ninterface IConverter {\\n    /**\\n     * After calling this function it is expected that requested currency will be\\n     * transferred to the msg.sender automatically\\n     */\\n    function convert(\\n        IERC20 source,\\n        uint256 amount,\\n        IERC20 target\\n    ) external returns (uint256);\\n\\n    /**\\n     * Estimates conversion of `source` currency into `target` currency\\n     */\\n    function estimateConvert(\\n        IERC20 source,\\n        uint256 amount,\\n        IERC20 target\\n    ) external view returns (uint256);\\n}\\n\",\"keccak256\":\"0x0e075a73c6ca8315b71dbf1f7baaff51da647cb35138b6103fe8837b86740c27\",\"license\":\"MIT\"},\"contracts/libs/Errors.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity 0.8.4;\\n\\n/**\\n * @title Errors library\\n * @dev Error messages prefix glossary:\\n *  - EXP = ExpMath\\n *  - ERC20 = ERC20\\n *  - ERC721 = ERC721\\n *  - ERC721META = ERC721Metadata\\n *  - ERC721ENUM = ERC721Enumerable\\n *  - DC = DefaultConverter\\n *  - DE = DefaultEstimator\\n *  - E = Enterprise\\n *  - EO = EnterpriseOwnable\\n *  - ES = EnterpriseStorage\\n *  - IO = InitializableOwnable\\n *  - PT = PowerToken\\n */\\nlibrary Errors {\\n    // common errors\\n    string internal constant NOT_INITIALIZED = \\\"1\\\";\\n    string internal constant ALREADY_INITIALIZED = \\\"2\\\";\\n    string internal constant CALLER_NOT_OWNER = \\\"3\\\";\\n    string internal constant CALLER_NOT_ENTERPRISE = \\\"4\\\";\\n    string internal constant INVALID_ADDRESS = \\\"5\\\";\\n    string internal constant UNREGISTERED_POWER_TOKEN = \\\"6\\\";\\n    string internal constant INVALID_ARRAY_LENGTH = \\\"7\\\";\\n\\n    // contract specific errors\\n    string internal constant EXP_INVALID_PERIOD = \\\"8\\\";\\n\\n    string internal constant ERC20_INVALID_PERIOD = \\\"9\\\";\\n    string internal constant ERC20_TRANSFER_AMOUNT_EXCEEDS_ALLOWANCE = \\\"10\\\";\\n    string internal constant ERC20_DECREASED_ALLOWANCE_BELOW_ZERO = \\\"11\\\";\\n    string internal constant ERC20_TRANSFER_FROM_THE_ZERO_ADDRESS = \\\"12\\\";\\n    string internal constant ERC20_TRANSFER_TO_THE_ZERO_ADDRESS = \\\"13\\\";\\n    string internal constant ERC20_TRANSFER_AMOUNT_EXCEEDS_BALANCE = \\\"14\\\";\\n    string internal constant ERC20_MINT_TO_THE_ZERO_ADDRESS = \\\"15\\\";\\n    string internal constant ERC20_BURN_FROM_THE_ZERO_ADDRESS = \\\"16\\\";\\n    string internal constant ERC20_BURN_AMOUNT_EXCEEDS_BALANCE = \\\"17\\\";\\n    string internal constant ERC20_APPROVE_FROM_THE_ZERO_ADDRESS = \\\"18\\\";\\n    string internal constant ERC20_APPROVE_TO_THE_ZERO_ADDRESS = \\\"19\\\";\\n\\n    string internal constant ERC721_BALANCE_QUERY_FOR_THE_ZERO_ADDRESS = \\\"20\\\";\\n    string internal constant ERC721_OWNER_QUERY_FOR_NONEXISTENT_TOKEN = \\\"21\\\";\\n    string internal constant ERC721_APPROVAL_TO_CURRENT_OWNER = \\\"22\\\";\\n    string internal constant ERC721_APPROVE_CALLER_IS_NOT_OWNER_NOR_APPROVED_FOR_ALL = \\\"23\\\";\\n    string internal constant ERC721_APPROVED_QUERY_FOR_NONEXISTENT_TOKEN = \\\"24\\\";\\n    string internal constant ERC721_APPROVE_TO_CALLER = \\\"25\\\";\\n    string internal constant ERC721_TRANSFER_CALLER_IS_NOT_OWNER_NOR_APPROVED = \\\"26\\\";\\n    string internal constant ERC721_TRANSFER_TO_NON_ERC721RECEIVER_IMPLEMENTER = \\\"27\\\";\\n    string internal constant ERC721_OPERATOR_QUERY_FOR_NONEXISTENT_TOKEN = \\\"28\\\";\\n    string internal constant ERC721_MINT_TO_THE_ZERO_ADDRESS = \\\"29\\\";\\n    string internal constant ERC721_TOKEN_ALREADY_MINTED = \\\"30\\\";\\n    string internal constant ERC721_TRANSFER_OF_TOKEN_THAT_IS_NOT_OWN = \\\"31\\\";\\n    string internal constant ERC721_TRANSFER_TO_THE_ZERO_ADDRESS = \\\"32\\\";\\n\\n    string internal constant ERC721META_URI_QUERY_FOR_NONEXISTENT_TOKEN = \\\"33\\\";\\n\\n    string internal constant ERC721ENUM_OWNER_INDEX_OUT_OF_BOUNDS = \\\"34\\\";\\n    string internal constant ERC721ENUM_GLOBAL_INDEX_OUT_OF_BOUNDS = \\\"35\\\";\\n\\n    string internal constant DC_UNSUPPORTED_PAIR = \\\"36\\\";\\n\\n    string internal constant DE_INVALID_ENTERPRISE_ADDRESS = \\\"37\\\";\\n    string internal constant DE_LABMDA_NOT_GT_0 = \\\"38\\\";\\n\\n    string internal constant E_CALLER_NOT_RENTAL_TOKEN = \\\"39\\\";\\n    string internal constant E_INVALID_BASE_TOKEN_ADDRESS = \\\"40\\\";\\n    string internal constant E_SERVICE_LIMIT_REACHED = \\\"41\\\";\\n    string internal constant E_INVALID_RENTAL_PERIOD_RANGE = \\\"42\\\";\\n    string internal constant E_SERVICE_ENERGY_GAP_HALVING_PERIOD_NOT_GT_0 = \\\"43\\\";\\n    string internal constant E_UNSUPPORTED_PAYMENT_TOKEN = \\\"44\\\";\\n    string internal constant E_RENTAL_PERIOD_OUT_OF_RANGE = \\\"45\\\";\\n    string internal constant E_INSUFFICIENT_LIQUIDITY = \\\"46\\\";\\n    string internal constant E_RENTAL_PAYMENT_SLIPPAGE = \\\"47\\\";\\n    string internal constant E_INVALID_RENTAL_TOKEN_ID = \\\"48\\\";\\n    string internal constant E_INVALID_RENTAL_PERIOD = \\\"49\\\";\\n    string internal constant E_FLASH_LIQUIDITY_REMOVAL = \\\"50\\\";\\n    string internal constant E_SWAPPING_DISABLED = \\\"51\\\";\\n    string internal constant E_RENTAL_TRANSFER_NOT_ALLOWED = \\\"52\\\";\\n    string internal constant E_INVALID_CALLER_WITHIN_RENTER_ONLY_RETURN_PERIOD = \\\"53\\\";\\n    string internal constant E_INVALID_CALLER_WITHIN_ENTERPRISE_ONLY_COLLECTION_PERIOD = \\\"54\\\";\\n\\n    string internal constant EF_INVALID_ENTERPRISE_IMPLEMENTATION_ADDRESS = \\\"55\\\";\\n    string internal constant EF_INVALID_POWER_TOKEN_IMPLEMENTATION_ADDRESS = \\\"56\\\";\\n    string internal constant EF_INVALID_STAKE_TOKEN_IMPLEMENTATION_ADDRESS = \\\"57\\\";\\n    string internal constant EF_INVALID_RENTAL_TOKEN_IMPLEMENTATION_ADDRESS = \\\"58\\\";\\n\\n    string internal constant EO_INVALID_ENTERPRISE_ADDRESS = \\\"59\\\";\\n\\n    string internal constant ES_INVALID_ESTIMATOR_ADDRESS = \\\"60\\\";\\n    string internal constant ES_INVALID_COLLECTOR_ADDRESS = \\\"61\\\";\\n    string internal constant ES_INVALID_WALLET_ADDRESS = \\\"62\\\";\\n    string internal constant ES_INVALID_CONVERTER_ADDRESS = \\\"63\\\";\\n    string internal constant ES_INVALID_RENTER_ONLY_RETURN_PERIOD = \\\"64\\\";\\n    string internal constant ES_INVALID_ENTERPRISE_ONLY_COLLECTION_PERIOD = \\\"65\\\";\\n    string internal constant ES_STREAMING_RESERVE_HALVING_PERIOD_NOT_GT_0 = \\\"66\\\";\\n    string internal constant ES_MAX_SERVICE_FEE_PERCENT_EXCEEDED = \\\"67\\\";\\n    string internal constant ES_INVALID_BASE_TOKEN_ADDRESS = \\\"68\\\";\\n    string internal constant ES_INVALID_RENTAL_PERIOD_RANGE = \\\"69\\\";\\n    string internal constant ES_SWAPPING_ALREADY_ENABLED = \\\"70\\\";\\n    string internal constant ES_INVALID_PAYMENT_TOKEN_ADDRESS = \\\"71\\\";\\n    string internal constant ES_UNREGISTERED_PAYMENT_TOKEN = \\\"72\\\";\\n\\n    string internal constant IO_INVALID_OWNER_ADDRESS = \\\"73\\\";\\n\\n    string internal constant PT_INSUFFICIENT_AVAILABLE_BALANCE = \\\"74\\\";\\n\\n    string internal constant E_ENTERPRISE_SHUTDOWN = \\\"75\\\";\\n    string internal constant E_INVALID_RENTAL_AMOUNT = \\\"76\\\";\\n    string internal constant ES_INVALID_BONDING_POLE = \\\"77\\\";\\n    string internal constant ES_INVALID_BONDING_SLOPE = \\\"78\\\";\\n    string internal constant ES_TRANSFER_ALREADY_ENABLED = \\\"79\\\";\\n    string internal constant PT_TRANSFER_DISABLED = \\\"80\\\";\\n    string internal constant E_INVALID_ENTERPRISE_NAME = \\\"81\\\";\\n    string internal constant PT_INVALID_MAX_RENTAL_PERIOD = \\\"82\\\";\\n    string internal constant E_INVALID_ENTERPRISE_FACTORY_ADDRESS = \\\"83\\\";\\n}\\n\",\"keccak256\":\"0xdd04680c9dff35e77efb100fd54d707517f6d8cec56e4c7e7c9eded49faf7e20\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x608060405234801561001057600080fd5b506101a2806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c8063029b465d1461003b57806329fb92ce1461003b575b600080fd5b61004e6100493660046100de565b610060565b60405190815260200160405180910390f35b6000816001600160a01b0316846001600160a01b03161460405180604001604052806002815260200161199b60f11b815250906100b95760405162461bcd60e51b81526004016100b09190610119565b60405180910390fd5b50919392505050565b80356001600160a01b03811681146100d957600080fd5b919050565b6000806000606084860312156100f2578283fd5b6100fb846100c2565b925060208401359150610110604085016100c2565b90509250925092565b6000602080835283518082850152825b8181101561014557858101830151858201604001528201610129565b818111156101565783604083870101525b50601f01601f191692909201604001939250505056fea2646970667358221220e191cd3cbed9c105c8ce82653ad189099f7ba95bc6491f0cb2fdf2bf113d7e5564736f6c63430008040033",
+  "deployedBytecode": "0x608060405234801561001057600080fd5b50600436106100365760003560e01c8063029b465d1461003b57806329fb92ce1461003b575b600080fd5b61004e6100493660046100de565b610060565b60405190815260200160405180910390f35b6000816001600160a01b0316846001600160a01b03161460405180604001604052806002815260200161199b60f11b815250906100b95760405162461bcd60e51b81526004016100b09190610119565b60405180910390fd5b50919392505050565b80356001600160a01b03811681146100d957600080fd5b919050565b6000806000606084860312156100f2578283fd5b6100fb846100c2565b925060208401359150610110604085016100c2565b90509250925092565b6000602080835283518082850152825b8181101561014557858101830151858201604001528201610129565b818111156101565783604083870101525b50601f01601f191692909201604001939250505056fea2646970667358221220e191cd3cbed9c105c8ce82653ad189099f7ba95bc6491f0cb2fdf2bf113d7e5564736f6c63430008040033",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {
+      "convert(address,uint256,address)": {
+        "details": "Converts `source` tokens to `target` tokens. Converted tokens must be on `msg.sender` address after exiting this function"
+      }
+    },
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "estimateConvert(address,uint256,address)": {
+        "notice": "Estimates conversion of `source` currency into `target` currency"
+      }
+    },
+    "notice": "Noop converter",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}
