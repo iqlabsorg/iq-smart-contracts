@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
 
+// IQ Protocol. Risk-free collateral-less utility renting
+// https://iq.space/docs/iq-yellow-paper.pdf
+// (C) Blockvis & PARSIQ
+// 🖖 Stake strong!
+
 pragma solidity 0.8.4;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IConverter.sol";

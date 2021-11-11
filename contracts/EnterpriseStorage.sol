@@ -27,6 +27,10 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
         uint256 shares;
         uint256 block;
     }
+    struct PaymentTokenInfo {
+        address paymentToken;
+        bool enabled;
+    }
 
     // This is the keccak-256 hash of "iq.protocol.proxy.admin" subtracted by 1
     bytes32 private constant _PROXY_ADMIN_SLOT = 0xd1248cccb5fef9131c731321e43e9a924840ffee7dc68c7d1d3e5cb7dedcae03;
@@ -208,6 +212,16 @@ abstract contract EnterpriseStorage is InitializableOwnable, IEnterpriseStorage 
 
     function getRentalToken() external view returns (IRentalToken) {
         return _rentalToken;
+    }
+
+    function getPaymentTokens() external view returns (PaymentTokenInfo[] memory) {
+        uint256 length = _paymentTokens.length;
+        PaymentTokenInfo[] memory info = new PaymentTokenInfo[](length);
+        for (uint256 i = 0; i < length; i++) {
+            address token = _paymentTokens[i];
+            info[i] = PaymentTokenInfo(token, _paymentTokensIndex[token] > 0);
+        }
+        return info;
     }
 
     function getPaymentTokenIndex(address token) public view returns (int16) {

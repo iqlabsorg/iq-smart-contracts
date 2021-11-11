@@ -9,7 +9,7 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IRentalToken.sol";
-import "./Enterprise.sol";
+import "./interfaces/IEnterprise.sol";
 import "./RentalTokenStorage.sol";
 
 contract RentalToken is RentalTokenStorage, IRentalToken {
@@ -25,7 +25,7 @@ contract RentalToken is RentalTokenStorage, IRentalToken {
     function burn(uint256 tokenId, address burner) external override onlyEnterprise {
         // Transfer GC reward to the burner address.
         IEnterprise enterprise = getEnterprise();
-        Enterprise.RentalAgreement memory rentalAgreement = enterprise.getRentalAgreement(tokenId);
+        IEnterprise.RentalAgreement memory rentalAgreement = enterprise.getRentalAgreement(tokenId);
         IERC20 paymentToken = IERC20(enterprise.getPaymentToken(rentalAgreement.gcRewardTokenIndex));
         paymentToken.safeTransfer(burner, rentalAgreement.gcRewardAmount);
 
