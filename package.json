@@ -70,6 +70,9 @@
     "export": "node ./scripts.js export",
     "fork:execute": "node ./scripts.js fork:run",
     "fork:deploy": "node ./scripts.js fork:deploy",
-    "fork:dev": "node ./scripts.js fork:dev"
+    "fork:dev": "node ./scripts.js fork:dev",
+    "deploy:binanceTestnet": "yarn deploy binanceTestnet --tags",
+    "deploy:binance": "yarn deploy binance --tags",
+    "deploy:polygonTestnet": "yarn deploy polygonTestnet --tags"
   }
 }
