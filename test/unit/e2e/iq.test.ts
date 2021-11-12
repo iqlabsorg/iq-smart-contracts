@@ -1,28 +1,23 @@
-import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/dist/src/signers';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import chai from 'chai';
-import {BigNumber} from 'ethers';
-import {ethers, waffle} from 'hardhat';
+import { BigNumber } from 'ethers';
+import { ethers, waffle } from 'hardhat';
+import { Enterprise, IERC20Metadata, StakeToken, PowerToken } from '../../../typechain';
 import {
-  Enterprise,
-  IERC20Metadata,
-  InterestToken,
-  PowerToken,
-} from '../../../typechain';
-import {
-  addLiquidity,
+  stake,
   basePrice,
   baseRate,
-  borrow,
+  rent,
   deployEnterprise,
-  estimateLoan,
-  getBorrowTokenId,
+  estimateRentalFee,
+  getRentalTokenId,
   getPowerToken,
   increaseTime,
   ONE_DAY,
   toTokens,
 } from '../../utils';
 chai.use(waffle.solidity);
-const {expect} = chai;
+const { expect } = chai;
 
 describe('IQ Protocol E2E', () => {
   let user: SignerWithAddress;
@@ -38,33 +33,29 @@ describe('IQ Protocol E2E', () => {
   });
 
   describe('Basic', () => {
-    it('should set liquidity token', async () => {
-      expect(await enterprise.getLiquidityToken()).to.equal(token.address);
+    it('should set enterprise token', async () => {
+      expect(await enterprise.getEnterpriseToken()).to.equal(token.address);
     });
-    it('should deploy interest token', async () => {
-      expect(await enterprise.getInterestToken()).not.to.equal(
-        ethers.constants.AddressZero
-      );
+    it('should deploy stake token', async () => {
+      expect(await enterprise.getStakeToken()).not.to.equal(ethers.constants.AddressZero);
     });
 
-    describe('InterestToken', async () => {
-      let interestToken: InterestToken;
+    describe('StakeToken', async () => {
+      let stakeToken: StakeToken;
       beforeEach(async () => {
-        const token = await enterprise.getInterestToken();
-        const InterestToken = await ethers.getContractFactory('InterestToken');
-        interestToken = InterestToken.attach(token) as InterestToken;
+        const token = await enterprise.getStakeToken();
+        const StakeToken = await ethers.getContractFactory('StakeToken');
+        stakeToken = StakeToken.attach(token) as StakeToken;
       });
 
-      it('should set InterestToken name', async () => {
+      it('should set StakeToken name', async () => {
         const symbol = await token.symbol();
-        expect(await interestToken.name()).to.equal(
-          `Interest Bearing ${symbol}`
-        );
+        expect(await stakeToken.name()).to.equal(`Staking ${symbol}`);
       });
 
-      it('should set InterestToken symbol', async () => {
+      it('should set StakeToken symbol', async () => {
         const symbol = await token.symbol();
-        expect(await interestToken.symbol()).to.equal(`i${symbol}`);
+        expect(await stakeToken.symbol()).to.equal(`s${symbol}`);
       });
     });
   });
@@ -88,18 +79,16 @@ describe('IQ Protocol E2E', () => {
 
       await expect(txPromise).to.emit(enterprise, 'ServiceRegistered');
       const powerToken = await getPowerToken(enterprise, await txPromise);
-      expect(await powerToken.getGapHalvingPeriod()).to.equal(
-        GAP_HALVING_PERIOD
-      );
+      expect(await powerToken.getEnergyGapHalvingPeriod()).to.equal(GAP_HALVING_PERIOD);
     });
   });
 
-  describe('Lend-Borrow-Return-Withdraw', () => {
-    const LEND_AMOUNT = ONE_TOKEN * 1_000_000n;
-    const BORROW_AMOUNT = ONE_TOKEN * 50n;
+  describe('Stake-Rent-Return-Unstake', () => {
+    const STAKE_AMOUNT = ONE_TOKEN * 1_000_000n;
+    const RENTAL_AMOUNT = ONE_TOKEN * 50n;
     const MAX_PAYMENT_AMOUNT = ONE_TOKEN * 5_000_000n;
     let powerToken: PowerToken;
-    let liquidityTokenId: BigNumber;
+    let enterpriseTokenId: BigNumber;
 
     beforeEach(async () => {
       // 2.Create service
@@ -117,80 +106,41 @@ describe('IQ Protocol E2E', () => {
       );
       powerToken = await getPowerToken(enterprise, tx);
 
-      // 3. Lend
-      liquidityTokenId = await addLiquidity(enterprise, LEND_AMOUNT);
+      // 3. Stake
+      enterpriseTokenId = await stake(enterprise, STAKE_AMOUNT);
 
       await token.transfer(user.address, MAX_PAYMENT_AMOUNT);
     });
 
-    it('should borrow-return-remove liquidity', async () => {
+    it('should rent-return-unstake', async () => {
       console.log(
         'Estimate:',
-        (
-          await enterprise.estimateLoan(
-            powerToken.address,
-            token.address,
-            BORROW_AMOUNT,
-            ONE_DAY
-          )
-        ).toString()
+        (await enterprise.estimateRentalFee(powerToken.address, token.address, RENTAL_AMOUNT, ONE_DAY)).toString()
       );
 
-      // 4. Borrow
-      const borrowTx = await borrow(
-        enterprise,
-        powerToken,
-        token,
-        BORROW_AMOUNT,
-        ONE_DAY,
-        MAX_PAYMENT_AMOUNT,
-        user
-      );
-      await expect(borrowTx).to.emit(enterprise, 'Borrowed');
+      // 4. Rent
+      const rentingTx = await rent(enterprise, powerToken, token, RENTAL_AMOUNT, ONE_DAY, MAX_PAYMENT_AMOUNT, user);
+      await expect(rentingTx).to.emit(enterprise, 'Rented');
       await increaseTime(86400);
 
       // 5. Burn
-      const tokenId = await getBorrowTokenId(enterprise, borrowTx);
-      await enterprise.connect(user).returnLoan(tokenId);
+      const tokenId = await getRentalTokenId(enterprise, rentingTx);
+      await enterprise.connect(user).returnRental(tokenId);
 
-      await enterprise.removeLiquidity(liquidityTokenId);
+      await enterprise.unstake(enterpriseTokenId);
     });
 
-    it('2 sequential borrow approximately costs the same as 1 for accumulated amount for the same period (additivity)', async () => {
-      const ONE_SHOT_BORROW_COST = estimateLoan(
-        basePrice(100.0, 86400.0, 3.0),
-        1000000.0,
-        0.0,
-        500000.0,
-        86400.0
-      );
-      const BORROW1 = ONE_TOKEN * 300000n;
-      const BORROW2 = ONE_TOKEN * 200000n;
+    it('2 sequential rentals approximately costs the same as 1 for accumulated amount for the same period (additivity)', async () => {
+      const SINGLE_RENTAL_FEE = estimateRentalFee(basePrice(100.0, 86400.0, 3.0), 1000000.0, 0.0, 500000.0, 86400.0);
 
       const balanceBefore = await token.balanceOf(user.address);
 
-      await borrow(
-        enterprise,
-        powerToken,
-        token,
-        BORROW1,
-        ONE_DAY,
-        MAX_PAYMENT_AMOUNT,
-        user
-      );
-      await borrow(
-        enterprise,
-        powerToken,
-        token,
-        BORROW2,
-        ONE_DAY,
-        MAX_PAYMENT_AMOUNT,
-        user
-      );
+      await rent(enterprise, powerToken, token, ONE_TOKEN * 300000n, ONE_DAY, MAX_PAYMENT_AMOUNT, user);
+      await rent(enterprise, powerToken, token, ONE_TOKEN * 200000n, ONE_DAY, MAX_PAYMENT_AMOUNT, user);
 
       const balanceAfter = await token.balanceOf(user.address);
       const diff = balanceBefore.toBigInt() - balanceAfter.toBigInt();
-      expect(toTokens(diff, 8)).to.be.approximately(ONE_SHOT_BORROW_COST, 0.1);
+      expect(toTokens(diff, 8)).to.be.approximately(SINGLE_RENTAL_FEE, 0.1);
     });
   });
 });

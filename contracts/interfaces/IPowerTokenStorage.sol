@@ -8,25 +8,22 @@ import "./IEnterprise.sol";
 interface IPowerTokenStorage {
     function initialize(
         IEnterprise enterprise,
+        IERC20Metadata baseToken,
         uint112 baseRate,
         uint96 minGCFee,
-        uint32 gapHalvingPeriod,
-        uint16 index,
-        IERC20Metadata baseToken
-    ) external;
-
-    function initialize2(
-        uint32 minLoanDuration,
-        uint32 maxLoanDuration,
         uint16 serviceFeePercent,
-        bool wrappingEnabled
+        uint32 energyGapHalvingPeriod,
+        uint16 index,
+        uint32 minRentalPeriod,
+        uint32 maxRentalPeriod,
+        bool swappingEnabled
     ) external;
 
-    function isAllowedLoanDuration(uint32 duration) external view returns (bool);
+    function isAllowedRentalPeriod(uint32 period) external view returns (bool);
 
     function getIndex() external view returns (uint16);
 
-    function isWrappingEnabled() external view returns (bool);
+    function isSwappingEnabled() external view returns (bool);
 
     function isTransferEnabled() external view returns (bool);
 }

@@ -62,20 +62,7 @@
     },
     {
       "inputs": [],
-      "name": "getGCFeePercent",
-      "outputs": [
-        {
-          "internalType": "uint16",
-          "name": "",
-          "type": "uint16"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "getLiquidityToken",
+      "name": "getEnterpriseToken",
       "outputs": [
         {
           "internalType": "contract IERC20Metadata",
@@ -87,61 +74,13 @@
       "type": "function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "borrowTokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getLoanInfo",
+      "inputs": [],
+      "name": "getGCFeePercent",
       "outputs": [
         {
-          "components": [
-            {
-              "internalType": "uint112",
-              "name": "amount",
-              "type": "uint112"
-            },
-            {
-              "internalType": "uint16",
-              "name": "powerTokenIndex",
-              "type": "uint16"
-            },
-            {
-              "internalType": "uint32",
-              "name": "borrowingTime",
-              "type": "uint32"
-            },
-            {
-              "internalType": "uint32",
-              "name": "maturityTime",
-              "type": "uint32"
-            },
-            {
-              "internalType": "uint32",
-              "name": "borrowerReturnGraceTime",
-              "type": "uint32"
-            },
-            {
-              "internalType": "uint32",
-              "name": "enterpriseCollectGraceTime",
-              "type": "uint32"
-            },
-            {
-              "internalType": "uint112",
-              "name": "gcFee",
-              "type": "uint112"
-            },
-            {
-              "internalType": "uint16",
-              "name": "gcFeeTokenIndex",
-              "type": "uint16"
-            }
-          ],
-          "internalType": "struct IEnterpriseStorage.LoanInfo",
+          "internalType": "uint16",
           "name": "",
-          "type": "tuple"
+          "type": "uint16"
         }
       ],
       "stateMutability": "view",
@@ -161,6 +100,67 @@
           "internalType": "address",
           "name": "",
           "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "rentalTokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getRentalAgreement",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint112",
+              "name": "rentalAmount",
+              "type": "uint112"
+            },
+            {
+              "internalType": "uint16",
+              "name": "powerTokenIndex",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint32",
+              "name": "startTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "endTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "renterOnlyReturnTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "enterpriseOnlyCollectionTime",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint112",
+              "name": "gcRewardAmount",
+              "type": "uint112"
+            },
+            {
+              "internalType": "uint16",
+              "name": "gcRewardTokenIndex",
+              "type": "uint16"
+            }
+          ],
+          "internalType": "struct IEnterpriseStorage.RentalAgreement",
+          "name": "",
+          "type": "tuple"
         }
       ],
       "stateMutability": "view",
@@ -234,17 +234,17 @@
       "inputs": [
         {
           "internalType": "contract IERC20Metadata",
-          "name": "liquidityToken",
+          "name": "enterpriseToken",
           "type": "address"
         },
         {
-          "internalType": "contract IInterestToken",
-          "name": "interestToken",
+          "internalType": "contract IStakeToken",
+          "name": "stakeToken",
           "type": "address"
         },
         {
-          "internalType": "contract IBorrowToken",
-          "name": "borrowToken",
+          "internalType": "contract IRentalToken",
+          "name": "rentalToken",
           "type": "address"
         }
       ],

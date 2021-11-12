@@ -1,14 +1,14 @@
-import {BigNumber, BigNumberish} from '@ethersproject/bignumber';
-import {Contract, ContractTransaction, Signer} from 'ethers';
-import {ethers} from 'hardhat';
-import {HardhatRuntimeEnvironment} from 'hardhat/types';
+import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
+import { Contract, ContractTransaction, Signer } from 'ethers';
+import { ethers } from 'hardhat';
+import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import {
-  BorrowToken,
+  RentalToken,
   Enterprise,
   EnterpriseFactory,
   IConverter,
   IERC20,
-  InterestToken,
+  StakeToken,
   PowerToken,
   ProxyAdmin,
 } from '../typechain';
@@ -16,37 +16,25 @@ import {
 export const ONE_DAY = 86400;
 export const ONE_HOUR = 3600;
 
-export const evmSnapshot = async (): Promise<unknown> =>
-  ethers.provider.send('evm_snapshot', []);
-export const evmRevert = async (id: string): Promise<unknown> =>
-  ethers.provider.send('evm_revert', [id]);
+export const evmSnapshot = async (): Promise<unknown> => ethers.provider.send('evm_snapshot', []);
+export const evmRevert = async (id: string): Promise<unknown> => ethers.provider.send('evm_revert', [id]);
 export const nextBlock = async (timestamp = 0): Promise<unknown> =>
   ethers.provider.send('evm_mine', timestamp > 0 ? [timestamp] : []);
 export const increaseTime = async (seconds: number): Promise<void> => {
   const time = await currentTime();
   await nextBlock(time + seconds);
 };
-export const setNextBlockTimestamp = async (
-  timestamp: number
-): Promise<unknown> =>
+export const setNextBlockTimestamp = async (timestamp: number): Promise<unknown> =>
   ethers.provider.send('evm_setNextBlockTimestamp', [timestamp]);
 export const currentTime = async (): Promise<number> => {
   const block = await ethers.provider.getBlock('latest');
   return block.timestamp;
 };
 
-export const deployEnterprise = async (
-  name: string,
-  token: string,
-  converterAddress?: string
-): Promise<Enterprise> => {
-  const converter = (await ethers.getContract(
-    'DefaultConverter'
-  )) as IConverter;
+export const deployEnterprise = async (name: string, token: string, converterAddress?: string): Promise<Enterprise> => {
+  const converter = (await ethers.getContract('DefaultConverter')) as IConverter;
 
-  const factory = (await ethers.getContract(
-    'EnterpriseFactory'
-  )) as EnterpriseFactory;
+  const factory = (await ethers.getContract('EnterpriseFactory')) as EnterpriseFactory;
   const tx = await factory.deploy(
     name,
     token,
@@ -76,13 +64,11 @@ export const getEnterprise = async (
   return Enterprise.attach(enterpriseAddress) as Enterprise;
 };
 
-export const getBorrowToken = async (
-  enterprise: Enterprise
-): Promise<BorrowToken> => {
-  const borrowTokenAddress = await enterprise.getBorrowToken();
-  const BorrowToken = await ethers.getContractFactory('BorrowToken');
+export const getRentalToken = async (enterprise: Enterprise): Promise<RentalToken> => {
+  const rentalTokenAddress = await enterprise.getRentalToken();
+  const RentalToken = await ethers.getContractFactory('RentalToken');
 
-  return BorrowToken.attach(borrowTokenAddress) as BorrowToken;
+  return RentalToken.attach(rentalTokenAddress) as RentalToken;
 };
 
 export const getPowerToken = async (
@@ -91,10 +77,7 @@ export const getPowerToken = async (
 ): Promise<PowerToken> => {
   const receipt = await registerServiceTx.wait(1);
 
-  const events = await enterprise.queryFilter(
-    enterprise.filters.ServiceRegistered(),
-    receipt.blockNumber
-  );
+  const events = await enterprise.queryFilter(enterprise.filters.ServiceRegistered(), receipt.blockNumber);
 
   const powerTokenAddress = events[0].args[0];
 
@@ -103,70 +86,45 @@ export const getPowerToken = async (
   return PowerToken.attach(powerTokenAddress) as PowerToken;
 };
 
-export const getBorrowTokenId = async (
-  enterprise: Enterprise,
-  borrowTx: ContractTransaction
-): Promise<BigNumber> => {
-  const receipt = await borrowTx.wait(1);
+export const getRentalTokenId = async (enterprise: Enterprise, rentingTx: ContractTransaction): Promise<BigNumber> => {
+  const receipt = await rentingTx.wait(1);
 
-  const events = await enterprise.queryFilter(
-    enterprise.filters.Borrowed(),
-    receipt.blockNumber
-  );
+  const events = await enterprise.queryFilter(enterprise.filters.Rented(), receipt.blockNumber);
 
-  return BigNumber.from(events[0].args.borrowTokenId);
+  return BigNumber.from(events[0].args.rentalTokenId);
 };
 
-export const getInterestTokenId = async (
-  enterprise: Enterprise,
-  liquidityTx: ContractTransaction
-): Promise<BigNumber> => {
-  const receipt = await liquidityTx.wait();
-  const InterestToken = await ethers.getContractFactory('InterestToken');
+export const getStakeTokenId = async (enterprise: Enterprise, stakeTx: ContractTransaction): Promise<BigNumber> => {
+  const receipt = await stakeTx.wait();
+  const StakeToken = await ethers.getContractFactory('StakeToken');
 
-  const interestToken = InterestToken.attach(
-    await enterprise.getInterestToken()
-  ) as InterestToken;
+  const stakeToken = StakeToken.attach(await enterprise.getStakeToken()) as StakeToken;
 
-  const events = await interestToken.queryFilter(
-    interestToken.filters.Transfer(),
-    receipt.blockNumber
-  );
+  const events = await stakeToken.queryFilter(stakeToken.filters.Transfer(), receipt.blockNumber);
 
   return BigNumber.from(events[0].args.tokenId);
 };
 
-export const getInterestToken = async (
-  enterprise: Enterprise
-): Promise<InterestToken> => {
-  const iTokenAddress = await enterprise.getInterestToken();
+export const getStakeToken = async (enterprise: Enterprise): Promise<StakeToken> => {
+  const iTokenAddress = await enterprise.getStakeToken();
 
-  const iToken = await ethers.getContractFactory('InterestToken');
+  const iToken = await ethers.getContractFactory('StakeToken');
 
-  return iToken.attach(iTokenAddress) as InterestToken;
+  return iToken.attach(iTokenAddress) as StakeToken;
 };
 
-export const toTokens = (
-  amount: BigNumberish,
-  decimals = 2,
-  tokenDecimals = 18
-): number => {
+export const toTokens = (amount: BigNumberish, decimals = 2, tokenDecimals = 18): number => {
   const a = BigInt(amount.toString());
   const dec = 10n ** BigInt(tokenDecimals - decimals);
   return Number(a / dec) / 10 ** decimals;
 };
 
-export const fromTokens = (
-  amount: number,
-  decimals = 6,
-  tokenDecimals = 18
-): BigNumber => {
+export const fromTokens = (amount: number, decimals = 6, tokenDecimals = 18): BigNumber => {
   const a = BigInt(Math.trunc(amount));
   const f = amount - Math.trunc(amount);
 
   return BigNumber.from(
-    (a * 10n ** BigInt(decimals) + BigInt(Math.trunc(f * 10 ** decimals))) *
-      10n ** BigInt(tokenDecimals - decimals)
+    (a * 10n ** BigInt(decimals) + BigInt(Math.trunc(f * 10 ** decimals))) * 10n ** BigInt(tokenDecimals - decimals)
   );
 };
 
@@ -178,28 +136,18 @@ export const baseRate = (
   priceDecimals = 18n
 ): bigint => {
   if (tokenDecimals > priceDecimals) {
-    return (
-      ((price * 10n ** (tokenDecimals - priceDecimals)) << 64n) /
-      (tokens * period)
-    );
+    return ((price * 10n ** (tokenDecimals - priceDecimals)) << 64n) / (tokens * period);
   } else if (tokenDecimals < priceDecimals) {
-    return (
-      (price << 64n) /
-      (tokens * 10n ** (priceDecimals - tokenDecimals) * period)
-    );
+    return (price << 64n) / (tokens * 10n ** (priceDecimals - tokenDecimals) * period);
   }
   return (price << 64n) / (tokens * period);
 };
 
-export const basePrice = (
-  tokens: number,
-  period: number,
-  price: number
-): number => {
+export const basePrice = (tokens: number, period: number, price: number): number => {
   return price / (tokens * period);
 };
 
-export const estimateLoan = (
+export const estimateRentalFee = (
   basePrice: number,
   reserves: number,
   usedReserves: number,
@@ -223,53 +171,36 @@ export const estimateLoan = (
   }
 };
 
-export const addLiquidity = async (
-  enterprise: Enterprise,
-  amount: BigNumberish,
-  user?: Signer
-): Promise<BigNumber> => {
+export const stake = async (enterprise: Enterprise, amount: BigNumberish, user?: Signer): Promise<BigNumber> => {
   const ERC20 = await ethers.getContractFactory('ERC20Mock');
-  const token = ERC20.attach(await enterprise.getLiquidityToken());
+  const token = ERC20.attach(await enterprise.getEnterpriseToken());
 
   if (user) {
     await token.connect(user).approve(enterprise.address, amount);
-    return getInterestTokenId(
-      enterprise,
-      await enterprise.connect(user).addLiquidity(amount)
-    );
+    return getStakeTokenId(enterprise, await enterprise.connect(user).stake(amount));
   } else {
     await token.approve(enterprise.address, amount);
-    return getInterestTokenId(
-      enterprise,
-      await enterprise.addLiquidity(amount)
-    );
+    return getStakeTokenId(enterprise, await enterprise.stake(amount));
   }
 };
 
-export const getProxyAdmin = async (
-  enterprise: Enterprise
-): Promise<ProxyAdmin> => {
+export const getProxyAdmin = async (enterprise: Enterprise): Promise<ProxyAdmin> => {
   const proxyAdminAddress = await enterprise.getProxyAdmin();
   const ProxyAdmin = await ethers.getContractFactory('ProxyAdmin');
   return ProxyAdmin.attach(proxyAdminAddress) as ProxyAdmin;
 };
 
-export const getProxyImplementation = async (
-  enterprise: Enterprise,
-  proxy: Contract | string
-): Promise<string> => {
+export const getProxyImplementation = async (enterprise: Enterprise, proxy: Contract | string): Promise<string> => {
   const proxyAdmin = await getProxyAdmin(enterprise);
-  return proxyAdmin.getProxyImplementation(
-    typeof proxy === 'string' ? proxy : proxy.address
-  );
+  return proxyAdmin.getProxyImplementation(typeof proxy === 'string' ? proxy : proxy.address);
 };
 
-export const borrow = async (
+export const rent = async (
   enterprise: Enterprise,
   powerToken: PowerToken,
   paymentToken: IERC20,
-  amount: BigNumberish,
-  duration: number,
+  rentalAmount: BigNumberish,
+  rentalPeriod: number,
   maxPayment: BigNumberish,
   user?: Signer
 ): Promise<ContractTransaction> => {
@@ -277,78 +208,56 @@ export const borrow = async (
     await paymentToken.connect(user).approve(enterprise.address, maxPayment);
     return enterprise
       .connect(user)
-      .borrow(
-        powerToken.address,
-        paymentToken.address,
-        amount,
-        duration,
-        maxPayment
-      );
+      .rent(powerToken.address, paymentToken.address, rentalAmount, rentalPeriod, maxPayment);
   }
   await paymentToken.approve(enterprise.address, maxPayment);
-  return enterprise.borrow(
-    powerToken.address,
-    paymentToken.address,
-    amount,
-    duration,
-    maxPayment
-  );
+  return enterprise.rent(powerToken.address, paymentToken.address, rentalAmount, rentalPeriod, maxPayment);
 };
 
-export const reborrow = async (
+export const extendRentalPeriod = async (
   enterprise: Enterprise,
-  borrowTokenId: BigNumberish,
+  rentalTokenId: BigNumberish,
   paymentToken: IERC20,
-  duration: number,
+  rentalPeriod: number,
   maxPayment: BigNumberish,
   user?: Signer
 ): Promise<ContractTransaction> => {
   if (user) {
     await paymentToken.connect(user).approve(enterprise.address, maxPayment);
-    return enterprise
-      .connect(user)
-      .reborrow(borrowTokenId, paymentToken.address, duration, maxPayment);
+    return enterprise.connect(user).extendRentalPeriod(rentalTokenId, paymentToken.address, rentalPeriod, maxPayment);
   }
   await paymentToken.approve(enterprise.address, maxPayment);
-  return enterprise.reborrow(
-    borrowTokenId,
-    paymentToken.address,
-    duration,
-    maxPayment
-  );
+  return enterprise.extendRentalPeriod(rentalTokenId, paymentToken.address, rentalPeriod, maxPayment);
 };
 
 export const registerService = async (
   enterprise: Enterprise,
-  halfLife: BigNumberish,
+  energyGapHalvingPeriod: BigNumberish,
   baseRate: BigNumberish,
   baseToken: string,
-  serviceFee: BigNumberish,
-  minLoanDuration: BigNumberish,
-  maxLoanDuration: BigNumberish,
+  serviceFeePercent: BigNumberish,
+  minRentalPeriod: BigNumberish,
+  maxRentalPeriod: BigNumberish,
   minGCFee: BigNumberish,
-  allowsWrapping: boolean
+  swappingEnabledForever: boolean
 ): Promise<PowerToken> => {
   const tx = await enterprise.registerService(
     'IQ Power Test',
     'IQPT',
-    halfLife,
+    energyGapHalvingPeriod,
     baseRate,
     baseToken,
-    serviceFee,
-    minLoanDuration,
-    maxLoanDuration,
+    serviceFeePercent,
+    minRentalPeriod,
+    maxRentalPeriod,
     minGCFee,
-    allowsWrapping
+    swappingEnabledForever
   );
 
   return getPowerToken(enterprise, tx);
 };
 
-export const resetFork = async (
-  hre: HardhatRuntimeEnvironment,
-  block?: number
-): Promise<void> => {
+export const resetFork = async (hre: HardhatRuntimeEnvironment, block?: number): Promise<void> => {
   await hre.network.provider.request({
     method: 'hardhat_reset',
     params: block
@@ -364,10 +273,7 @@ export const resetFork = async (
   });
 };
 
-export const impersonate = async (
-  hre: HardhatRuntimeEnvironment,
-  account: string
-): Promise<void> => {
+export const impersonate = async (hre: HardhatRuntimeEnvironment, account: string): Promise<void> => {
   await hre.network.provider.request({
     method: 'hardhat_impersonateAccount',
     params: [account],

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-// IQ Protocol. Risk-free collateral-less utility loans
+// IQ Protocol. Risk-free collateral-less utility renting
 // https://iq.space/docs/iq-yellow-paper.pdf
 // (C) Blockvis & PARSIQ
-// 🖖 Lend long and prosper!
+// 🖖 Stake strong!
 
 pragma solidity 0.8.4;
 
@@ -11,43 +11,44 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "./interfaces/IConverter.sol";
 import "./interfaces/IEnterprise.sol";
-import "./interfaces/IInterestToken.sol";
-import "./interfaces/IBorrowToken.sol";
+import "./interfaces/IStakeToken.sol";
+import "./interfaces/IRentalToken.sol";
 import "./interfaces/IPowerToken.sol";
 import "./libs/Errors.sol";
 
 contract EnterpriseFactory {
     event EnterpriseDeployed(
         address indexed creator,
-        address indexed liquidityToken,
+        address indexed enterpriseToken,
         string name,
         string baseUri,
         address deployed
     );
+
     address private immutable _enterpriseImpl;
     address private immutable _powerTokenImpl;
-    address private immutable _interestTokenImpl;
-    address private immutable _borrowTokenImpl;
+    address private immutable _stakeTokenImpl;
+    address private immutable _rentalTokenImpl;
 
     constructor(
         address enterpriseImpl,
         address powerTokenImpl,
-        address interestTokenImpl,
-        address borrowTokenImpl
+        address stakeTokenImpl,
+        address rentalTokenImpl
     ) {
         require(enterpriseImpl != address(0), Errors.EF_INVALID_ENTERPRISE_IMPLEMENTATION_ADDRESS);
         require(powerTokenImpl != address(0), Errors.EF_INVALID_POWER_TOKEN_IMPLEMENTATION_ADDRESS);
-        require(interestTokenImpl != address(0), Errors.EF_INVALID_INTEREST_TOKEN_IMPLEMENTATION_ADDRESS);
-        require(borrowTokenImpl != address(0), Errors.EF_INVALID_BORROW_TOKEN_IMPLEMENTATION_ADDRESS);
+        require(stakeTokenImpl != address(0), Errors.EF_INVALID_STAKE_TOKEN_IMPLEMENTATION_ADDRESS);
+        require(rentalTokenImpl != address(0), Errors.EF_INVALID_RENTAL_TOKEN_IMPLEMENTATION_ADDRESS);
         _enterpriseImpl = enterpriseImpl;
         _powerTokenImpl = powerTokenImpl;
-        _interestTokenImpl = interestTokenImpl;
-        _borrowTokenImpl = borrowTokenImpl;
+        _stakeTokenImpl = stakeTokenImpl;
+        _rentalTokenImpl = rentalTokenImpl;
     }
 
     function deploy(
         string calldata name,
-        IERC20Metadata liquidityToken,
+        IERC20Metadata enterpriseToken,
         string calldata baseUri,
         uint16 gcFeePercent,
         IConverter converter
@@ -60,12 +61,12 @@ contract EnterpriseFactory {
             enterprise.initialize(name, baseUri, gcFeePercent, converter, proxyAdmin, msg.sender);
         }
         {
-            IInterestToken interestToken = _deployInterestToken(liquidityToken.symbol(), enterprise, proxyAdmin);
-            IBorrowToken borrowToken = _deployBorrowToken(liquidityToken.symbol(), enterprise, proxyAdmin);
-            enterprise.initializeTokens(liquidityToken, interestToken, borrowToken);
+            IStakeToken stakeToken = _deployStakeToken(enterpriseToken.symbol(), enterprise, proxyAdmin);
+            IRentalToken rentalToken = _deployRentalToken(enterpriseToken.symbol(), enterprise, proxyAdmin);
+            enterprise.initializeTokens(enterpriseToken, stakeToken, rentalToken);
         }
 
-        emit EnterpriseDeployed(msg.sender, address(liquidityToken), name, baseUri, address(enterprise));
+        emit EnterpriseDeployed(msg.sender, address(enterpriseToken), name, baseUri, address(enterprise));
 
         return enterprise;
     }
@@ -78,30 +79,30 @@ contract EnterpriseFactory {
         return IPowerToken(deployProxy(_powerTokenImpl, admin));
     }
 
-    function _deployInterestToken(
+    function _deployStakeToken(
         string memory symbol,
         IEnterprise enterprise,
         ProxyAdmin proxyAdmin
-    ) internal returns (IInterestToken) {
-        string memory interestTokenName = string(abi.encodePacked("Interest Bearing ", symbol));
-        string memory interestTokenSymbol = string(abi.encodePacked("i", symbol));
+    ) internal returns (IStakeToken) {
+        string memory stakeTokenName = string(abi.encodePacked("Staking ", symbol));
+        string memory stakeTokenSymbol = string(abi.encodePacked("s", symbol));
 
-        IInterestToken interestToken = IInterestToken(deployProxy(_interestTokenImpl, proxyAdmin));
-        interestToken.initialize(interestTokenName, interestTokenSymbol, enterprise);
-        return interestToken;
+        IStakeToken stakeToken = IStakeToken(deployProxy(_stakeTokenImpl, proxyAdmin));
+        stakeToken.initialize(stakeTokenName, stakeTokenSymbol, enterprise);
+        return stakeToken;
     }
 
-    function _deployBorrowToken(
+    function _deployRentalToken(
         string memory symbol,
         IEnterprise enterprise,
         ProxyAdmin proxyAdmin
-    ) internal returns (IBorrowToken) {
-        string memory borrowTokenName = string(abi.encodePacked("Borrow ", symbol));
-        string memory borrowTokenSymbol = string(abi.encodePacked("b", symbol));
+    ) internal returns (IRentalToken) {
+        string memory rentalTokenName = string(abi.encodePacked("Rental ", symbol));
+        string memory rentalTokenSymbol = string(abi.encodePacked("r", symbol));
 
-        IBorrowToken borrowToken = IBorrowToken(deployProxy(_borrowTokenImpl, proxyAdmin));
-        borrowToken.initialize(borrowTokenName, borrowTokenSymbol, enterprise);
-        return borrowToken;
+        IRentalToken rentalToken = IRentalToken(deployProxy(_rentalTokenImpl, proxyAdmin));
+        rentalToken.initialize(rentalTokenName, rentalTokenSymbol, enterprise);
+        return rentalToken;
     }
 
     function getEnterpriseImpl() external view returns (address) {
@@ -112,11 +113,11 @@ contract EnterpriseFactory {
         return _powerTokenImpl;
     }
 
-    function getInterestTokenImpl() external view returns (address) {
-        return _interestTokenImpl;
+    function getStakeTokenImpl() external view returns (address) {
+        return _stakeTokenImpl;
     }
 
-    function getBorrowTokenImpl() external view returns (address) {
-        return _borrowTokenImpl;
+    function getRentalTokenImpl() external view returns (address) {
+        return _rentalTokenImpl;
     }
 }

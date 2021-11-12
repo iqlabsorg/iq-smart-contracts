@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: MIT
 
-// IQ Protocol. Risk-free collateral-less utility loans
+// IQ Protocol. Risk-free collateral-less utility renting
 // https://iq.space/docs/iq-yellow-paper.pdf
 // (C) Blockvis & PARSIQ
-// 🖖 Lend long and prosper!
+// 🖖 Stake strong!
 
 pragma solidity 0.8.4;
 
-import "./interfaces/IInterestToken.sol";
+import "./interfaces/IStakeToken.sol";
 import "./interfaces/IEnterprise.sol";
-import "./InterestTokenStorage.sol";
+import "./StakeTokenStorage.sol";
 
-contract InterestToken is InterestTokenStorage, IInterestToken {
+contract StakeToken is StakeTokenStorage, IStakeToken {
     function getNextTokenId() public view override returns (uint256) {
-        return uint256(keccak256(abi.encodePacked("i", address(this), _tokenIdTracker)));
+        return uint256(keccak256(abi.encodePacked("s", address(this), _tokenIdTracker)));
     }
 
     function _baseURI() internal view override returns (string memory) {
         string memory baseURI = getEnterprise().getBaseUri();
-        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, "interest/")) : "";
+        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, "stake/")) : "";
     }
 
     function mint(address to) external override onlyEnterprise returns (uint256) {

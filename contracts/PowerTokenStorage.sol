@@ -21,62 +21,57 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
     // slot 1, 0 bytes left
     uint112 internal _baseRate; // base rate for price calculations, nominated in baseToken
     uint96 internal _minGCFee; // fee for collecting expired PowerTokens
-    uint32 internal _gapHalvingPeriod; // fixed, not updatable
+    uint32 internal _energyGapHalvingPeriod; // fixed, not updatable
     uint16 internal _index; // index in _powerTokens array. Not updatable
     // slot 2, 0 bytes left
     IERC20Metadata internal _baseToken;
-    uint32 internal _minLoanDuration;
-    uint32 internal _maxLoanDuration;
+    uint32 internal _minRentalPeriod;
+    uint32 internal _maxRentalPeriod;
     uint16 internal _serviceFeePercent; // 100 is 1%, 10_000 is 100%. Fee which goes to the enterprise to cover service operational costs for this service
-    bool internal _wrappingEnabled; // allows wrapping tokens into perpetual PowerTokens
+    bool internal _swappingEnabled; // allows swapping enterprise tokens into PowerTokens
     bool internal _transferEnabled; // allows transfers of PowerTokens
 
     mapping(address => State) internal _states;
 
     event BaseRateChanged(uint112 baseRate, address baseToken, uint96 minGCFee);
     event ServiceFeePercentChanged(uint16 percent);
-    event LoanDurationLimitsChanged(uint32 minDuration, uint32 maxDuration);
-    event WrappingEnabled();
+    event RentalPeriodLimitsChanged(uint32 minRentalPeriod, uint32 maxRentalPeriod);
+    event SwappingEnabled();
     event TransferEnabled();
 
     function initialize(
         IEnterprise enterprise,
+        IERC20Metadata baseToken,
         uint112 baseRate,
         uint96 minGCFee,
-        uint32 gapHalvingPeriod,
+        uint16 serviceFeePercent,
+        uint32 energyGapHalvingPeriod,
         uint16 index,
-        IERC20Metadata baseToken
+        uint32 minRentalPeriod,
+        uint32 maxRentalPeriod,
+        bool swappingEnabled
     ) external override {
-        require(_gapHalvingPeriod == 0, Errors.ALREADY_INITIALIZED);
-        require(gapHalvingPeriod > 0, Errors.E_SERVICE_GAP_HALVING_PERIOD_NOT_GT_0);
+        require(_energyGapHalvingPeriod == 0, Errors.ALREADY_INITIALIZED);
+        require(energyGapHalvingPeriod > 0, Errors.E_SERVICE_ENERGY_GAP_HALVING_PERIOD_NOT_GT_0);
+        require(maxRentalPeriod > 0, Errors.PT_INVALID_MAX_RENTAL_PERIOD);
+        require(minRentalPeriod <= maxRentalPeriod, Errors.ES_INVALID_RENTAL_PERIOD_RANGE);
 
         EnterpriseOwnable.initialize(enterprise);
+        _baseToken = baseToken;
         _baseRate = baseRate;
         _minGCFee = minGCFee;
-        _gapHalvingPeriod = gapHalvingPeriod;
-        _index = index;
-        _baseToken = baseToken;
-        emit BaseRateChanged(baseRate, address(baseToken), minGCFee);
-    }
-
-    function initialize2(
-        uint32 minLoanDuration,
-        uint32 maxLoanDuration,
-        uint16 serviceFeePercent,
-        bool wrappingEnabled
-    ) external override {
-        require(_maxLoanDuration == 0, Errors.ALREADY_INITIALIZED);
-        require(maxLoanDuration > 0, Errors.PT_INVALID_MAX_LOAN_DURATION);
-        require(minLoanDuration <= maxLoanDuration, Errors.ES_INVALID_LOAN_DURATION_RANGE);
-
-        _minLoanDuration = minLoanDuration;
-        _maxLoanDuration = maxLoanDuration;
         _serviceFeePercent = serviceFeePercent;
-        _wrappingEnabled = wrappingEnabled;
+        _energyGapHalvingPeriod = energyGapHalvingPeriod;
+        _index = index;
+        _minRentalPeriod = minRentalPeriod;
+        _maxRentalPeriod = maxRentalPeriod;
+        _swappingEnabled = swappingEnabled;
+
+        emit BaseRateChanged(baseRate, address(baseToken), minGCFee);
         emit ServiceFeePercentChanged(serviceFeePercent);
-        emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
-        if (wrappingEnabled) {
-            emit WrappingEnabled();
+        emit RentalPeriodLimitsChanged(minRentalPeriod, maxRentalPeriod);
+        if (swappingEnabled) {
+            emit SwappingEnabled();
         }
     }
 
@@ -101,19 +96,19 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         emit ServiceFeePercentChanged(newServiceFeePercent);
     }
 
-    function setLoanDurationLimits(uint32 minLoanDuration, uint32 maxLoanDuration) external onlyEnterpriseOwner {
-        require(minLoanDuration <= maxLoanDuration, Errors.ES_INVALID_LOAN_DURATION_RANGE);
+    function setRentalPeriodLimits(uint32 minRentalPeriod, uint32 maxRentalPeriod) external onlyEnterpriseOwner {
+        require(minRentalPeriod <= maxRentalPeriod, Errors.ES_INVALID_RENTAL_PERIOD_RANGE);
 
-        _minLoanDuration = minLoanDuration;
-        _maxLoanDuration = maxLoanDuration;
-        emit LoanDurationLimitsChanged(minLoanDuration, maxLoanDuration);
+        _minRentalPeriod = minRentalPeriod;
+        _maxRentalPeriod = maxRentalPeriod;
+        emit RentalPeriodLimitsChanged(minRentalPeriod, maxRentalPeriod);
     }
 
-    function enableWrappingForever() external onlyEnterpriseOwner {
-        require(!_wrappingEnabled, Errors.ES_WRAPPING_ALREADY_ENABLED);
+    function enableSwappingForever() external onlyEnterpriseOwner {
+        require(!_swappingEnabled, Errors.ES_SWAPPING_ALREADY_ENABLED);
 
-        _wrappingEnabled = true;
-        emit WrappingEnabled();
+        _swappingEnabled = true;
+        emit SwappingEnabled();
     }
 
     function enableTransferForever() external onlyEnterpriseOwner {
@@ -123,8 +118,8 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         emit TransferEnabled();
     }
 
-    function isAllowedLoanDuration(uint32 duration) public view override returns (bool) {
-        return _minLoanDuration <= duration && duration <= _maxLoanDuration;
+    function isAllowedRentalPeriod(uint32 period) public view override returns (bool) {
+        return _minRentalPeriod <= period && period <= _maxRentalPeriod;
     }
 
     function getBaseRate() external view returns (uint112) {
@@ -135,8 +130,8 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         return _minGCFee;
     }
 
-    function getGapHalvingPeriod() external view returns (uint32) {
-        return _gapHalvingPeriod;
+    function getEnergyGapHalvingPeriod() external view returns (uint32) {
+        return _energyGapHalvingPeriod;
     }
 
     function getIndex() external view override returns (uint16) {
@@ -147,12 +142,12 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         return _baseToken;
     }
 
-    function getMinLoanDuration() external view returns (uint32) {
-        return _minLoanDuration;
+    function getMinRentalPeriod() external view returns (uint32) {
+        return _minRentalPeriod;
     }
 
-    function getMaxLoanDuration() external view returns (uint32) {
-        return _maxLoanDuration;
+    function getMaxRentalPeriod() external view returns (uint32) {
+        return _maxRentalPeriod;
     }
 
     function getServiceFeePercent() external view returns (uint16) {
@@ -163,8 +158,8 @@ abstract contract PowerTokenStorage is EnterpriseOwnable, IPowerTokenStorage {
         return _states[account];
     }
 
-    function isWrappingEnabled() external view override returns (bool) {
-        return _wrappingEnabled;
+    function isSwappingEnabled() external view override returns (bool) {
+        return _swappingEnabled;
     }
 
     function isTransferEnabled() external view override returns (bool) {
