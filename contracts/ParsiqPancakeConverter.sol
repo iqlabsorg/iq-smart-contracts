@@ -14,14 +14,20 @@ import "./libs/IUniswapV2Pair.sol";
 import "./libs/IUniswapV2Factory.sol";
 
 /**
- * TODO: proper name here
+ * Pancakeswap converter for estimating token prices.
  */
 contract ParsiqPancakeConverter is IConverter {
     IUniswapV2Pair public immutable swapPair;
     IUniswapV2Router02 private _uniswapRouter;
 
     /**
-     * TODO: proper natspec here
+     * @notice Constructor for `ParsiqPancakeConverter`
+     * @param uniswapRouter - UniswapV2 router implementation. On BSC that would be Pancakeswap.
+     * @param allowedSourceCoin - The ERC20 token that's used for expressing the price of a service
+     * @param allowedTargetCoin - The ERC20 token that's used for paying for the service
+     * @dev The token pair must be pre-deployed and registered on the router!
+     * @dev Instantiate a uniswap router pointer
+     * @dev Find the existing token pair
      */
     constructor(
         IUniswapV2Router02 uniswapRouter,
@@ -34,7 +40,11 @@ contract ParsiqPancakeConverter is IConverter {
     }
 
     /**
-     * TODO: proper natspec here
+     * @notice Perform estimation of how many `target` tokens are necessary to cover required amount of `source` tokens.
+     * @param source - the source token address
+     * @param target - the target token address
+     * @param amount - the amount of source token price
+     * @dev Source and target token addresses must be the exact ones as specified in the constructor of this contract.
      */
     function estimateConvert(
         IERC20 source,
@@ -49,8 +59,7 @@ contract ParsiqPancakeConverter is IConverter {
     }
 
     /**
-     * @dev Converts `source` tokens to `target` tokens.
-     * Converted tokens must be on `msg.sender` address after exiting this function
+     * @notice Noop converter. Reverts if `source` and `target` tokens differ.
      */
     function convert(
         IERC20 source,
