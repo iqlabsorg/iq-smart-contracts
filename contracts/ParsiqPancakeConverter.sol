@@ -17,7 +17,7 @@ import "./libs/IUniswapV2Factory.sol";
  * Pancakeswap converter for estimating token prices.
  */
 contract ParsiqPancakeConverter is IConverter {
-    IUniswapV2Pair public immutable swapPair;
+    IUniswapV2Pair public swapPair;
     IUniswapV2Router02 private _uniswapRouter;
 
     /**
@@ -37,25 +37,32 @@ contract ParsiqPancakeConverter is IConverter {
         _uniswapRouter = uniswapRouter;
         IUniswapV2Factory uniswapFactory = IUniswapV2Factory(_uniswapRouter.factory());
         swapPair = IUniswapV2Pair(uniswapFactory.getPair(address(allowedSourceCoin), address(allowedTargetCoin)));
+
+        // Make sure that the `token0` and `token1` mappings are correct
+        require(address(allowedTargetCoin) == swapPair.token0(), Errors.DC_UNSUPPORTED_PAIR);
+        require(address(allowedSourceCoin) == swapPair.token1(), Errors.DC_UNSUPPORTED_PAIR);
     }
 
     /**
      * @notice Perform estimation of how many `target` tokens are necessary to cover required amount of `source` tokens.
-     * @param source - the source token address
-     * @param target - the target token address
-     * @param amount - the amount of source token price
+     * @param source - the source token address (e.g. stablecoin)
+     * @param target - the target token address (e.g. volitale coin)
+     * @param amountInSourceTokens - the amount of source token price
      * @dev Source and target token addresses must be the exact ones as specified in the constructor of this contract.
      */
     function estimateConvert(
         IERC20 source,
-        uint256 amount,
+        uint256 amountInSourceTokens,
         IERC20 target
     ) external view override returns (uint256) {
-        require(address(source) == swapPair.token0(), Errors.DC_UNSUPPORTED_PAIR);
-        require(address(target) == swapPair.token1(), Errors.DC_UNSUPPORTED_PAIR);
+        require(address(target) == swapPair.token0(), Errors.DC_UNSUPPORTED_PAIR);
+        require(address(source) == swapPair.token1(), Errors.DC_UNSUPPORTED_PAIR);
 
-        // the price of token1 denominated in token0
-        return swapPair.price1CumulativeLast() * amount;
+        // NOTE:
+        //  - price0CumulativeLast is "the price of token0 (target) denominated in token1 (source)"
+        //  - price1CumulativeLast is "the price of token1 (source) denominated in token0 (target)"
+        uint256 oneTargetTokenInSourceTokens = swapPair.price0CumulativeLast();
+        return oneTargetTokenInSourceTokens * amountInSourceTokens;
     }
 
     /**
@@ -63,10 +70,10 @@ contract ParsiqPancakeConverter is IConverter {
      */
     function convert(
         IERC20 source,
-        uint256 amount,
+        uint256 amountInSourceTokens,
         IERC20 target
     ) external pure override returns (uint256) {
         require(address(source) == address(target), Errors.DC_UNSUPPORTED_PAIR);
-        return amount;
+        return amountInSourceTokens;
     }
 }
