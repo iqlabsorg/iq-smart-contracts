@@ -57,12 +57,14 @@ contract ParsiqPancakeConverter is IConverter {
     ) external view override returns (uint256) {
         require(address(target) == swapPair.token0(), Errors.DC_UNSUPPORTED_PAIR);
         require(address(source) == swapPair.token1(), Errors.DC_UNSUPPORTED_PAIR);
+        (uint112 targetReserve, uint112 sourceReserve, uint32 blockTimestampLast) = swapPair.getReserves();
 
-        // NOTE:
-        //  - price0CumulativeLast is "the price of token0 (target) denominated in token1 (source)"
-        //  - price1CumulativeLast is "the price of token1 (source) denominated in token0 (target)"
-        uint256 oneTargetTokenInSourceTokens = swapPair.price0CumulativeLast();
-        return oneTargetTokenInSourceTokens * amountInSourceTokens;
+        // Formula for conversion: https://ethereum.stackexchange.com/a/103869
+        //      `Y * I / (X + I)`
+        //          I is your input amount of source tokens
+        //          X is the balance of the pool in the source token
+        //          Y is the balance of the pool in the target token
+        return (targetReserve * amountInSourceTokens) / (sourceReserve + amountInSourceTokens);
     }
 
     /**

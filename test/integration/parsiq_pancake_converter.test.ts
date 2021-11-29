@@ -1,7 +1,6 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import { expect } from 'chai';
-import { BigNumber, BigNumberish } from 'ethers';
-import { ethers } from 'hardhat';
+import hre, { ethers } from 'hardhat';
 import {
   ERC20,
   ParsiqPancakeConverter,
@@ -12,6 +11,7 @@ import {
   IUniswapV2Pair,
   IUniswapV2Pair__factory,
 } from '../../typechain';
+import { resetFork } from '../utils';
 
 const ONE_ETHER = 10n ** 18n;
 const ONE_TOKEN = 10n ** 18n;
@@ -20,7 +20,10 @@ const PRQ_BUSD_PAIR = '0xCfaE4b92AAF0F56fAE420087833D7a8954f6fE16';
 const PRQ_TOKEN = '0xd21d29b38374528675c34936bf7d5dd693d2a577';
 const BUSD_TOKEN = '0xe9e7cea3dedca5984780bafc599bd69add087d56';
 const PANCAKE_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
-const priceOfServiceInBusd = BigNumber.from(ONE_TOKEN).mul(10); // 10 BUSD
+const priceOfServiceInBusd = ONE_TOKEN * 10n; // 10 BUSD
+
+// NOTE https://ethereum.stackexchange.com/a/103869
+const performConversion = (source: bigint, amount: bigint, target: bigint) => (target * amount) / (source + amount);
 
 /// Supposed to be run as a fork of BSC chain.
 describe.only('ParsiqPancakeConverter', function () {
@@ -33,6 +36,16 @@ describe.only('ParsiqPancakeConverter', function () {
   let user2: SignerWithAddress;
 
   beforeEach(async () => {
+    /**
+     * NOTE: This information is manually validated!
+     * BlockNumber: 9346625
+     * Date: Jul-21-2021 09:01:34 AM +UTC
+     * Rate: 1 PRQ  per 0.334917 BUSD
+     * Rate: 1 BUSD per 2.985814 PRQ
+     */
+
+    await resetFork(hre, 9346625);
+
     [user, user2] = await ethers.getSigners();
     busd = ERC20__factory.connect(BUSD_TOKEN, user);
     prq = ERC20__factory.connect(PRQ_TOKEN, user);
@@ -50,14 +63,28 @@ describe.only('ParsiqPancakeConverter', function () {
     });
   });
   describe('Estimate convert', () => {
-    it('should correctly estimate the required PRQ tokens', async () => {
-      const estimatedPriceInPRQ = await converter.estimateConvert(busd.address, priceOfServiceInBusd, prq.address);
+    it.only('should correctly estimate the required PRQ tokens', async () => {
+      const estimatedPriceInPRQ = BigInt(
+        (await converter.estimateConvert(busd.address, priceOfServiceInBusd, prq.address)).toString()
+      );
 
-      const onePRQInBUSD = await swapPair.price0CumulativeLast();
-      const expectedPrice = onePRQInBUSD.mul(priceOfServiceInBusd);
-      expect(estimatedPriceInPRQ).to.equal(expectedPrice, 'The prices do not match!');
+      const data = await swapPair.getReserves();
+      const fetchedTargetTokenReserve = BigInt(data.reserve0.toString());
+      const fetchedSourceTokenReserve = BigInt(data.reserve1.toString());
 
-      console.log('Price of the service (10 BUSD) nominated in PRQ is:', estimatedPriceInPRQ.div(ONE_TOKEN).toString());
+      const expectedPriceInPRQ = performConversion(
+        fetchedSourceTokenReserve,
+        priceOfServiceInBusd,
+        fetchedTargetTokenReserve
+      );
+
+      expect(estimatedPriceInPRQ).to.equal(expectedPriceInPRQ, 'The prices do not match!');
+
+      // Sanity check (mostly just for "visual" confirmation)
+      // NOTE: Ignore rounding.
+      const whole = estimatedPriceInPRQ / ONE_TOKEN;
+      const residual = (estimatedPriceInPRQ % ONE_TOKEN).toString().slice(0, 3);
+      expect(`${whole}.${residual}`).to.equal('29.778', `The prices do not match the expected one at block 9346625!`);
     });
     it('should not allow estimation between unregistered tokens', async () => {
       const WETH = await router.WETH();
