@@ -13,7 +13,6 @@ import {
 } from '../../typechain';
 import { resetFork } from '../utils';
 
-const ONE_ETHER = 10n ** 18n;
 const ONE_TOKEN = 10n ** 18n;
 
 const PRQ_BUSD_PAIR = '0xCfaE4b92AAF0F56fAE420087833D7a8954f6fE16';
@@ -26,7 +25,7 @@ const priceOfServiceInBusd = ONE_TOKEN * 10n; // 10 BUSD
 const performConversion = (source: bigint, amount: bigint, target: bigint) => (target * amount) / (source + amount);
 
 /// Supposed to be run as a fork of BSC chain.
-describe.only('ParsiqPancakeConverter', function () {
+describe('ParsiqPancakeConverter', function () {
   let busd: ERC20;
   let prq: ERC20;
   let swapPair: IUniswapV2Pair;
@@ -35,15 +34,14 @@ describe.only('ParsiqPancakeConverter', function () {
   let user: SignerWithAddress;
   let user2: SignerWithAddress;
 
+  /**
+   * NOTE: This information is manually validated!
+   * BlockNumber: 9346625
+   * Date: Jul-21-2021 09:01:34 AM +UTC
+   * Rate: 1 PRQ  per 0.334917 BUSD
+   * Rate: 1 BUSD per 2.985814 PRQ
+   */
   beforeEach(async () => {
-    /**
-     * NOTE: This information is manually validated!
-     * BlockNumber: 9346625
-     * Date: Jul-21-2021 09:01:34 AM +UTC
-     * Rate: 1 PRQ  per 0.334917 BUSD
-     * Rate: 1 BUSD per 2.985814 PRQ
-     */
-
     await resetFork(hre, 9346625);
 
     [user, user2] = await ethers.getSigners();
@@ -63,20 +61,16 @@ describe.only('ParsiqPancakeConverter', function () {
     });
   });
   describe('Estimate convert', () => {
-    it.only('should correctly estimate the required PRQ tokens', async () => {
+    it('should correctly estimate the required PRQ tokens', async () => {
       const estimatedPriceInPRQ = BigInt(
         (await converter.estimateConvert(busd.address, priceOfServiceInBusd, prq.address)).toString()
       );
 
       const data = await swapPair.getReserves();
-      const fetchedTargetTokenReserve = BigInt(data.reserve0.toString());
-      const fetchedSourceTokenReserve = BigInt(data.reserve1.toString());
+      const fetchedTargetReserve = BigInt(data.reserve0.toString());
+      const fetchedSourceReserve = BigInt(data.reserve1.toString());
 
-      const expectedPriceInPRQ = performConversion(
-        fetchedSourceTokenReserve,
-        priceOfServiceInBusd,
-        fetchedTargetTokenReserve
-      );
+      const expectedPriceInPRQ = performConversion(fetchedSourceReserve, priceOfServiceInBusd, fetchedTargetReserve);
 
       expect(estimatedPriceInPRQ).to.equal(expectedPriceInPRQ, 'The prices do not match!');
 
@@ -86,15 +80,31 @@ describe.only('ParsiqPancakeConverter', function () {
       const residual = (estimatedPriceInPRQ % ONE_TOKEN).toString().slice(0, 3);
       expect(`${whole}.${residual}`).to.equal('29.778', `The prices do not match the expected one at block 9346625!`);
     });
+    it('should correctly estimate the required BUSD tokens', async () => {
+      const estimatedPriceInPRQ = BigInt(
+        (await converter.estimateConvert(prq.address, priceOfServiceInBusd, busd.address)).toString()
+      );
+
+      const data = await swapPair.getReserves();
+      const fetchedTargetReserve = BigInt(data.reserve1.toString());
+      const fetchedSourceReserve = BigInt(data.reserve0.toString());
+
+      const expectedPriceInPRQ = performConversion(fetchedSourceReserve, priceOfServiceInBusd, fetchedTargetReserve);
+
+      expect(estimatedPriceInPRQ).to.equal(expectedPriceInPRQ, 'The prices do not match!');
+
+      // Sanity check (mostly just for "visual" confirmation)
+      // NOTE: Ignore rounding.
+      const whole = estimatedPriceInPRQ / ONE_TOKEN;
+      const residual = (estimatedPriceInPRQ % ONE_TOKEN).toString().slice(0, 3);
+      expect(`${whole}.${residual}`).to.equal('3.357', `The prices do not match the expected one at block 9346625!`);
+    });
     it('should not allow estimation between unregistered tokens', async () => {
       const WETH = await router.WETH();
       // WETH is not registered
       await expect(converter.estimateConvert(WETH, priceOfServiceInBusd, busd.address)).to.be.revertedWith('36');
       await expect(converter.estimateConvert(WETH, priceOfServiceInBusd, WETH)).to.be.revertedWith('36');
       await expect(converter.estimateConvert(prq.address, priceOfServiceInBusd, WETH)).to.be.revertedWith('36');
-    });
-    it('should not allow estimation with source and target tokens swapped', async () => {
-      await expect(converter.estimateConvert(prq.address, priceOfServiceInBusd, busd.address)).to.be.revertedWith('36');
     });
   });
   describe('Convert', () => {
