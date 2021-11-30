@@ -32,7 +32,6 @@ describe('ParsiqPancakeConverter', function () {
   let router: IUniswapV2Router02;
   let converter: ParsiqPancakeConverter;
   let user: SignerWithAddress;
-  let user2: SignerWithAddress;
 
   /**
    * NOTE: This information is manually validated!
@@ -44,7 +43,7 @@ describe('ParsiqPancakeConverter', function () {
   beforeEach(async () => {
     await resetFork(hre, 9346625);
 
-    [user, user2] = await ethers.getSigners();
+    [user] = await ethers.getSigners();
     busd = ERC20__factory.connect(BUSD_TOKEN, user);
     prq = ERC20__factory.connect(PRQ_TOKEN, user);
     router = IUniswapV2Router02__factory.connect(PANCAKE_ROUTER, user);

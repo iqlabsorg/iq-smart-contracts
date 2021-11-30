@@ -9,9 +9,9 @@ pragma solidity 0.8.4;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IConverter.sol";
 import "./libs/Errors.sol";
-import "./libs/IUniswapV2Router02.sol";
-import "./libs/IUniswapV2Pair.sol";
-import "./libs/IUniswapV2Factory.sol";
+import "./libs/uniswap-v2/IUniswapV2Router02.sol";
+import "./libs/uniswap-v2/IUniswapV2Pair.sol";
+import "./libs/uniswap-v2/IUniswapV2Factory.sol";
 
 /**
  * Pancakeswap converter for estimating token prices.
