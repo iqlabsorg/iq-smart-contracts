@@ -98,12 +98,21 @@ describe('ParsiqPancakeConverter', function () {
       const residual = (estimatedPriceInPRQ % ONE_TOKEN).toString().slice(0, 3);
       expect(`${whole}.${residual}`).to.equal('3.357', `The prices do not match the expected one at block 9346625!`);
     });
-    it('should not allow estimation between unregistered tokens', async () => {
+    it('should not allow estimation between a registered and an unregistered token', async () => {
       const WETH = await router.WETH();
       // WETH is not registered
       await expect(converter.estimateConvert(WETH, priceOfServiceInBusd, busd.address)).to.be.revertedWith('36');
-      await expect(converter.estimateConvert(WETH, priceOfServiceInBusd, WETH)).to.be.revertedWith('36');
       await expect(converter.estimateConvert(prq.address, priceOfServiceInBusd, WETH)).to.be.revertedWith('36');
+    });
+    it('should allow estimation when source and target are the same, even when unregistered', async () => {
+      const WETH = await router.WETH();
+      // WETH is not registered in the constructor!
+      const estimatedPrice = await converter.estimateConvert(WETH, priceOfServiceInBusd, WETH);
+      expect(estimatedPrice).to.equal(priceOfServiceInBusd.toString());
+    });
+    it('should allow to use the same registered token for `target` and `source` fields', async () => {
+      const estimatedPrice = await converter.estimateConvert(busd.address, priceOfServiceInBusd, busd.address);
+      expect(estimatedPrice).to.equal(priceOfServiceInBusd.toString());
     });
   });
   describe('Convert', () => {
