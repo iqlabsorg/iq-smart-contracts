@@ -17,7 +17,7 @@ import "./libs/uniswap-v2/IUniswapV2Factory.sol";
  * Pancakeswap converter for estimating token prices.
  */
 contract ParsiqPancakeConverter is IConverter {
-    IUniswapV2Pair public swapPair;
+    IUniswapV2Pair public immutable swapPair;
     IUniswapV2Router02 private _uniswapRouter;
 
     /**
@@ -50,6 +50,8 @@ contract ParsiqPancakeConverter is IConverter {
         uint256 amountInSourceTokens,
         IERC20 target
     ) external view override returns (uint256) {
+        if (address(source) == address(target)) return amountInSourceTokens;
+
         address pairToken0 = swapPair.token0();
         address pairToken1 = swapPair.token1();
 
