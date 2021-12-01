@@ -18,7 +18,7 @@ import "./libs/uniswap-v2/IUniswapV2Factory.sol";
  */
 contract ParsiqPancakeConverter is IConverter {
     IUniswapV2Pair public immutable swapPair;
-    IUniswapV2Router02 private _uniswapRouter;
+    IUniswapV2Router02 private immutable _uniswapRouter;
 
     /**
      * @notice Constructor for `ParsiqPancakeConverter`
@@ -34,7 +34,7 @@ contract ParsiqPancakeConverter is IConverter {
         IERC20 allowedTargetTwo // <- PRQ
     ) {
         _uniswapRouter = uniswapRouter;
-        IUniswapV2Factory uniswapFactory = IUniswapV2Factory(_uniswapRouter.factory());
+        IUniswapV2Factory uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
         swapPair = IUniswapV2Pair(uniswapFactory.getPair(address(allowedTokenOne), address(allowedTargetTwo)));
     }
 
