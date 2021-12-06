@@ -96,6 +96,11 @@ const config: HardhatUserConfig = {
   typechain: {
     outDir: 'typechain',
     target: 'ethers-v5',
+    externalArtifacts: [
+      './node_modules/@uniswap/v2-core/build/UniswapV2Pair.json',
+      './node_modules/@uniswap/v2-core/build/UniswapV2Factory.json',
+      './node_modules/@uniswap/v2-periphery/build/UniswapV2Router02.json',
+    ],
   },
   mocha: {
     timeout: 0,
