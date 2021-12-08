@@ -22,14 +22,23 @@ const BUSD_TOKEN = '0xe9e7cea3dedca5984780bafc599bd69add087d56';
 const PANCAKE_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
 const priceOfServiceInBusd = ONE_TOKEN * 10n; // 10 BUSD
 
-// NOTE https://ethereum.stackexchange.com/a/103869
-const performConversion = (source: bigint, amount: bigint, target: bigint) => (target * amount) / (source + amount);
+// NOTE: https://github.com/Uniswap/v2-periphery/blob/master/contracts/libraries/UniswapV2Library.sol#L43
+// NOTE:
+//  Pancakeswap github contract swap fees differ from the deployed fees!
+//  be careful when configuring the converter and always check the deployed code!
+//   - https://github.com/pancakeswap/pancake-swap-periphery/blob/master/contracts/libraries/PancakeLibrary.sol#L44
+//   - https://www.bscscan.com/address/0x10ED43C718714eb63d5aA57B78B54704E256024E#code
+const performConversion = (source: bigint, amount: bigint, target: bigint) => {
+  const amountInWithFee = amount * 9975n;
+  const numerator = amountInWithFee * target;
+  const denominator = source * 10000n + amountInWithFee;
+  return numerator / denominator;
+};
 
-const humanReadableToken = (source: BigNumber) => {
-  const sourceAsBigInt = BigInt(source.toString());
+const humanReadableToken = (source: bigint) => {
   // NOTE: Ignore rounding.
-  const whole = sourceAsBigInt / ONE_TOKEN;
-  const residual = (sourceAsBigInt % ONE_TOKEN).toString().slice(0, 1);
+  const whole = source / ONE_TOKEN;
+  const residual = (source % ONE_TOKEN).toString().slice(0, 1);
   return `${whole}.${residual}`;
 };
 
@@ -59,7 +68,13 @@ describe.only('ParsiqPancakeConverter', function () {
     swapPair = IUniswapV2Pair__factory.connect(PRQ_BUSD_PAIR, user);
 
     // Deploy the converter
-    converter = await new ParsiqPancakeConverter__factory(user).deploy(router.address, busd.address, prq.address);
+    converter = await new ParsiqPancakeConverter__factory(user).deploy(
+      router.address,
+      busd.address,
+      prq.address,
+      9975n,
+      10000n
+    );
   });
 
   describe('Basic', () => {
@@ -81,24 +96,23 @@ describe.only('ParsiqPancakeConverter', function () {
       const expectedPriceInPRQ = performConversion(fetchedSourceReserve, priceOfServiceInBusd, fetchedTargetReserve);
       expect(estimatedPriceInPRQ.toString()).to.equal(expectedPriceInPRQ.toString(), 'The prices do not match!');
       // Sanity check (mostly just for "visual" confirmation)
-      expect(humanReadableToken(BigNumber.from(estimatedPriceInPRQ))).to.equal(
-        '29.7',
-        `The prices do not match the expected one at block 9346625!`
-      );
+      const priceAsANiceString = humanReadableToken(estimatedPriceInPRQ);
+      expect(priceAsANiceString).to.equal('29.7', `The prices do not match the expected one at block 9346625!`);
     });
     it('should correctly estimate the required BUSD tokens', async () => {
+      const priceOfServiceInPRQ = priceOfServiceInBusd;
       const data = await swapPair.getReserves();
       const fetchedTargetReserve = BigInt(data.reserve1.toString());
       const fetchedSourceReserve = BigInt(data.reserve0.toString());
 
       const estimatedPriceInBUSD = BigInt(
-        (await converter.estimateConvert(prq.address, priceOfServiceInBusd, busd.address)).toString()
+        (await converter.estimateConvert(prq.address, priceOfServiceInPRQ, busd.address)).toString()
       );
 
-      const expectedPriceInPRQ = performConversion(fetchedSourceReserve, priceOfServiceInBusd, fetchedTargetReserve);
-      expect(estimatedPriceInBUSD).to.equal(expectedPriceInPRQ, 'The prices do not match!');
+      const expectedPriceInBUSD = performConversion(fetchedSourceReserve, priceOfServiceInPRQ, fetchedTargetReserve);
+      expect(estimatedPriceInBUSD.toString()).to.equal(expectedPriceInBUSD.toString(), 'The prices do not match!');
       // Sanity check (mostly just for "visual" confirmation)
-      expect(humanReadableToken(BigNumber.from(estimatedPriceInBUSD))).to.equal(
+      expect(humanReadableToken(estimatedPriceInBUSD)).to.equal(
         '3.3',
         `The prices do not match the expected one at block 9346625!`
       );
@@ -141,16 +155,27 @@ describe.only('ParsiqPancakeConverter', function () {
       await hre.network.provider.send('hardhat_setBalance', [PRQ_HOLDER, '0x1000000000000000000000000000000000000000']);
     });
 
-    it('should allow conversion token A -> token B when both tokens are registered', async () => {
+    it('should allow conversion BUSD -> PRQ when both tokens are registered', async () => {
       await impersonate(hre, BUSD_HOLDER);
       const busdHolder = await ethers.getSigner(BUSD_HOLDER);
-      const amountToApprove = await converter.estimateConvert(busd.address, priceOfServiceInBusd, prq.address);
-      await busd.connect(busdHolder).approve(converter.address, amountToApprove);
+      await busd.connect(busdHolder).approve(converter.address, priceOfServiceInBusd);
 
       await converter.connect(busdHolder).convert(busd.address, priceOfServiceInBusd, prq.address);
 
       const balanceOfPRQ = await prq.balanceOf(BUSD_HOLDER);
-      expect(humanReadableToken(balanceOfPRQ)).to.equal('29.7');
+      expect(humanReadableToken(balanceOfPRQ.toBigInt())).to.equal('29.7');
+    });
+    it('should allow conversion PRQ -> BUSD when both tokens are registered', async () => {
+      const priceOfServiceInPRQ = ONE_TOKEN;
+      await impersonate(hre, PRQ_HOLDER);
+      const prqHolder = await ethers.getSigner(PRQ_HOLDER);
+      await prq.connect(prqHolder).approve(converter.address, priceOfServiceInPRQ);
+
+      await converter.connect(prqHolder).convert(prq.address, priceOfServiceInPRQ, busd.address);
+
+      // NOTE The service price is 10x smaller here than in the estimation tests.
+      const balanceOfBUSD = await busd.balanceOf(PRQ_HOLDER);
+      expect(humanReadableToken(balanceOfBUSD.toBigInt())).to.equal('0.3');
     });
   });
 });
