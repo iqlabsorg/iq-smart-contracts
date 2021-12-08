@@ -4,8 +4,8 @@ import { expect } from 'chai';
 import hre, { ethers } from 'hardhat';
 import {
   ERC20,
-  SimpleConverter,
-  SimpleConverter__factory,
+  SimpleUniswapV2Converter,
+  SimpleUniswapV2Converter__factory,
   ERC20__factory,
   IUniswapV2Router02__factory,
   IUniswapV2Router02,
@@ -43,12 +43,12 @@ const humanReadableToken = (source: bigint) => {
 };
 
 /// Supposed to be run as a fork of BSC chain.
-describe('SimpleConverter', function () {
+describe('SimpleUniswapV2Converter', function () {
   let busd: ERC20;
   let prq: ERC20;
   let swapPair: IUniswapV2Pair;
   let router: IUniswapV2Router02;
-  let converter: SimpleConverter;
+  let converter: SimpleUniswapV2Converter;
   let user: SignerWithAddress;
 
   /**
@@ -68,7 +68,7 @@ describe('SimpleConverter', function () {
     swapPair = IUniswapV2Pair__factory.connect(PRQ_BUSD_PAIR, user);
 
     // Deploy the converter
-    converter = await new SimpleConverter__factory(user).deploy(
+    converter = await new SimpleUniswapV2Converter__factory(user).deploy(
       router.address,
       busd.address,
       prq.address,
