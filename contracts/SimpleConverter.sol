@@ -17,7 +17,7 @@ import "./libs/Errors.sol";
 /**
  * Pancakeswap converter for estimating token prices.
  */
-contract ParsiqPancakeConverter is IConverter {
+contract SimpleConverter is IConverter {
     IUniswapV2Pair public immutable swapPair;
     IUniswapV2Router02 private immutable _uniswapRouter;
     IUniswapV2Factory private immutable _uniswapfactory;
@@ -25,7 +25,7 @@ contract ParsiqPancakeConverter is IConverter {
     uint256 private immutable _feeBase;
 
     /**
-     * @notice Constructor for `ParsiqPancakeConverter`
+     * @notice Constructor for `SimpleConverter`
      * @param uniswapRouter - UniswapV2 router implementation. On BSC that would be Pancakeswap.
      * @param allowedTokenOne - The ERC20 token that's used for finding the swap pair
      * @param allowedTargetTwo - The ERC20 token that's used for finding the swap pair
