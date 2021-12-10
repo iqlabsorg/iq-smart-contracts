@@ -11,8 +11,13 @@ import {
   IUniswapV2Router02,
   IUniswapV2Pair,
   IUniswapV2Pair__factory,
+  ERC20Mock,
+  PowerToken,
+  Enterprise,
+  EnterpriseFactory__factory,
+  EnterpriseFactory,
 } from '../../typechain';
-import { impersonate, resetFork } from '../utils';
+import { deployEnterprise, impersonate, resetFork, stake } from '../utils';
 
 const ONE_TOKEN = 10n ** 18n;
 
@@ -49,7 +54,7 @@ describe('SimpleUniswapV2Converter', function () {
   let swapPair: IUniswapV2Pair;
   let router: IUniswapV2Router02;
   let converter: SimpleUniswapV2Converter;
-  let user: SignerWithAddress;
+  let deployer: SignerWithAddress;
 
   /**
    * NOTE: This information is manually validated!
@@ -61,14 +66,14 @@ describe('SimpleUniswapV2Converter', function () {
   beforeEach(async () => {
     await resetFork(hre, 9346625);
 
-    [user] = await ethers.getSigners();
-    busd = ERC20__factory.connect(BUSD_TOKEN, user);
-    prq = ERC20__factory.connect(PRQ_TOKEN, user);
-    router = IUniswapV2Router02__factory.connect(PANCAKE_ROUTER, user);
-    swapPair = IUniswapV2Pair__factory.connect(PRQ_BUSD_PAIR, user);
+    [deployer] = await ethers.getSigners();
+    busd = ERC20__factory.connect(BUSD_TOKEN, deployer);
+    prq = ERC20__factory.connect(PRQ_TOKEN, deployer);
+    router = IUniswapV2Router02__factory.connect(PANCAKE_ROUTER, deployer);
+    swapPair = IUniswapV2Pair__factory.connect(PRQ_BUSD_PAIR, deployer);
 
     // Deploy the converter
-    converter = await new SimpleUniswapV2Converter__factory(user).deploy(
+    converter = await new SimpleUniswapV2Converter__factory(deployer).deploy(
       router.address,
       busd.address,
       prq.address,
@@ -83,6 +88,7 @@ describe('SimpleUniswapV2Converter', function () {
       expect(extractedPairAddress).to.equal(swapPair.address, 'The expected PRQ/BUSD pair was not found!');
     });
   });
+
   describe('Estimate convert', () => {
     it('should correctly estimate the required PRQ tokens', async () => {
       const data = await swapPair.getReserves();
@@ -99,6 +105,7 @@ describe('SimpleUniswapV2Converter', function () {
       const priceAsANiceString = humanReadableToken(estimatedPriceInPRQ);
       expect(priceAsANiceString).to.equal('29.7', `The prices do not match the expected one at block 9346625!`);
     });
+
     it('should correctly estimate the required BUSD tokens', async () => {
       const priceOfServiceInPRQ = priceOfServiceInBusd;
       const data = await swapPair.getReserves();
@@ -117,6 +124,7 @@ describe('SimpleUniswapV2Converter', function () {
         `The prices do not match the expected one at block 9346625!`
       );
     });
+
     it('should not allow estimation between a registered and an unregistered token', async () => {
       // WETH is not registered
       const WETH = await router.WETH();
@@ -124,6 +132,7 @@ describe('SimpleUniswapV2Converter', function () {
       await expect(converter.estimateConvert(WETH, priceOfServiceInBusd, busd.address)).to.be.revertedWith('36');
       await expect(converter.estimateConvert(prq.address, priceOfServiceInBusd, WETH)).to.be.revertedWith('36');
     });
+
     it('should allow estimation when source and target are the same, even when unregistered', async () => {
       // WETH is not registered in the constructor!
       const WETH = await router.WETH();
@@ -132,12 +141,14 @@ describe('SimpleUniswapV2Converter', function () {
 
       expect(estimatedPrice).to.equal(priceOfServiceInBusd.toString());
     });
+
     it('should allow to use the same registered token for `target` and `source` fields', async () => {
       const estimatedPrice = await converter.estimateConvert(busd.address, priceOfServiceInBusd, busd.address);
 
       expect(estimatedPrice).to.equal(priceOfServiceInBusd.toString());
     });
   });
+
   describe('Convert', () => {
     const BUSD_HOLDER = '0x8c7de13ecf6e92e249696defed7aa81e9c93931a';
     const PRQ_HOLDER = '0xfaa9721d51c49f0ca7e82203d7914c9726b5ccab'; // (note: this the IQ protocols address, but that does not matter for these tests )
@@ -165,6 +176,7 @@ describe('SimpleUniswapV2Converter', function () {
       const balanceOfPRQ = await prq.balanceOf(BUSD_HOLDER);
       expect(humanReadableToken(balanceOfPRQ.toBigInt())).to.equal('29.7');
     });
+
     it('should allow conversion PRQ -> BUSD when both tokens are registered', async () => {
       const priceOfServiceInPRQ = ONE_TOKEN;
       await impersonate(hre, PRQ_HOLDER);
@@ -177,5 +189,32 @@ describe('SimpleUniswapV2Converter', function () {
       const balanceOfBUSD = await busd.balanceOf(PRQ_HOLDER);
       expect(humanReadableToken(balanceOfBUSD.toBigInt())).to.equal('0.3');
     });
+  });
+
+  describe('Converter being used inside the Enterprise', () => {
+    let enterprise: Enterprise;
+
+    const BUSD_HOLDER = '0x8c7de13ecf6e92e249696defed7aa81e9c93931a';
+    const PRQ_HOLDER = '0xfaa9721d51c49f0ca7e82203d7914c9726b5ccab'; // (note: this the IQ protocols address, but that does not matter for these tests )
+
+    beforeEach(async () => {
+      converter = await new SimpleUniswapV2Converter__factory(deployer).deploy(
+        router.address,
+        prq.address,
+        busd.address,
+        9975n,
+        10000n
+      );
+      enterprise = await deployEnterprise('Test', prq.address, converter.address);
+      await enterprise.enablePaymentToken(busd.address);
+      await hre.network.provider.send('hardhat_setBalance', [PRQ_HOLDER, '0x1000000000000000000000000000000000000000']);
+
+      await impersonate(hre, PRQ_HOLDER);
+      const prqHolder = await ethers.getSigner(PRQ_HOLDER);
+
+      await stake(enterprise, ONE_TOKEN * 100000n, prqHolder);
+    });
+
+    it('should be possible to rent paying with BUSD', async () => {});
   });
 });
