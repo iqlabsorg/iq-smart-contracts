@@ -1,23 +1,22 @@
-import { BigNumber } from '@ethersproject/bignumber';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import { expect } from 'chai';
 import hre, { ethers } from 'hardhat';
 import {
+  Enterprise,
+  Enterprise__factory,
   ERC20,
-  SimpleUniswapV2Converter,
-  SimpleUniswapV2Converter__factory,
   ERC20__factory,
-  IUniswapV2Router02__factory,
-  IUniswapV2Router02,
   IUniswapV2Pair,
   IUniswapV2Pair__factory,
-  ERC20Mock,
+  IUniswapV2Router02,
+  IUniswapV2Router02__factory,
   PowerToken,
-  Enterprise,
-  EnterpriseFactory__factory,
-  EnterpriseFactory,
+  PowerToken__factory,
+  SimpleUniswapV2Converter,
+  SimpleUniswapV2Converter__factory,
 } from '../../typechain';
-import { deployEnterprise, impersonate, resetFork, stake } from '../utils';
+import { impersonate, ONE_DAY, rent, resetFork, stake, toTokens } from '../utils';
+import { PARSIQ_ENTERPRISE_ADDRESS } from './addresses';
 
 const ONE_TOKEN = 10n ** 18n;
 
@@ -25,7 +24,10 @@ const PRQ_BUSD_PAIR = '0xCfaE4b92AAF0F56fAE420087833D7a8954f6fE16';
 const PRQ_TOKEN = '0xd21d29b38374528675c34936bf7d5dd693d2a577';
 const BUSD_TOKEN = '0xe9e7cea3dedca5984780bafc599bd69add087d56';
 const PANCAKE_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
+const PARSIQ_ENTERPRISE_OWNER = '0xE4e5548e5968F0a41e4CEE06a9BCf61586d73e68';
 const priceOfServiceInBusd = ONE_TOKEN * 10n; // 10 BUSD
+
+const PRQ_TO_BUSD_RATIO = 0.486328;
 
 // NOTE: https://github.com/Uniswap/v2-periphery/blob/master/contracts/libraries/UniswapV2Library.sol#L43
 // NOTE:
@@ -58,13 +60,13 @@ describe('SimpleUniswapV2Converter', function () {
 
   /**
    * NOTE: This information is manually validated!
-   * BlockNumber: 9346625
-   * Date: Jul-21-2021 09:01:34 AM +UTC
-   * Rate: 1 PRQ  per 0.334917 BUSD
-   * Rate: 1 BUSD per 2.985814 PRQ
+   * BlockNumber: 13351728
+   * Date: Dec-10-2021 11:18:29 AM +UTC
+   * Rate: 1 PRQ  per 0.486328 BUSD
+   * Rate: 1 BUSD per 2.056225 PRQ
    */
   beforeEach(async () => {
-    await resetFork(hre, 9346625);
+    await resetFork(hre, 13351728);
 
     [deployer] = await ethers.getSigners();
     busd = ERC20__factory.connect(BUSD_TOKEN, deployer);
@@ -103,7 +105,7 @@ describe('SimpleUniswapV2Converter', function () {
       expect(estimatedPriceInPRQ.toString()).to.equal(expectedPriceInPRQ.toString(), 'The prices do not match!');
       // Sanity check (mostly just for "visual" confirmation)
       const priceAsANiceString = humanReadableToken(estimatedPriceInPRQ);
-      expect(priceAsANiceString).to.equal('29.7', `The prices do not match the expected one at block 9346625!`);
+      expect(priceAsANiceString).to.equal('20.9', `The prices do not match the expected one at block 9346625!`);
     });
 
     it('should correctly estimate the required BUSD tokens', async () => {
@@ -120,7 +122,7 @@ describe('SimpleUniswapV2Converter', function () {
       expect(estimatedPriceInBUSD.toString()).to.equal(expectedPriceInBUSD.toString(), 'The prices do not match!');
       // Sanity check (mostly just for "visual" confirmation)
       expect(humanReadableToken(estimatedPriceInBUSD)).to.equal(
-        '3.3',
+        '4.7',
         `The prices do not match the expected one at block 9346625!`
       );
     });
@@ -174,7 +176,7 @@ describe('SimpleUniswapV2Converter', function () {
       await converter.connect(busdHolder).convert(busd.address, priceOfServiceInBusd, prq.address);
 
       const balanceOfPRQ = await prq.balanceOf(BUSD_HOLDER);
-      expect(humanReadableToken(balanceOfPRQ.toBigInt())).to.equal('29.7');
+      expect(humanReadableToken(balanceOfPRQ.toBigInt())).to.equal('20.9');
     });
 
     it('should allow conversion PRQ -> BUSD when both tokens are registered', async () => {
@@ -187,34 +189,53 @@ describe('SimpleUniswapV2Converter', function () {
 
       // NOTE The service price is 10x smaller here than in the estimation tests.
       const balanceOfBUSD = await busd.balanceOf(PRQ_HOLDER);
-      expect(humanReadableToken(balanceOfBUSD.toBigInt())).to.equal('0.3');
+      expect(humanReadableToken(balanceOfBUSD.toBigInt())).to.equal('0.4');
     });
   });
 
-  describe('Converter being used inside the Enterprise', () => {
+  describe.only('Converter being used inside the Enterprise', () => {
     let enterprise: Enterprise;
+    let owner: SignerWithAddress;
+    let powerToken: PowerToken;
+    let user: SignerWithAddress;
+    let enterpriseToken: ERC20;
 
     const BUSD_HOLDER = '0x8c7de13ecf6e92e249696defed7aa81e9c93931a';
-    const PRQ_HOLDER = '0xfaa9721d51c49f0ca7e82203d7914c9726b5ccab'; // (note: this the IQ protocols address, but that does not matter for these tests )
+    const PRQ_HOLDER = '0x4982085C9e2F89F2eCb8131Eca71aFAD896e89CB';
 
     beforeEach(async () => {
-      converter = await new SimpleUniswapV2Converter__factory(deployer).deploy(
-        router.address,
-        prq.address,
-        busd.address,
-        9975n,
-        10000n
-      );
-      enterprise = await deployEnterprise('Test', prq.address, converter.address);
+      owner = await impersonate(hre, PARSIQ_ENTERPRISE_OWNER);
+      user = await impersonate(hre, BUSD_HOLDER);
+      enterprise = await Enterprise__factory.connect(PARSIQ_ENTERPRISE_ADDRESS, owner);
+      enterpriseToken = ERC20__factory.connect(await enterprise.getEnterpriseToken(), deployer);
+      await enterprise.setConverter(converter.address);
       await enterprise.enablePaymentToken(busd.address);
       await hre.network.provider.send('hardhat_setBalance', [PRQ_HOLDER, '0x1000000000000000000000000000000000000000']);
 
-      await impersonate(hre, PRQ_HOLDER);
-      const prqHolder = await ethers.getSigner(PRQ_HOLDER);
+      const [powerTokenAddress] = await enterprise.getPowerTokens();
+      powerToken = PowerToken__factory.connect(powerTokenAddress, deployer);
+
+      const prqHolder = await impersonate(hre, PRQ_HOLDER);
 
       await stake(enterprise, ONE_TOKEN * 100000n, prqHolder);
     });
 
-    it('should be possible to rent paying with BUSD', async () => {});
+    it('should be possible to rent paying with BUSD', async () => {
+      const enterpriseBalance = await enterpriseToken.balanceOf(enterprise.address);
+      const balance = await busd.balanceOf(user.address);
+      const rentalFeeUSD = await enterprise.estimateRentalFee(
+        powerToken.address,
+        busd.address,
+        ONE_TOKEN * 10_000n,
+        ONE_DAY * 7
+      );
+
+      await rent(enterprise, powerToken, busd, ONE_TOKEN * 10000n, ONE_DAY * 7, balance, user);
+
+      expect(await powerToken.balanceOf(user.address)).to.eq(ONE_TOKEN * 10000n);
+      const balanceAfter = await busd.balanceOf(user.address);
+      expect(toTokens(balance.sub(balanceAfter))).to.closeTo(toTokens(rentalFeeUSD), 0.01);
+      expect(await enterpriseToken.balanceOf(enterprise.address)).to.be.above(enterpriseBalance);
+    });
   });
 });
