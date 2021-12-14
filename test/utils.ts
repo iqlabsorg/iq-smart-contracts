@@ -144,16 +144,6 @@ export const baseRate = (
   return (price << 64n) / (tokens * period);
 };
 
-export const baseRateToPrice = (
-  baseRate: bigint,
-  tokens: bigint,
-  period: bigint,
-  tokenDecimals = 18n,
-  priceDecimals = 18n
-): bigint => {
-  return baseRate * tokens * period;
-};
-
 export const basePrice = (tokens: number, period: number, price: number): number => {
   return price / (tokens * period);
 };
