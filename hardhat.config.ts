@@ -82,6 +82,10 @@ const config: HardhatUserConfig = {
       url: 'https://matic-testnet-archive-rpc.bwarelabs.com',
       accounts: privateKey('polygonTestnet'),
     },
+    polygon: {
+      url: 'https://polygon-rpc.com/',
+      accounts: privateKey('polygon'),
+    },
   },
   paths: {
     sources: 'contracts',
