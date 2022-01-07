@@ -1,16 +1,17 @@
 import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import { Contract, ContractTransaction, Signer } from 'ethers';
 import { ethers } from 'hardhat';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import {
-  RentalToken,
   Enterprise,
   EnterpriseFactory,
   IConverter,
   IERC20,
-  StakeToken,
   PowerToken,
   ProxyAdmin,
+  RentalToken,
+  StakeToken,
 } from '../typechain';
 
 export const ONE_DAY = 86400;
@@ -273,9 +274,11 @@ export const resetFork = async (hre: HardhatRuntimeEnvironment, block?: number):
   });
 };
 
-export const impersonate = async (hre: HardhatRuntimeEnvironment, account: string): Promise<void> => {
+export const impersonate = async (hre: HardhatRuntimeEnvironment, account: string): Promise<SignerWithAddress> => {
   await hre.network.provider.request({
     method: 'hardhat_impersonateAccount',
     params: [account],
   });
+
+  return hre.ethers.getSigner(account);
 };
